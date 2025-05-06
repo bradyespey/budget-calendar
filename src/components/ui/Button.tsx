@@ -1,3 +1,5 @@
+//src/components/ui/Button.tsx
+
 import React from 'react';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';

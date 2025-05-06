@@ -1,3 +1,5 @@
+//src/pages/DashboardPage.tsx
+
 import React, { useEffect, useState } from 'react';
 import { Wallet, TrendingDown, TrendingUp, ArrowUpCircle, ArrowDownCircle, Calculator } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';

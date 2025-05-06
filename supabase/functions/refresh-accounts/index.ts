@@ -1,137 +1,48 @@
-import { createClient } from "npm:@supabase/supabase-js@2.39.8";
+//supabase/functions/refresh-accounts/index.ts
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+import { serve } from "https://deno.land/std@0.224/http/server.ts";
 
-async function loginToMonarch(email: string, password: string, mfaCode: string) {
-  const response = await fetch("https://api.monarchmoney.com/auth/login/", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-      mfa_token: mfaCode,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to login to Monarch");
-  }
-
-  const data = await response.json();
-  return data.token;
-}
-
-async function getAccountData(token: string, accountId: string) {
-  const response = await fetch(`https://api.monarchmoney.com/accounts/${accountId}`, {
-    headers: {
-      "Authorization": `Token ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch account data");
-  }
-
-  return response.json();
-}
-
-async function refreshAccount(token: string, accountId: string) {
-  const response = await fetch(`https://api.monarchmoney.com/accounts/${accountId}/refresh`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Token ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to refresh account");
-  }
-
-  return response.json();
-}
-
-Deno.serve(async (req: Request) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders,
-    });
-  }
-
+serve(async (req: Request) => {
+  // no CORS here if you only call from your backend; add headers if needed
   try {
-    // Get environment variables
-    const email = Deno.env.get("MONARCH_EMAIL");
-    const password = Deno.env.get("MONARCH_PASSWORD");
-    const mfaSecret = Deno.env.get("MONARCH_MFA_SECRET");
-    const accountId = Deno.env.get("MONARCH_CHASE_CHECKING_ACCOUNT_ID");
+    const { MONARCH_EMAIL, MONARCH_PASSWORD, MONARCH_MFA_SECRET, MONARCH_CHASE_CHECKING_ACCOUNT_ID } =
+      Deno.env.toObject();
 
-    if (!email || !password || !mfaSecret || !accountId) {
-      throw new Error("Missing required environment variables");
+    if (!MONARCH_EMAIL || !MONARCH_PASSWORD || !MONARCH_MFA_SECRET || !MONARCH_CHASE_CHECKING_ACCOUNT_ID) {
+      return new Response("Missing env vars", { status: 500 });
     }
 
-    // Login to Monarch
-    const token = await loginToMonarch(email, password, mfaSecret);
-
-    // Refresh the account
-    await refreshAccount(token, accountId);
-
-    // Get the updated account data
-    const account = await getAccountData(token, accountId);
-
-    // Update account in Supabase
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    const { error: updateError } = await supabase
-      .from("accounts")
-      .upsert({
-        id: accountId,
-        display_name: "Chase Checking",
-        last_balance: account.balance,
-        last_synced: new Date().toISOString(),
-      });
-
-    if (updateError) {
-      throw updateError;
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        balance: account.balance,
-        lastSynced: new Date().toISOString()
+    // 1) Login
+    const loginRes = await fetch("https://api.monarchmoney.com/auth/login/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: MONARCH_EMAIL,
+        password: MONARCH_PASSWORD,
+        mfa_token: MONARCH_MFA_SECRET,
       }),
-      { 
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
+    });
+    if (!loginRes.ok) throw new Error("Login failed");
+    const { token } = await loginRes.json();
+
+    // 2) Trigger a refresh on the account
+    const refreshRes = await fetch(
+      `https://api.monarchmoney.com/accounts/${MONARCH_CHASE_CHECKING_ACCOUNT_ID}/refresh`,
+      {
+        method: "POST",
+        headers: { Authorization: `Token ${token}` },
       }
     );
-  } catch (error) {
-    console.error("Error refreshing account:", error);
-    
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error.message 
-      }),
-      { 
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
+    if (!refreshRes.ok) throw new Error("Refresh failed");
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err: any) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 });

@@ -1,3 +1,5 @@
+//src/types/index.ts
+
 export interface Bill {
   id: string;
   name: string;

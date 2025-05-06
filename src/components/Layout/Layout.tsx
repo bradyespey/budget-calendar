@@ -1,3 +1,5 @@
+//src/components/Layout/Layout.tsx
+
 import React, { useEffect, useState } from 'react';
 import { Navbar } from './Navbar';
 

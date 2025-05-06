@@ -1,3 +1,5 @@
+//supabase/functions/nightly-projection/index.ts
+
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
 import { format, addDays, parseISO } from "npm:date-fns@3.4.0";
 

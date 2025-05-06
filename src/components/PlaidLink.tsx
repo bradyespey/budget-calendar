@@ -1,3 +1,5 @@
+//src/components/PlaidLink.tsx
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import { Button } from './ui/Button';

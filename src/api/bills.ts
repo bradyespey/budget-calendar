@@ -1,3 +1,5 @@
+//src/api/bills.ts
+
 import { supabase } from '../lib/supabase';
 import { Bill } from '../types';
 

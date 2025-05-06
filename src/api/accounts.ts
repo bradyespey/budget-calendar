@@ -1,4 +1,5 @@
-// src/api/accounts.ts
+//src/api/accounts.ts
+
 
 import { supabase } from '../lib/supabase';
 import { Account } from '../types';

@@ -1,30 +1,29 @@
-//supabase/functions/chase-balance/index.ts
+// @ts-nocheck
+import { serve } from "https://deno.land/std@0.178.0/http/server.ts";
 
-import { serve } from "https://deno.land/std@0.224/http/server.ts";
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+};
 
-serve(async () => {
+serve(async (req: Request) => {
+  // 1) Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS });
+  }
+
   try {
-    const { MONARCH_EMAIL, MONARCH_PASSWORD, MONARCH_MFA_SECRET } =
-      Deno.env.toObject();
-
-    if (!MONARCH_EMAIL || !MONARCH_PASSWORD || !MONARCH_MFA_SECRET) {
-      return new Response("Missing env vars", { status: 500 });
+    // 2) Grab your stored token
+    const token = Deno.env.get("MONARCH_TOKEN");
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: "No MONARCH_TOKEN found" }),
+        { status: 500, headers: { ...CORS, "Content-Type": "application/json" } }
+      );
     }
 
-    // 1) Login
-    const loginRes = await fetch("https://api.monarchmoney.com/auth/login/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: MONARCH_EMAIL,
-        password: MONARCH_PASSWORD,
-        mfa_token: MONARCH_MFA_SECRET,
-      }),
-    });
-    if (!loginRes.ok) throw new Error("Login failed");
-    const { token } = await loginRes.json();
-
-    // 2) Fetch via GraphQL
+    // 3) Fire the GraphQL request
     const gqlRes = await fetch("https://api.monarchmoney.com/graphql", {
       method: "POST",
       headers: {
@@ -46,25 +45,37 @@ serve(async () => {
         `,
       }),
     });
-    if (!gqlRes.ok) throw new Error("GraphQL failed");
+    if (!gqlRes.ok) {
+      throw new Error(`GraphQL error ${gqlRes.status}`);
+    }
     const json = await gqlRes.json();
 
-    // Find “Joint Checking” (or whatever your account is called)
+    // 4) Pick out “Joint Checking”
     const account = (json.data.accountTypeSummaries as any[])
       .flatMap((s) => s.accounts)
       .find((a: any) => a.displayName === "Joint Checking");
 
-    if (!account) return new Response("Account not found", { status: 404 });
+    if (!account) {
+      return new Response(
+        JSON.stringify({ error: "Account not found" }),
+        { status: 404, headers: { ...CORS, "Content-Type": "application/json" } }
+      );
+    }
 
+    // 5) Return just the balance
     return new Response(
       JSON.stringify({ balance: account.displayBalance }),
-      { headers: { "Content-Type": "application/json" } }
+      {
+        status: 200,
+        headers: { ...CORS, "Content-Type": "application/json" },
+      }
     );
+
   } catch (err: any) {
     console.error(err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: err.message || "Unknown error" }),
+      { status: 500, headers: { ...CORS, "Content-Type": "application/json" } }
+    );
   }
 });

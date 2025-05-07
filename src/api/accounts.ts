@@ -1,10 +1,12 @@
-//src/api/accounts.ts
-
+// src/api/accounts.ts
 import { supabase } from '../lib/supabase'
 import type { Account } from '../types'
 
 const FN = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL!
 
+/**
+ * Fetch all account records.
+ */
 export async function getAccounts(): Promise<Account[]> {
   const { data, error } = await supabase
     .from('accounts')
@@ -17,6 +19,9 @@ export async function getAccounts(): Promise<Account[]> {
   return data as Account[]
 }
 
+/**
+ * Sum up all last_balance fields across accounts.
+ */
 export async function getTotalBalance(): Promise<number> {
   const { data, error } = await supabase
     .from('accounts')
@@ -28,6 +33,9 @@ export async function getTotalBalance(): Promise<number> {
   return data.reduce((sum, a) => sum + a.last_balance, 0)
 }
 
+/**
+ * Fetch the most recent last_synced timestamp.
+ */
 export async function getLastSyncTime(): Promise<Date | null> {
   const { data, error } = await supabase
     .from('accounts')
@@ -41,6 +49,9 @@ export async function getLastSyncTime(): Promise<Date | null> {
   return data.length > 0 ? new Date(data[0].last_synced) : null
 }
 
+/**
+ * Trigger your existing "refresh_accounts" Edge Function.
+ */
 export async function refreshAccounts(): Promise<{ success: boolean }> {
   const res = await fetch(`${FN}/refresh-accounts`, { method: 'POST' })
   if (!res.ok) {
@@ -51,8 +62,7 @@ export async function refreshAccounts(): Promise<{ success: boolean }> {
 }
 
 /**
- * Calls your Supabase Edge Function to get the latest Chase balance
- * (using Monarch under the hood).
+ * Fetch the latest Chase balance from your Edge Function.
  */
 export async function getChaseBalance(): Promise<number> {
   const res = await fetch(`${FN}/chase-balance`, {
@@ -69,6 +79,32 @@ export async function getChaseBalance(): Promise<number> {
   return balance
 }
 
+/**
+ * Fetch + persist the Chase balance in your 'accounts' table.
+ */
+export async function refreshChaseBalanceInDb(): Promise<number> {
+  // 1) get raw number
+  const balance = await getChaseBalance()
+
+  // 2) upsert into accounts table
+  const { error } = await supabase
+    .from('accounts')
+    .upsert(
+      {
+        id: 'joint_checking',        // your primary key
+        display_name: 'Joint Checking',
+        last_balance: balance,
+        last_synced: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    )
+  if (error) throw error
+  return balance
+}
+
+/**
+ * Fetch count of transactions awaiting review.
+ */
 export async function getTransactionsReviewCount(): Promise<number> {
   const res = await fetch(`${FN}/transactions-review`, { method: 'GET' })
   if (!res.ok) {

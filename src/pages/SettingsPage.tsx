@@ -1,5 +1,3 @@
-//src/pages/SettingsPage.tsx
-
 import React, { useState, useRef } from 'react'
 import { Calculator, Calendar, Upload } from 'lucide-react'
 import { Button } from '../components/ui/Button'
@@ -12,7 +10,8 @@ import {
   CardTitle,
 } from '../components/ui/Card'
 import { triggerManualRecalculation } from '../api/projections'
-import { getChaseBalance } from '../api/accounts'
+import { refreshChaseBalanceInDb } from '../api/accounts'
+import { useBalance } from '../context/BalanceContext'
 
 export function SettingsPage() {
   const [recalculating, setRecalculating] = useState(false)
@@ -23,12 +22,20 @@ export function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // <-- NEW: pull in context setters -->
+  const { setBalance, setLastSync } = useBalance()
+
   const handleUpdateBalance = async () => {
     try {
       setUpdatingBalance(true)
       setError(null)
-      const balance = await getChaseBalance()
-      setLastAction(`Chase balance: $${balance.toLocaleString()}`)
+
+      const balance = await refreshChaseBalanceInDb()
+      // <-- NEW: update context -->
+      setBalance(balance)
+      setLastSync(new Date())
+
+      setLastAction(`Chase balance updated: $${balance.toLocaleString()}`)
     } catch (err: any) {
       console.error(err)
       setError(`Error updating balance: ${err.message}`)
@@ -81,7 +88,7 @@ export function SettingsPage() {
     try {
       setImporting(true)
       setError(null)
-      // ... your CSV import logic here ...
+      // ... CSV import logic ...
       const text = await file.text()
       console.log('Imported CSV:', text)
       setLastAction('Successfully imported bills from CSV.')
@@ -152,7 +159,6 @@ export function SettingsPage() {
         </CardFooter>
       </Card>
 
-      {/* Configuration / CSV import section */}
       <Card>
         <CardHeader>
           <CardTitle>Import Bills from CSV</CardTitle>

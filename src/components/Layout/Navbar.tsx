@@ -1,3 +1,5 @@
+//src/components/Layout/Navbar.tsx
+
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Moon, Sun } from 'lucide-react'

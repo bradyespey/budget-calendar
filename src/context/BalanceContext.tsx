@@ -1,4 +1,5 @@
-// src/context/BalanceContext.tsx
+//src/context/BalanceContext.tsx
+
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { getLastSyncTime, getTotalBalance } from '../api/accounts'
 

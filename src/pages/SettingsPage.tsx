@@ -1,3 +1,5 @@
+//src/pages/SettingsPage.tsx
+
 import React, { useState, useRef } from 'react'
 import { Calculator, Calendar, Upload } from 'lucide-react'
 import { Button } from '../components/ui/Button'

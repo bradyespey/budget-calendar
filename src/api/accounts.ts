@@ -41,58 +41,35 @@ export async function getLastSyncTime(): Promise<Date | null> {
   return data.length > 0 ? new Date(data[0].last_synced) : null;
 }
 
-/**
- * Trigger your "refresh-accounts" Edge Function.
- */
+/* -------- refresh ALL Monarch accounts -------- */
 export async function refreshAccounts(): Promise<void> {
-  const res = await fetch(`${FN}/refresh-accounts`, {
-    method: 'POST',
-    headers: {
-      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Refresh failed: ${err}`);
-  }
+  const { error } = await supabase.functions.invoke('refresh-accounts')
+  if (error) throw error
 }
 
-/**
- * Fetch + persist the Chase balance in your 'accounts' table.
- * Calls your `chase-balance` Edge Function (already deployed).
- */
+/* -------- refresh Chase balance -------- */
 export async function refreshChaseBalanceInDb(): Promise<number> {
-  // 1) get balance
-  const res = await fetch(`${FN}/chase-balance`, {
-    method: 'GET',
-    headers: {
-      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    },
-  });
-  const payload = await res.json();
-  if (!res.ok) {
-    throw new Error(`Error updating balance: ${payload.error || res.statusText}`);
-  }
-  const balance = payload.balance as number;
+  /* call Edge Function with the client helper – it attaches the right headers */
+  const { data, error } = await supabase.functions.invoke('chase-balance')
+  if (error) throw error
 
-  // 2) upsert into DB
-  const { error } = await supabase
+  const balance = (data as any).balance as number
+
+  /* upsert into DB */
+  const { error: dbErr } = await supabase
     .from('accounts')
     .upsert(
       {
-        id: 'joint_checking',
+        id:           'joint_checking',
         display_name: 'Joint Checking',
         last_balance: balance,
-        last_synced: new Date().toISOString(),
+        last_synced:  new Date().toISOString(),
       },
-      { onConflict: 'id' }
-    );
-  if (error) throw error;
+      { onConflict: 'id' },
+    )
+  if (dbErr) throw dbErr
 
-  return balance;
+  return balance
 }
 
 /**

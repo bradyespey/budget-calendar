@@ -1,64 +1,62 @@
-//supabase/functions/chase-balance/index.ts
-
+// supabase/functions/chase-balance/index.ts
 // @ts-nocheck
 
 import { serve } from "https://deno.land/std@0.178.0/http/server.ts";
 
+/* CORS */
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-client-info",
 };
 
-serve(async (req: Request) => {
-  // CORS preflight
+serve(async req => {
+  /* OPTIONS pre-flight */
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS });
   }
 
   try {
+    /* ---- env ---- */
     const token = Deno.env.get("MONARCH_TOKEN");
-    if (!token) throw new Error("No MONARCH_TOKEN found");
+    if (!token) throw new Error("Missing MONARCH_TOKEN");
 
-    // GraphQL fetch
-    const gqlRes = await fetch("https://api.monarchmoney.com/graphql", {
-      method: "POST",
+    /* ---- GraphQL ---- */
+    const gql = await fetch("https://api.monarchmoney.com/graphql", {
+      method:  "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Token ${token}`,
+        Authorization:  `Token ${token}`,   // static API token -- no login needed
       },
       body: JSON.stringify({
         operationName: "Web_GetAccountsPage",
-        variables: {},
+        variables:     {},
         query: `
           query Web_GetAccountsPage {
             accountTypeSummaries {
-              accounts {
-                displayName
-                displayBalance
-              }
+              accounts { displayName displayBalance }
             }
-          }
-        `,
+          }`,
       }),
     });
-    if (!gqlRes.ok) throw new Error(`GraphQL error ${gqlRes.status}`);
-    const json = await gqlRes.json();
 
-    const account = (json.data.accountTypeSummaries as any[])
-      .flatMap((s) => s.accounts)
-      .find((a: any) => a.displayName === "Joint Checking");
-    if (!account) throw new Error("Account not found");
+    if (!gql.ok) throw new Error(`GraphQL error ${gql.status}`);
+    const json   = await gql.json();
+    const acct   = (json.data.accountTypeSummaries as any[])
+                     .flatMap((s) => s.accounts)
+                     .find((a: any) => a.displayName === "Joint Checking");
+    if (!acct) throw new Error("Joint Checking not found");
 
     return new Response(
-      JSON.stringify({ balance: account.displayBalance }),
-      { status: 200, headers: { ...CORS, "Content-Type": "application/json" } }
+      JSON.stringify({ balance: acct.displayBalance }),
+      { status: 200, headers: { ...CORS, "Content-Type": "application/json" } },
     );
+
   } catch (err: any) {
-    console.error(err);
+    console.error("💥 chase-balance:", err);
     return new Response(
-      JSON.stringify({ error: err.message || "Unknown error" }),
-      { status: 500, headers: { ...CORS, "Content-Type": "application/json" } }
+      JSON.stringify({ error: err.message || "unknown error" }),
+      { status: 500, headers: { ...CORS, "Content-Type": "application/json" } },
     );
   }
 });

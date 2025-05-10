@@ -13,10 +13,7 @@ export async function getAccounts(): Promise<Account[]> {
     .from('accounts')
     .select('*')
     .order('display_name', { ascending: true })
-  if (error) {
-    console.error('Error fetching accounts:', error)
-    throw error
-  }
+  if (error) throw error
   return data as Account[]
 }
 
@@ -27,10 +24,7 @@ export async function getTotalBalance(): Promise<number> {
   const { data, error } = await supabase
     .from('accounts')
     .select('last_balance')
-  if (error) {
-    console.error('Error fetching total balance:', error)
-    throw error
-  }
+  if (error) throw error
   return data.reduce((sum, a) => sum + a.last_balance, 0)
 }
 
@@ -43,68 +37,51 @@ export async function getLastSyncTime(): Promise<Date | null> {
     .select('last_synced')
     .order('last_synced', { ascending: false })
     .limit(1)
-  if (error) {
-    console.error('Error fetching last sync time:', error)
-    throw error
-  }
+  if (error) throw error
   return data.length > 0 ? new Date(data[0].last_synced) : null
 }
 
 /**
- * Trigger your existing "refresh_accounts" Edge Function.
+ * Fetch + persist the Chase balance in your 'accounts' table.
+ * Calls your `chase-balance` Edge Function, which handles login + GraphQL fetch.
  */
-export async function refreshAccounts(): Promise<{ success: boolean }> {
-  const res = await fetch(`${FN}/refresh-accounts`, { method: 'POST' })
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Refresh failed: ${err}`)
-  }
-  return res.json()
-}
-
-/**
- * Fetch the latest Chase balance from your Edge Function.
- */
-export async function getChaseBalance(): Promise<number> {
+export async function refreshChaseBalanceInDb(): Promise<number> {
+  // 1) Invoke the Edge Function
   const res = await fetch(`${FN}/chase-balance`, {
     method: 'GET',
     headers: {
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
     },
   })
+
+  const payload = await res.json()
   if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`fetch chase-balance failed: ${err}`)
+    throw new Error(`Error updating balance: ${payload.error || res.statusText}`)
   }
-  const { balance } = await res.json()
-  return balance
-}
 
-/**
- * Fetch + persist the Chase balance in your 'accounts' table.
- */
-export async function refreshChaseBalanceInDb(): Promise<number> {
-  // 1) get raw number
-  const balance = await getChaseBalance()
+  const balance = payload.balance as number
 
-  // 2) upsert into accounts table
+  // 2) Upsert into your Supabase `accounts` table
   const { error } = await supabase
     .from('accounts')
     .upsert(
       {
-        id: 'joint_checking',        // your primary key
+        id: 'joint_checking',
         display_name: 'Joint Checking',
         last_balance: balance,
         last_synced: new Date().toISOString(),
       },
       { onConflict: 'id' }
     )
+
   if (error) throw error
+
   return balance
 }
 
 /**
- * Fetch count of transactions awaiting review.
+ * Fetch count of transactions awaiting review (if used elsewhere).
  */
 export async function getTransactionsReviewCount(): Promise<number> {
   const res = await fetch(`${FN}/transactions-review`, { method: 'GET' })

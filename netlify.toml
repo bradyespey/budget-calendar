@@ -4,13 +4,6 @@
   command = "npm run build"
   publish = "dist"
 
-[build.environment]
-  VITE_SUPABASE_URL               = "https://budgetcalendar.supabase.co"
-  VITE_SUPABASE_ANON_KEY          = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpZmJ4cHF0aXRtb212d2Zrdm14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYzODkzOTQsImV4cCI6MjA2MTk2NTM5NH0.L5y6tT7aLxYU74YH1Dmy9gMGH0WZ5lkAjbTa5PsrTgw"
-  VITE_SUPABASE_FUNCTIONS_URL     = "https://qifbxpqtitmomvwfkvmx.functions.supabase.co"
-  VITE_REFRESH_ACCOUNTS_API_URL   = "https://api.theespeys.com/refresh_accounts"
-  VITE_REFRESH_ACCOUNTS_API_AUTH  = "admin:Wrrg7Ke.GwsUGoKq"
-
 [[redirects]]
   from   = "/*"
   to     = "/index.html"

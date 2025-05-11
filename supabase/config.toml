@@ -1,4 +1,4 @@
-# supabase/config.prod.toml
+# supabase/config.toml
 
 # Supabase CLI override for “Prod” environment
 # ------------------------------------------------------------------------------

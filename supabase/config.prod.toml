@@ -12,7 +12,7 @@ site_url = "https://budgetcalendar.netlify.app"
 
 # OAuth redirect callbacks permitted
 additional_redirect_urls = [
-  "https://budgetcalendar.netlify.app/auth/callback"
+  "https://budgetcalendar.netlify.app/auth/v1/callback"
 ]
 
 # How long JWTs live (seconds)

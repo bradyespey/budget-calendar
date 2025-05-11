@@ -1,4 +1,5 @@
-// @ts-nocheck
+//supabase/functions/refresh-accounts/index.ts
+
 import { serve } from "https://deno.land/std@0.178.0/http/server.ts";
 import { init, wasm_data, totp } from "https://deno.land/x/totp_wasm/deno/mod.ts";
 

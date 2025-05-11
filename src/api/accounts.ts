@@ -1,3 +1,5 @@
+//src/api/accounts.ts
+
 import { supabase } from "../lib/supabase";
 import type { Account } from "../types";
 

@@ -1,23 +1,20 @@
-# supabase/config.dev.toml
+# supabase/config.toml
 
-# Supabase CLI local‐development override for “Dev” environment
-# ------------------------------------------------------------------------------
+# Single, parameterized Supabase CLI config.
+# SITE_URL will be substituted by the Makefile (or Netlify build env)
 
 [auth]
-# Whether Auth is enabled
 enabled = true
 
-# The URL your app is served from in development
-site_url = "http://localhost:5173"
+# pick up the site URL from the environment
+site_url = "${SITE_URL}"
 
-# OAuth redirect callbacks permitted
+# allow both v1 and v0 callbacks
 additional_redirect_urls = [
-  "http://localhost:5173/auth/callback"
+  "${SITE_URL}/auth/v1/callback",
+  "${SITE_URL}/auth/callback",
 ]
 
-# How long JWTs live (seconds)
-jwt_expiry = 3600
-
-# Whether to rotate & reuse refresh tokens
-enable_refresh_token_rotation = true
+jwt_expiry                     = 3600
+enable_refresh_token_rotation  = true
 refresh_token_reuse_interval   = 10

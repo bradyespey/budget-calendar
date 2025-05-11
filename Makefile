@@ -1,10 +1,11 @@
-# Pick the right .env and supabase/config.toml for dev vs prod
+# Makefile
+
 ENV_FILE        := .env
 SUPA_CONF       := supabase/config.toml
 SUPA_CONF_DEV   := supabase/config.dev.toml
 SUPA_CONF_PROD  := supabase/config.prod.toml
 
-.PHONY: dev prod stop
+.PHONY: dev prod
 
 dev:
 	@echo "⮀ Switching to DEV settings"

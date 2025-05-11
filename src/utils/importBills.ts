@@ -1,105 +1,93 @@
 //src/utils/importBills.ts
 
-import { parse } from 'date-fns';
-import { Bill } from '../types';
-import { importBills } from '../api/bills';
+import { parse } from 'date-fns'
+import type { Bill } from '../types'
+import { importBills } from '../api/bills'
 
-// Function to parse CSV data and import bills
-export async function importBillsFromCSV(csvData: string) {
-  // Parse CSV data
-  const lines = csvData.split('\n');
-  const headers = lines[0].split(',').map(h => h.trim());
-  
-  const bills: Omit<Bill, 'id'>[] = [];
-  
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+// ── Parse CSV and import bills ───────────────────────────────────────────────
+export async function importBillsFromCSV(csvData: string): Promise<number> {
+  const lines = csvData.split('\n')
+  const headers = lines.shift()!.split(',').map(h => h.trim())
 
-    // Handle quoted values correctly
-    const row: string[] = [];
-    let inQuotes = false;
-    let currentValue = '';
+  const bills: Omit<Bill, 'id'>[] = []
 
-    for (let j = 0; j < line.length; j++) {
-      const char = line[j];
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        row.push(currentValue);
-        currentValue = '';
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    // ── Split row on commas outside quotes ─────────────────────────────────
+    const row: string[] = []
+    let inQuotes = false
+    let cur = ''
+    for (const ch of trimmed) {
+      if (ch === '"') {
+        inQuotes = !inQuotes
+      } else if (ch === ',' && !inQuotes) {
+        row.push(cur)
+        cur = ''
       } else {
-        currentValue += char;
+        cur += ch
       }
     }
-    row.push(currentValue);
+    row.push(cur)
 
-    // Create object from row
-    const rowData: Record<string, string> = {};
-    headers.forEach((header, index) => {
-      rowData[header] = row[index]?.trim().replace(/^"(.*)"$/, '$1') ?? '';
-    });
-    
-    // Skip empty rows
-    if (!rowData.Name || !rowData.Category) continue;
-    
-    // Parse amount - remove $ and , then convert to number
-    const amount = parseFloat(rowData.Amount.replace(/[$,]/g, '')) || 0;
-    
-    // Parse date
-    let startDate = new Date();
+    // ── Map header → value ────────────────────────────────────────────────
+    const data: Record<string, string> = {}
+    headers.forEach((h, i) => {
+      data[h] = (row[i] ?? '').trim().replace(/^"(.*)"$/, '$1')
+    })
+
+    // ── Skip incomplete rows ───────────────────────────────────────────────
+    if (!data.Name || !data.Category) continue
+
+    // ── Parse amount ──────────────────────────────────────────────────────
+    const amount = parseFloat(data.Amount.replace(/[$,]/g, '')) || 0
+
+    // ── Parse dates ───────────────────────────────────────────────────────
+    let start_date = new Date().toISOString()
     try {
-      startDate = parse(rowData['Start Date'], 'M/d/yyyy', new Date());
-    } catch (error) {
-      console.warn(`Invalid date format for ${rowData.Name}, using current date`);
+      start_date = parse(data['Start Date'], 'M/d/yyyy', new Date()).toISOString()
+    } catch {
+      console.warn(`Invalid start date for "${data.Name}", using today`)
     }
-    
-    // Parse end date if exists
-    let endDate: string | undefined;
-    if (rowData['End Date']) {
+
+    let end_date: string | undefined
+    if (data['End Date']) {
       try {
-        endDate = parse(rowData['End Date'], 'M/d/yyyy', new Date()).toISOString();
-      } catch (error) {
-        console.warn(`Invalid end date format for ${rowData.Name}, skipping end date`);
+        end_date = parse(data['End Date'], 'M/d/yyyy', new Date()).toISOString()
+      } catch {
+        console.warn(`Invalid end date for "${data.Name}", skipping`)
       }
     }
-    
-    // Normalize frequency
-    let frequency = rowData.Frequency?.toLowerCase() || 'one-time';
-    if (frequency === 'years') frequency = 'yearly';
-    if (frequency === 'months') frequency = 'monthly';
-    if (frequency === 'weeks') frequency = 'weekly';
-    if (frequency === 'days') frequency = 'daily';
-    if (frequency === 'one-time') frequency = 'one-time';
 
-    // Normalize category
-    let category = rowData.Category.toLowerCase();
-    if (category === 'food & drinks') category = 'food & drinks';
-    if (category === 'cloud storage') category = 'cloud storage';
-    if (category === 'credit card') category = 'credit card';
-    if (category === 'job search') category = 'job search';
-    if (category === 'mobile phone') category = 'mobile phone';
-    
-    // Add bill
+    // ── Normalize frequency & category ────────────────────────────────────
+    let frequency = (data.Frequency?.toLowerCase() || 'one-time')
+      .replace(/years?/, 'yearly')
+      .replace(/months?/, 'monthly')
+      .replace(/weeks?/, 'weekly')
+      .replace(/days?/, 'daily')
+
+    const category = data.Category.toLowerCase()
+
+    // ── Build bill entry ──────────────────────────────────────────────────
     bills.push({
-      name: rowData.Name,
-      category: category,
-      amount: amount,
-      frequency: frequency as Bill['frequency'],
-      repeats_every: parseInt(rowData['Repeats Every'] || '1'),
-      start_date: startDate.toISOString(),
-      end_date: endDate,
-      owner: rowData.Owner as Bill['owner'],
-      note: rowData.Note
-    });
-  }
-  
-  if (bills.length === 0) {
-    throw new Error('No valid bills found in CSV');
+      name:        data.Name,
+      category,
+      amount,
+      frequency:   frequency as Bill['frequency'],
+      repeats_every: parseInt(data['Repeats Every'] || '1', 10) || 1,
+      start_date,
+      end_date,
+      owner:       data.Owner as Bill['owner'],
+      note:        data.Note
+    })
   }
 
-  // Import bills to database
-  await importBills(bills);
-  
-  return bills.length;
+  if (bills.length === 0) {
+    throw new Error('No valid bills found in provided CSV')
+  }
+
+  // ── Send to API ────────────────────────────────────────────────────────
+  await importBills(bills)
+  return bills.length
 }

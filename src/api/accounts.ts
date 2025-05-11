@@ -3,13 +3,12 @@
 import { supabase } from "../lib/supabase";
 import type { Account } from "../types";
 
-const FN   = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL!;
-const API  = import.meta.env.VITE_REFRESH_ACCOUNTS_API_URL!;
-const CREDS = import.meta.env.VITE_REFRESH_ACCOUNTS_API_AUTH!;  // "user:pass"
+// ── Supabase & external API config ───────────────────────────────────────
+const FUNCTIONS_URL      = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL!;
+const REFRESH_API_URL    = import.meta.env.VITE_REFRESH_ACCOUNTS_API_URL!;
+const REFRESH_API_AUTH   = import.meta.env.VITE_REFRESH_ACCOUNTS_API_AUTH!;
 
-/**
- * Fetch all account records.
- */
+// ── Supabase query functions ─────────────────────────────────────────────
 export async function getAccounts(): Promise<Account[]> {
   const { data, error } = await supabase
     .from("accounts")
@@ -19,20 +18,15 @@ export async function getAccounts(): Promise<Account[]> {
   return data as Account[];
 }
 
-/**
- * Sum up all last_balance fields.
- */
 export async function getTotalBalance(): Promise<number> {
   const { data, error } = await supabase
     .from("accounts")
     .select("last_balance");
   if (error) throw error;
-  return data.reduce((sum, a) => sum + a.last_balance, 0);
+  return (data as { last_balance: number }[])
+    .reduce((sum, a) => sum + a.last_balance, 0);
 }
 
-/**
- * Fetch the most recent last_synced timestamp.
- */
 export async function getLastSyncTime(): Promise<Date | null> {
   const { data, error } = await supabase
     .from("accounts")
@@ -43,28 +37,25 @@ export async function getLastSyncTime(): Promise<Date | null> {
   return data.length ? new Date(data[0].last_synced) : null;
 }
 
-/**
- * 🔄 Refresh ALL Monarch accounts via your Flask server
- */
+// ── Refresh accounts via Flask API ────────────────────────────────────────
 export async function refreshAccountsViaFlask(): Promise<void> {
-  const res = await fetch(API, {
-    method : "GET",
-    headers: { Authorization: `Basic ${btoa(CREDS)}` },
+  const res = await fetch(REFRESH_API_URL, {
+    method: "GET",
+    headers: { Authorization: `Basic ${btoa(REFRESH_API_AUTH)}` },
   });
-  if (res.status !== 202) {                         // ⟵ was 200
-    throw new Error(`Flask refresh failed (${res.status}): ${await res.text()}`);
+  if (res.status !== 202) {
+    const txt = await res.text();
+    throw new Error(`Flask refresh failed (${res.status}): ${txt}`);
   }
 }
 
-/**
- * 💰 Refresh Chase balance only (Supabase Edge Function)
- */
+// ── Supabase Edge Functions ──────────────────────────────────────────────
 export async function refreshChaseBalanceInDb(): Promise<number> {
   const { data, error } = await supabase.functions.invoke("chase-balance");
   if (error) throw error;
   const balance = (data as any).balance as number;
 
-  const { error: dbErr } = await supabase
+  const { error: dbError } = await supabase
     .from("accounts")
     .upsert(
       {
@@ -73,22 +64,19 @@ export async function refreshChaseBalanceInDb(): Promise<number> {
         last_balance: balance,
         last_synced: new Date().toISOString(),
       },
-      { onConflict: "id" },
+      { onConflict: "id" }
     );
-  if (dbErr) throw dbErr;
+  if (dbError) throw dbError;
 
   return balance;
 }
 
-/**
- * 🔢 Transactions-to-review count (Supabase Edge Function)
- */
 export async function getTransactionsReviewCount(): Promise<number> {
-  const res = await fetch(`${FN}/transactions-review`, { method: "GET" });
+  const res = await fetch(`${FUNCTIONS_URL}/transactions-review`);
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Review count fetch failed: ${err}`);
   }
   const json = await res.json();
-  return (json as any).transactions_to_review as number;
+  return (json as { transactions_to_review: number }).transactions_to_review;
 }

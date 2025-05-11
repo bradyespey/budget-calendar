@@ -1,6 +1,6 @@
 //src/pages/UpcomingPage.tsx
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { getProjections } from '../api/projections';

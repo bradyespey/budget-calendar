@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Session, User } from '../types';
+import { Session } from '../types';
 
 interface AuthContextType {
   session: Session;

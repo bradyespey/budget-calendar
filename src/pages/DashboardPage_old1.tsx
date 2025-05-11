@@ -1,6 +1,6 @@
-//src/pages/DashboardPage.tsx
+//src/pages/DashboardPage_old1.tsx
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Wallet,
   TrendingDown,
@@ -10,9 +10,10 @@ import {
   Calculator,
 } from 'lucide-react'
 import { Card, CardContent } from '../components/ui/Card'
+import { getAccounts } from '../api/accounts'
 import { getHighLowProjections } from '../api/projections'
 import { getBills } from '../api/bills'
-import { Bill, Projection } from '../types'
+import { Account, Bill, Projection } from '../types'
 import { format, parseISO } from 'date-fns'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useBalance } from '../context/BalanceContext'
@@ -36,10 +37,15 @@ interface BillsSummary {
 }
 
 export function DashboardPage() {
-  // ── State ─────────────────────────────────────────────────────────────
-  const [, setBills] = useState<Bill[]>([])
-  const [highLow, setHighLow] = useState<{ highest?: Projection; lowest?: Projection }>({})
-  const [categoryAverages, setCategoryAverages] = useState<Record<string, CategoryAverage>>({})
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [bills, setBills] = useState<Bill[]>([])
+  const [highLow, setHighLow] = useState<{
+    highest?: Projection
+    lowest?: Projection
+  }>({})
+  const [categoryAverages, setCategoryAverages] = useState<
+    Record<string, CategoryAverage>
+  >({})
   const [billsSummary, setBillsSummary] = useState<BillsSummary>({
     oneTime: { bills: 0, income: 0 },
     daily: { bills: 0, income: 0 },
@@ -47,35 +53,44 @@ export function DashboardPage() {
     monthly: { bills: 0, income: 0 },
     yearly: { bills: 0, income: 0 },
   })
-  const [monthlyTotals, setMonthlyTotals] = useState({ income: 0, bills: 0, leftover: 0 })
+  const [monthlyTotals, setMonthlyTotals] = useState({
+    income: 0,
+    bills: 0,
+    leftover: 0,
+  })
   const [loading, setLoading] = useState(true)
-
   const { projectionDays } = useSettingsStore()
+
+  // <-- NEW: grab balance & lastSync from context -->
   const { balance: totalBalance, lastSync } = useBalance()
 
-  // ── Fetch data ─────────────────────────────────────────────────────────
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
+    const fetchData = async () => {
       try {
-        const [billsData, highLowData] = await Promise.all([
+        setLoading(true)
+
+        const [accountsData, billsData, highLowData] = await Promise.all([
+          getAccounts(),
           getBills(),
           getHighLowProjections(),
         ])
+
+        setAccounts(accountsData)
         setBills(billsData)
         setHighLow(highLowData)
+
         calculateAverages(billsData)
-      } catch (e) {
-        console.error('Error fetching dashboard data:', e)
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
       } finally {
         setLoading(false)
       }
     }
+
     fetchData()
   }, [projectionDays])
 
-  // ── Compute summaries ──────────────────────────────────────────────────
-  function calculateAverages(bills: Bill[]) {
+  const calculateAverages = (bills: Bill[]) => {
     const categories: Record<string, CategoryAverage> = {}
     const summary: BillsSummary = {
       oneTime: { bills: 0, income: 0 },
@@ -84,42 +99,57 @@ export function DashboardPage() {
       monthly: { bills: 0, income: 0 },
       yearly: { bills: 0, income: 0 },
     }
+
     let totalMonthlyIncome = 0
     let totalMonthlyBills = 0
 
-    bills.forEach(bill => {
+    bills.forEach((bill) => {
       if (!categories[bill.category]) {
         categories[bill.category] = { monthly: 0, yearly: 0 }
       }
+
       let monthlyAmount = 0
       let yearlyAmount = 0
+
       switch (bill.frequency) {
         case 'daily':
           monthlyAmount = (bill.amount * 30.44) / bill.repeats_every
           yearlyAmount = (bill.amount * 365.25) / bill.repeats_every
-          summary.daily[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          summary.daily[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(
+            bill.amount
+          )
           break
         case 'weekly':
           monthlyAmount = (bill.amount * 4.35) / bill.repeats_every
           yearlyAmount = (bill.amount * 52.18) / bill.repeats_every
-          summary.weekly[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          summary.weekly[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(
+            bill.amount
+          )
           break
         case 'monthly':
           monthlyAmount = bill.amount / bill.repeats_every
           yearlyAmount = (bill.amount * 12) / bill.repeats_every
-          summary.monthly[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          summary.monthly[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(
+            bill.amount
+          )
           break
         case 'yearly':
           monthlyAmount = bill.amount / (12 * bill.repeats_every)
           yearlyAmount = bill.amount / bill.repeats_every
-          summary.yearly[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          summary.yearly[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(
+            bill.amount
+          )
           break
         case 'one-time':
-          summary.oneTime[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          summary.oneTime[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(
+            bill.amount
+          )
           break
       }
+
       categories[bill.category].monthly += monthlyAmount
       categories[bill.category].yearly += yearlyAmount
+
       if (bill.amount >= 0) {
         totalMonthlyIncome += monthlyAmount
       } else {
@@ -147,12 +177,11 @@ export function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     )
   }
 
-  // ── UI ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -330,10 +359,12 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-                {/* Bills/Income Summary */}
-                <Card>
+        {/* Bills/Income Summary */}
+        <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Bills/Income Summary</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Bills/Income Summary
+            </h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>

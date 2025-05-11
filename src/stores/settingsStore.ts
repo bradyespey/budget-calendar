@@ -1,21 +1,21 @@
 //src/stores/settingsStore.ts
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
+// ── Settings store interface ─────────────────────────────────────────────────
 interface SettingsState {
-  projectionDays: number;
-  setProjectionDays: (days: number) => void;
+  projectionDays: number
+  setProjectionDays: (days: number) => void
 }
 
+// ── Persistent settings store ────────────────────────────────────────────────
 export const useSettingsStore = create<SettingsState>()(
   persist(
-    (set) => ({
+    set => ({
       projectionDays: 30,
-      setProjectionDays: (days) => set({ projectionDays: days }),
+      setProjectionDays: days => set({ projectionDays: days })
     }),
-    {
-      name: 'settings-storage',
-    }
+    { name: 'settings-storage' }
   )
-);
+)

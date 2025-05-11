@@ -1,7 +1,7 @@
 //src/pages/TransactionsPage.tsx
 
-import React, { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, Check, X, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Edit2, Trash2, Check, X } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';

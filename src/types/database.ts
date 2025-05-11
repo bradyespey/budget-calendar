@@ -8,6 +8,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+// ── Database schema types ────────────────────────────────────────────────────
 export interface Database {
   public: {
     Tables: {

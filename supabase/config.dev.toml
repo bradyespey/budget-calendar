@@ -1,23 +1,11 @@
-# supabase/config.dev.toml
-
-# Supabase CLI local‐development override for “Dev” environment
-# ------------------------------------------------------------------------------
-
+# Local‐development override for “Dev” environment
 [auth]
-# Whether Auth is enabled
 enabled = true
-
-# The URL your app is served from in development
 site_url = "http://localhost:5173"
-
-# OAuth redirect callbacks permitted
 additional_redirect_urls = [
+  "http://localhost:5173/auth/v1/callback",
   "http://localhost:5173/auth/callback"
 ]
-
-# How long JWTs live (seconds)
 jwt_expiry = 3600
-
-# Whether to rotate & reuse refresh tokens
 enable_refresh_token_rotation = true
-refresh_token_reuse_interval   = 10
+refresh_token_reuse_interval = 10

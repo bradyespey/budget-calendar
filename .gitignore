@@ -1,3 +1,5 @@
+#.gitignore
+
 # Logs
 logs
 *.log
@@ -12,7 +14,7 @@ node_modules
 dist
 dist-ssr
 *.local
-supabase/config.toml
+/supabase/config.toml
 
 # Editor directories and files
 .vscode/*

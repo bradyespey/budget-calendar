@@ -1,18 +1,18 @@
-# supabase/config.toml
+# supabase/config.prod.toml
 
-# Supabase CLI local‐development override for “Dev” environment
+# Supabase CLI override for “Prod” environment
 # ------------------------------------------------------------------------------
 
 [auth]
 # Whether Auth is enabled
 enabled = true
 
-# The URL your app is served from in development
-site_url = "http://localhost:5173"
+# The URL your production app is served from
+site_url = "https://budgetcalendar.netlify.app"
 
 # OAuth redirect callbacks permitted
 additional_redirect_urls = [
-  "http://localhost:5173/auth/callback"
+  "https://budgetcalendar.netlify.app/auth/callback"
 ]
 
 # How long JWTs live (seconds)

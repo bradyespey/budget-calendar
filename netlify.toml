@@ -1,8 +1,8 @@
 # netlify.toml
 
 [build]
-  command   = "make prod && npm run build"
-  publish   = "dist"
+  command = "npm run build"
+  publish = "dist"
 
 [build.environment]
   VITE_SUPABASE_URL               = "https://budgetcalendar.supabase.co"

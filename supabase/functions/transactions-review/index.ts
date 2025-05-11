@@ -1,4 +1,5 @@
-// @ts-nocheck
+//supabase/functions/transactions-review/index.ts
+
 import { serve } from "https://deno.land/std@0.178.0/http/server.ts";  // <-- align this!
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";

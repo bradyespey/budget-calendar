@@ -1,4 +1,6 @@
-# Pick the right .env and the right supabase/config.toml for dev vs prod
+# Makefile#
+
+ Pick the right .env and the right supabase/config.toml for dev vs prod
 ENV_FILE      := .env
 SUPA_CONF     := supabase/config.toml
 SUPA_CONF_DEV := supabase/config.dev.toml
@@ -6,7 +8,8 @@ SUPA_CONF_PROD:= supabase/config.prod.toml
 
 .PHONY: dev prod
 
-dev:
+dev:a
+	clear
 	@echo "⮀ Switching to DEV settings"
 	@cp .env.dev $(ENV_FILE)
 	@cp $(SUPA_CONF_DEV) $(SUPA_CONF)
@@ -15,6 +18,7 @@ dev:
 	npm run dev
 
 prod:
+	clear
 	@echo "⮀ Switching to PROD settings"
 	@cp .env.prod $(ENV_FILE)
 	@cp $(SUPA_CONF_PROD) $(SUPA_CONF)

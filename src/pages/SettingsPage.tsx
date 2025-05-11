@@ -1,8 +1,6 @@
-//src/pages/SettingsPage.tsx
-
-import React, { useState, useRef } from 'react';
-import { Calculator, RefreshCcw, Calendar, Upload } from 'lucide-react';
-import { Button } from '../components/ui/Button';
+import React, { useState, useRef } from "react";
+import { Calculator, RefreshCcw, Calendar, Upload } from "lucide-react";
+import { Button } from "../components/ui/Button";
 import {
   Card,
   CardContent,
@@ -10,10 +8,13 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '../components/ui/Card';
-import { triggerManualRecalculation } from '../api/projections';
-import { refreshChaseBalanceInDb, refreshAccounts } from '../api/accounts';
-import { useBalance } from '../context/BalanceContext';
+} from "../components/ui/Card";
+import { triggerManualRecalculation } from "../api/projections";
+import {
+  refreshAccountsViaFlask,
+  refreshChaseBalanceInDb,
+} from "../api/accounts";
+import { useBalance } from "../context/BalanceContext";
 
 export function SettingsPage() {
   const [busy, setBusy] = useState(false);
@@ -22,115 +23,115 @@ export function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setBalance, setLastSync } = useBalance();
 
+  // ── 🔄 Refresh ALL Accounts ─────────────────────────────
   const handleRefreshAccounts = async () => {
+    setBusy(true);
+    setError(null);
     try {
-      setBusy(true);
-      setError(null);
-      await refreshAccounts();
-      setLastAction('🔄 Accounts refresh triggered.');
-    } catch (err: any) {
-      console.error(err);
-      setError(`Error refreshing accounts: ${err.message}`);
+      await refreshAccountsViaFlask();
+      setLastAction("🔄 Accounts refresh triggered.");
+    } catch (e: any) {
+      console.error(e);
+      setError(`Error refreshing accounts: ${e.message}`);
     } finally {
       setBusy(false);
     }
   };
 
+  // ── 💰 Update Chase Balance ─────────────────────────────
   const handleUpdateBalance = async () => {
+    setBusy(true);
+    setError(null);
     try {
-      setBusy(true);
-      setError(null);
-
-      const balance = await refreshChaseBalanceInDb();
-      setBalance(balance);
+      const bal = await refreshChaseBalanceInDb();
+      setBalance(bal);
       setLastSync(new Date());
-
-      setLastAction(`💰 Chase balance updated: $${balance.toLocaleString()}`);
-    } catch (err: any) {
-      console.error(err);
-      setError(`Error updating balance: ${err.message}`);
+      setLastAction(`💰 Chase balance updated: $${bal.toLocaleString()}`);
+    } catch (e: any) {
+      console.error(e);
+      setError(`Error updating balance: ${e.message}`);
     } finally {
       setBusy(false);
     }
   };
 
+  // ── 📊 Recalculate Projections ─────────────────────────
   const handleRecalculate = async () => {
+    setBusy(true);
+    setError(null);
     try {
-      setBusy(true);
-      setError(null);
       await triggerManualRecalculation();
-      setLastAction('📊 Budget projections recalculated.');
-    } catch (err: any) {
-      console.error(err);
-      setError('Error recalculating projections. Please try again.');
+      setLastAction("📊 Budget projections recalculated.");
+    } catch {
+      setError("Error recalculating projections.");
     } finally {
       setBusy(false);
     }
   };
 
+  // ── 📅 Sync Calendar ────────────────────────────────────
   const handleSyncCalendar = async () => {
+    setBusy(true);
+    setError(null);
     try {
-      setBusy(true);
-      setError(null);
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-calendar`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
-        }
+        },
       );
-      if (!res.ok) throw new Error('Failed to sync calendar');
-      setLastAction('📅 Calendar sync completed.');
-    } catch (err: any) {
-      console.error(err);
-      setError('Error syncing calendar. Please try again.');
+      if (!res.ok) throw new Error("Calendar sync failed");
+      setLastAction("📅 Calendar sync completed.");
+    } catch (e: any) {
+      console.error(e);
+      setError(`Error syncing calendar: ${e.message}`);
     } finally {
       setBusy(false);
     }
   };
 
+  // ── 📥 Import CSV ───────────────────────────────────────
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setBusy(true);
+    setError(null);
     try {
-      setBusy(true);
-      setError(null);
-      const text = await file.text();
-      console.log('Imported CSV:', text);
-      setLastAction('📥 Bills imported from CSV.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (err: any) {
-      console.error(err);
-      setError('Error importing CSV. Check the file format and try again.');
+      await f.text();
+      setLastAction("📥 Bills imported from CSV.");
+    } catch {
+      setError("Error importing CSV. Check the file format.");
     } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
       setBusy(false);
     }
   };
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-        Settings
-      </h1>
+      <h1 className="text-2xl font-bold">Settings</h1>
 
       {lastAction && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-4 rounded-md">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-4 rounded">
           {lastAction}
         </div>
       )}
-      {error && <div className="text-red-600 dark:text-red-400">{error}</div>}
+      {error && (
+        <div className="text-red-600 dark:text-red-400">
+          {error}
+        </div>
+      )}
 
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>
-            Force‐run any of your nightly processes on demand.
-          </CardDescription>
+          <CardDescription>Force-run any nightly job on demand.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-3">
+        <CardContent className="flex flex-wrap gap-3">
           <Button
             onClick={handleRefreshAccounts}
             isLoading={busy}
@@ -161,7 +162,7 @@ export function SettingsPage() {
           </Button>
         </CardContent>
         <CardFooter className="border-t pt-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-gray-500">
             Nightly jobs still run at 02:00 UTC — these just force them now.
           </p>
         </CardFooter>
@@ -171,15 +172,14 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle>Import Bills from CSV</CardTitle>
           <CardDescription>
-            CSV must have columns: Name, Category, Amount, Frequency, Repeats
-            Every, Start Date, End Date (optional), Owner, Note (optional).
+            CSV columns: Name, Category, Amount, Frequency, Repeats Every, Start Date, End Date, Owner, Note.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <input
+            ref={fileInputRef}
             type="file"
             accept=".csv"
-            ref={fileInputRef}
             onChange={handleFileChange}
             className="hidden"
           />

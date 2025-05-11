@@ -1,4 +1,5 @@
-// supabase/functions/chase-balance/index.ts
+//supabase/functions/chase-balance/index.ts
+
 // @ts-nocheck
 
 import { serve } from "https://deno.land/std@0.178.0/http/server.ts";

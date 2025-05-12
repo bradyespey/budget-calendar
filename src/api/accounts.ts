@@ -4,9 +4,8 @@ import { supabase } from "../lib/supabase";
 import type { Account } from "../types";
 
 // ── Supabase & external API config ───────────────────────────────────────
-const FUNCTIONS_URL      = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL!;
-const REFRESH_API_URL    = import.meta.env.VITE_REFRESH_ACCOUNTS_API_URL!;
-const REFRESH_API_AUTH   = import.meta.env.VITE_REFRESH_ACCOUNTS_API_AUTH!;
+const FUNCTIONS_URL    = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL!;
+const ANON_KEY         = import.meta.env.VITE_SUPABASE_ANON_KEY!;
 
 // ── Supabase query functions ─────────────────────────────────────────────
 export async function getAccounts(): Promise<Account[]> {
@@ -39,44 +38,52 @@ export async function getLastSyncTime(): Promise<Date | null> {
 
 // ── Refresh accounts via Flask API ────────────────────────────────────────
 export async function refreshAccountsViaFlask(): Promise<void> {
-  const res = await fetch(REFRESH_API_URL, {
+  const res = await fetch(import.meta.env.VITE_REFRESH_ACCOUNTS_API_URL!, {
     method: "GET",
-    headers: { Authorization: `Basic ${btoa(REFRESH_API_AUTH)}` },
+    headers: {
+      Authorization: `Basic ${btoa(import.meta.env.VITE_REFRESH_ACCOUNTS_API_AUTH!)}`,
+    },
   });
   if (res.status !== 202) {
-    const txt = await res.text();
-    throw new Error(`Flask refresh failed (${res.status}): ${txt}`);
+    throw new Error(`Flask refresh failed (${res.status}): ${await res.text()}`);
   }
 }
 
 // ── Supabase Edge Functions ──────────────────────────────────────────────
+/**
+ * 💰 Refresh Chase balance only (Supabase Edge Function)
+ *    Now calls the function with proper headers and returns persisted balance.
+ */
 export async function refreshChaseBalanceInDb(): Promise<number> {
-  const { data, error } = await supabase.functions.invoke("chase-balance");
-  if (error) throw error;
-  const balance = (data as any).balance as number;
-
-  const { error: dbError } = await supabase
-    .from("accounts")
-    .upsert(
-      {
-        id: "joint_checking",
-        display_name: "Joint Checking",
-        last_balance: balance,
-        last_synced: new Date().toISOString(),
-      },
-      { onConflict: "id" }
-    );
-  if (dbError) throw dbError;
-
+  const res = await fetch(`${FUNCTIONS_URL}/chase-balance`, {
+    method: "GET",
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${ANON_KEY}`,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Chase balance function failed: ${err}`);
+  }
+  const { balance } = (await res.json()) as { balance: number };
   return balance;
 }
 
 export async function getTransactionsReviewCount(): Promise<number> {
-  const res = await fetch(`${FUNCTIONS_URL}/transactions-review`);
+  const res = await fetch(`${FUNCTIONS_URL}/transactions-review`, {
+    method: "GET",
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${ANON_KEY}`,
+    },
+  });
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Review count fetch failed: ${err}`);
   }
-  const json = await res.json();
-  return (json as { transactions_to_review: number }).transactions_to_review;
+  const { transactions_to_review } = (await res.json()) as {
+    transactions_to_review: number;
+  };
+  return transactions_to_review;
 }

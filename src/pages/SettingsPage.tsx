@@ -1,6 +1,5 @@
 //src/pages/SettingsPage.tsx
 
-// ── Settings page ─────────────────────────────────────────────────────────
 import { useState, useRef } from 'react'
 import {
   Calculator,
@@ -20,6 +19,7 @@ import {
 import {
   refreshAccountsViaFlask,
   refreshChaseBalanceInDb,
+  getLastSyncTime,            // ← import this
 } from '../api/accounts'
 import { triggerManualRecalculation } from '../api/projections'
 import { useBalance } from '../context/BalanceContext'
@@ -31,7 +31,7 @@ export function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { setBalance, setLastSync } = useBalance()
 
-  // ── Refresh all accounts ─────────────────────────────────────────────────
+  // ── Refresh all accounts ──────────────────────────────────────────────
   async function handleRefreshAccounts() {
     setBusy(true); setError(null)
     try {
@@ -45,12 +45,21 @@ export function SettingsPage() {
     }
   }
 
-  // ── Update Chase balance ─────────────────────────────────────────────────
+  // ── Update Chase balance ──────────────────────────────────────────────
   async function handleUpdateBalance() {
-    setBusy(true); setError(null)
+    setBusy(true)
+    setError(null)
     try {
+      // fetch & persist via Edge Function
       const bal = await refreshChaseBalanceInDb()
-      setBalance(bal); setLastSync(new Date())
+      setBalance(bal)
+
+      // now re‐fetch the true last_synced time from the DB
+      const freshSync = await getLastSyncTime()
+      if (freshSync) {
+        setLastSync(freshSync)
+      }
+
       setLastAction(`Chase balance updated: $${bal.toLocaleString()}`)
     } catch (e: any) {
       console.error(e)
@@ -58,9 +67,9 @@ export function SettingsPage() {
     } finally {
       setBusy(false)
     }
-  }
+}
 
-  // ── Recalculate projections ──────────────────────────────────────────────
+  // ── Recalculate projections ──────────────────────────────────────────
   async function handleRecalculate() {
     setBusy(true); setError(null)
     try {
@@ -73,7 +82,7 @@ export function SettingsPage() {
     }
   }
 
-  // ── Sync Google Calendar ─────────────────────────────────────────────────
+  // ── Sync Google Calendar ─────────────────────────────────────────────
   async function handleSyncCalendar() {
     setBusy(true); setError(null)
     try {
@@ -97,7 +106,7 @@ export function SettingsPage() {
     }
   }
 
-  // ── Import bills CSV ────────────────────────────────────────────────────
+  // ── Import bills CSV ────────────────────────────────────────────────
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -134,16 +143,32 @@ export function SettingsPage() {
           <CardDescription>Force-run any nightly job on demand.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
-          <Button onClick={handleRefreshAccounts} isLoading={busy} leftIcon={<RefreshCcw size={16} />}>
+          <Button
+            onClick={handleRefreshAccounts}
+            isLoading={busy}
+            leftIcon={<RefreshCcw size={16} />}
+          >
             Refresh Accounts
           </Button>
-          <Button onClick={handleUpdateBalance} isLoading={busy} leftIcon={<Calculator size={16} />}>
+          <Button
+            onClick={handleUpdateBalance}
+            isLoading={busy}
+            leftIcon={<Calculator size={16} />}
+          >
             Update Balance
           </Button>
-          <Button onClick={handleRecalculate} isLoading={busy} leftIcon={<Calculator size={16} />}>
+          <Button
+            onClick={handleRecalculate}
+            isLoading={busy}
+            leftIcon={<Calculator size={16} />}
+          >
             Recalculate
           </Button>
-          <Button onClick={handleSyncCalendar} isLoading={busy} leftIcon={<Calendar size={16} />}>
+          <Button
+            onClick={handleSyncCalendar}
+            isLoading={busy}
+            leftIcon={<Calendar size={16} />}
+          >
             Sync Calendar
           </Button>
         </CardContent>
@@ -170,7 +195,11 @@ export function SettingsPage() {
             onChange={handleFileChange}
             className="hidden"
           />
-          <Button onClick={() => fileInputRef.current?.click()} isLoading={busy} leftIcon={<Upload size={16} />}>
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            isLoading={busy}
+            leftIcon={<Upload size={16} />}
+          >
             Import CSV
           </Button>
         </CardContent>

@@ -35,3 +35,7 @@ monarch_cookies.json
 .DS_Store
 # Local Netlify folder
 .netlify
+
+# Other
+gas/
+flask/

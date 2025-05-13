@@ -42,8 +42,21 @@ export async function getHighLowProjections() {
 }
 
 export async function triggerManualRecalculation() {
-  const { data, error } = await supabase.functions.invoke('recalculate-projections', {
+  const session = await supabase.auth.getSession();
+  console.log('Session:', session); // Debug log
+
+  if (!session.data.session) {
+    throw new Error("No active session");
+  }
+
+  const token = session.data.session.access_token;
+  console.log('Token:', token ? 'Present' : 'Missing'); // Debug log
+
+  const { data, error } = await supabase.functions.invoke('budget-projection', {
     method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (error) {

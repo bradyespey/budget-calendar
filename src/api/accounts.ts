@@ -17,23 +17,24 @@ export async function getAccounts(): Promise<Account[]> {
   return data as Account[];
 }
 
-export async function getTotalBalance(): Promise<number> {
+export async function getCheckingBalance(): Promise<number> {
   const { data, error } = await supabase
     .from("accounts")
-    .select("last_balance");
+    .select("last_balance")
+    .eq("id", "checking")
+    .single();
   if (error) throw error;
-  return (data as { last_balance: number }[])
-    .reduce((sum, a) => sum + a.last_balance, 0);
+  return data.last_balance;
 }
 
 export async function getLastSyncTime(): Promise<Date | null> {
   const { data, error } = await supabase
     .from("accounts")
     .select("last_synced")
-    .order("last_synced", { ascending: false })
-    .limit(1);
+    .eq("id", "checking")
+    .single();
   if (error) throw error;
-  return data.length ? new Date(data[0].last_synced) : null;
+  return data && data.last_synced ? new Date(data.last_synced) : null;
 }
 
 // ── Refresh accounts via Flask API ────────────────────────────────────────

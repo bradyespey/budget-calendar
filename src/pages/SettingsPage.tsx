@@ -29,7 +29,7 @@ export function SettingsPage() {
   const [lastAction, setLastAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { setBalance, setLastSync } = useBalance()
+  const { setBalance, setLastSync, refreshBalance } = useBalance()
 
   // ── Refresh all accounts ──────────────────────────────────────────────
   async function handleRefreshAccounts() {
@@ -52,13 +52,15 @@ export function SettingsPage() {
     try {
       // fetch & persist via Edge Function
       const bal = await refreshChaseBalanceInDb()
-      setBalance(bal)
-
+      
       // now re‐fetch the true last_synced time from the DB
       const freshSync = await getLastSyncTime()
       if (freshSync) {
         setLastSync(freshSync)
       }
+
+      // Update the balance in the UI
+      await setBalance(bal)
 
       setLastAction(`Chase balance updated: $${bal.toLocaleString()}`)
     } catch (e: any) {
@@ -67,7 +69,7 @@ export function SettingsPage() {
     } finally {
       setBusy(false)
     }
-}
+  }
 
   // ── Recalculate projections ──────────────────────────────────────────
   async function handleRecalculate() {

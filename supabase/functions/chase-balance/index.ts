@@ -31,7 +31,7 @@ serve(async (req: Request) => {
     if (!token) throw new Error("Missing MONARCH_TOKEN");
 
     // 2) call Monarch GraphQL
-    const monarchRes = await fetch("https://api.monarchmoney.com/graphql", {
+    const res = await fetch("https://api.monarchmoney.com/graphql", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -42,33 +42,30 @@ serve(async (req: Request) => {
         query: `
           query Web_GetAccountsPage {
             accountTypeSummaries {
-              accounts {
-                displayName
-                displayBalance
-              }
+              accounts { id displayName displayBalance }
             }
           }
         `,
       }),
     });
-    if (!monarchRes.ok) throw new Error(`GraphQL error ${monarchRes.status}`);
-    const { accountTypeSummaries } = (await monarchRes.json()).data;
+    if (!res.ok) throw new Error(`GraphQL error ${res.status}`);
 
-    // 3) extract Joint Checking
-    const joint = (accountTypeSummaries as any[])
-      .flatMap((s) => s.accounts)
-      .find((a: any) => a.displayName === "Joint Checking");
-    if (!joint) throw new Error("Joint Checking not found");
-    const balance = joint.displayBalance as number;
+    const { accountTypeSummaries } = (await res.json()).data;
+    const accountId = Deno.env.get("MONARCH_CHECKING_ID");
+    if (!accountId) throw new Error("Missing MONARCH_CHECKING_ID");
+    const checking = (accountTypeSummaries as any[])
+      .flatMap(s => s.accounts)
+      .find((a: any) => String(a.id) === String(accountId));
+    if (!checking) throw new Error("Chase Checking account ID not found");
 
     // 4) persist to Supabase
     const { error: dbError } = await supabaseAdmin
       .from("accounts")
       .upsert(
         {
-          id: "joint_checking",
-          display_name: "Joint Checking",
-          last_balance: balance,
+          id: "checking",
+          display_name: "Chase Checking",
+          last_balance: checking.displayBalance,
           last_synced: new Date().toISOString(),
         },
         { onConflict: "id" }
@@ -76,10 +73,10 @@ serve(async (req: Request) => {
     if (dbError) throw dbError;
 
     // 5) return new balance
-    return new Response(JSON.stringify({ balance }), {
-      status: 200,
-      headers: { ...CORS, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ balance: checking.displayBalance }),
+      { status: 200, headers: { ...CORS, "Content-Type": "application/json" } }
+    );
 
   } catch (err: any) {
     console.error("chase-balance error:", err);

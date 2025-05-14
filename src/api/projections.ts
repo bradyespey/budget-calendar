@@ -2,24 +2,21 @@
 
 import { supabase } from '../lib/supabase';
 import { Projection } from '../types';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 
-export async function getProjections(days = 30) {
+export async function getProjections() {
   const today = new Date();
-  const endDate = addDays(today, days);
-  
   const { data, error } = await supabase
     .from('projections')
     .select('*')
     .gte('proj_date', format(today, 'yyyy-MM-dd'))
-    .lte('proj_date', format(endDate, 'yyyy-MM-dd'))
     .order('proj_date', { ascending: true });
-    
+
   if (error) {
     console.error('Error fetching projections:', error);
     throw error;
   }
-  
+
   return data as Projection[];
 }
 

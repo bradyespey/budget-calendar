@@ -7,7 +7,9 @@ import { getProjections } from '../api/projections';
 import { getBills } from '../api/bills';
 import { Bill, Projection } from '../types';
 import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
-import { useSettingsStore } from '../stores/settingsStore';
+import { supabase } from '../lib/supabase';
+import { formatDistanceToNow } from 'date-fns';
+import { useLocation } from 'react-router-dom';
 
 interface DayData {
   date: string;
@@ -25,12 +27,24 @@ interface DayData {
 export function UpcomingPage() {
   const [upcomingDays, setUpcomingDays] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(true);
-  const { projectionDays } = useSettingsStore();
-  const [lastUpdate] = useState<Date>(new Date());
+  const [lastProjected, setLastProjected] = useState<Date | null>(null);
+  const location = useLocation();
 
   useEffect(() => {
     fetchUpcomingData();
-  }, [projectionDays, lastUpdate]);
+    async function fetchLastProjected() {
+      // Get the last_projected_at from settings
+      const { data } = await supabase
+        .from('settings')
+        .select('last_projected_at')
+        .eq('id', 1)
+        .maybeSingle();
+      if (data?.last_projected_at) {
+        setLastProjected(new Date(data.last_projected_at));
+      }
+    }
+    fetchLastProjected();
+  }, [location.pathname]);
 
   const fetchUpcomingData = async () => {
     try {
@@ -38,7 +52,7 @@ export function UpcomingPage() {
       
       // Fetch projections and bills in parallel
       const [projections, bills] = await Promise.all([
-        getProjections(projectionDays),
+        getProjections(),
         getBills()
       ]);
       
@@ -142,9 +156,17 @@ export function UpcomingPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-        {projectionDays}-Day Projection
-      </h1>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-2 mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white md:mr-8">
+          {upcomingDays.length}-Day Projection
+        </h1>
+        {lastProjected && (
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            <strong>Last projected:</strong> {format(lastProjected, "MMMM d, yyyy, h:mm a")}
+            <span className="ml-2 text-xs">({formatDistanceToNow(lastProjected, { addSuffix: true })})</span>
+          </div>
+        )}
+      </div>
       
       <div className="flex justify-center">
         <div className="w-full max-w-2xl space-y-4">

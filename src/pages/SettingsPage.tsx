@@ -23,34 +23,22 @@ import {
 } from '../api/accounts'
 import { triggerManualRecalculation } from '../api/projections'
 import { useBalance } from '../context/BalanceContext'
-import { useSettingsStore } from '../stores/settingsStore'
 import { supabase } from '../lib/supabase'
-
-// Helper functions (add these at the top of your file)
-function formatNumberWithCommas(num: number | string): string {
-  if (num === null || num === undefined || num === "") return "";
-  return Number(num).toLocaleString("en-US");
-}
-
-function formatCurrency(num: number | string): string {
-  if (num === null || num === undefined || num === "") return "";
-  return "$" + Number(num).toLocaleString("en-US");
-}
+import { useLocation } from 'react-router-dom'
 
 export function SettingsPage() {
   const [busy, setBusy] = useState(false)
-  const [lastAction, setLastAction] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { setBalance, setLastSync } = useBalance()
-  const { projectionDays, balanceThreshold, setProjectionDays, setBalanceThreshold } = useSettingsStore()
-  const [localProjectionDays, setLocalProjectionDays] = useState<number>(projectionDays)
-  const [localBalanceThreshold, setLocalBalanceThreshold] = useState<number>(balanceThreshold)
-  const [saving, setSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState('')
-  const [daysError, setDaysError] = useState<string | null>(null)
+  const [localProjectionDays, setLocalProjectionDays] = useState<number>(30)
+  const [localBalanceThreshold, setLocalBalanceThreshold] = useState<number>(1000)
+  const [saveMessage] = useState('')
+  const [calendarMode, setCalendarMode] = useState<'dev' | 'prod'>('prod')
+  const [manualBalanceOverride, setManualBalanceOverride] = useState<string>('')
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const location = useLocation()
 
-  // Load current settings from Supabase on mount
+  // Load settings on mount
   useEffect(() => {
     async function fetchSettings() {
       const { data } = await supabase
@@ -59,83 +47,73 @@ export function SettingsPage() {
         .limit(1)
         .maybeSingle();
 
-      const daysToProject = data?.projection_days ?? 7; // <--- fallback to 7 if not found
-
       if (data) {
-        setProjectionDays(data.projection_days)
-        setBalanceThreshold(data.balance_threshold)
+        setLocalProjectionDays(data.projection_days ?? 30)
+        setLocalBalanceThreshold(data.balance_threshold ?? 1000)
+        setManualBalanceOverride(data.manual_balance_override?.toString() ?? '')
+        setCalendarMode(data.calendar_mode ?? 'prod')
       }
-
-      console.log('Using daysToProject:', daysToProject);
     }
     fetchSettings()
   }, [])
 
+  // Clear notification on route change
   useEffect(() => {
-    setLocalProjectionDays(projectionDays);
-    setLocalBalanceThreshold(balanceThreshold);
-  }, [projectionDays, balanceThreshold]);
+    setNotification(null);
+  }, [location.pathname]);
 
   // ── Refresh all accounts ──────────────────────────────────────────────
   async function handleRefreshAccounts() {
-    setBusy(true); setError(null)
+    setBusy(true);
     try {
-      await refreshAccountsViaFlask()
-      setLastAction('Accounts refresh triggered.')
+      await saveSettings();
+      await refreshAccountsViaFlask();
+      showNotification('Accounts refreshed.', 'success');
     } catch (e: any) {
-      console.error(e)
-      setError(`Error refreshing accounts: ${e.message}`)
+      showNotification(`Error refreshing accounts: ${e.message}`, 'error');
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
   }
 
   // ── Update Chase balance ──────────────────────────────────────────────
   async function handleUpdateBalance() {
-    setBusy(true)
-    setError(null)
+    setBusy(true);
     try {
-      // fetch & persist via Edge Function
-      const bal = await refreshChaseBalanceInDb()
-      
-      // now re‐fetch the true last_synced time from the DB
-      const freshSync = await getLastSyncTime()
-      if (freshSync) {
-        setLastSync(freshSync)
-      }
-
-      // Update the balance in the UI
-      await setBalance(bal)
-
-      setLastAction(`Chase balance updated: $${bal.toLocaleString()}`)
+      await saveSettings();
+      const bal = await refreshChaseBalanceInDb();
+      const freshSync = await getLastSyncTime();
+      if (freshSync) setLastSync(freshSync);
+      await setBalance(bal);
+      showNotification(`Chase balance updated: $${bal.toLocaleString()}`, 'success');
     } catch (e: any) {
-      console.error(e)
-      setError(`Error updating balance: ${e.message}`)
+      showNotification(`Error updating balance: ${e.message}`, 'error');
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
   }
 
   // ── Recalculate projections ──────────────────────────────────────────
   async function handleRecalculate() {
-    setBusy(true); setError(null)
+    setBusy(true);
     try {
-      await triggerManualRecalculation()
-      setLastAction('Budget projections recalculated.')
+      await saveSettings();
+      await triggerManualRecalculation();
+      showNotification('Budget projections recalculated.', 'success');
     } catch (e: any) {
-      console.error(e)
-      setError('Error recalculating projections.')
+      showNotification('Error recalculating projections.', 'error');
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
   }
 
   // ── Sync Google Calendar ─────────────────────────────────────────────
   async function handleSyncCalendar() {
-    setBusy(true); setError(null)
+    setBusy(true);
     try {
+      await saveSettings();
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-calendar`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-calendar?env=${calendarMode}`,
         {
           method: 'POST',
           headers: {
@@ -145,10 +123,9 @@ export function SettingsPage() {
         }
       )
       if (!res.ok) throw new Error('Calendar sync failed')
-      setLastAction('Calendar sync completed.')
+      showNotification('Calendar sync completed.', 'success')
     } catch (e: any) {
-      console.error(e)
-      setError(`Error syncing calendar: ${e.message}`)
+      showNotification(`Error syncing calendar: ${e.message}`, 'error')
     } finally {
       setBusy(false)
     }
@@ -158,54 +135,81 @@ export function SettingsPage() {
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setBusy(true); setError(null)
+    setBusy(true);
     try {
       await file.text()
-      setLastAction('Bills imported from CSV.')
     } catch {
-      setError('Error importing CSV. Check file format.')
+      console.error('Error importing CSV. Check file format.')
     } finally {
       fileInputRef.current!.value = ''
       setBusy(false)
     }
   }
 
-  // Save handler
+  // Save handler for all settings
   async function handleSave() {
-    if (daysError) {
-      setSaveMessage("Please fix errors before saving.");
-      return;
-    }
-    setSaving(true);
-    setSaveMessage('');
-    const days = Number(localProjectionDays);
-    const threshold = Number(localBalanceThreshold);
-
     const { error } = await supabase
       .from('settings')
-      .update({ projection_days: days, balance_threshold: threshold })
+      .update({
+        projection_days: Number(localProjectionDays),
+        balance_threshold: Number(localBalanceThreshold),
+        manual_balance_override: manualBalanceOverride === '' ? null : Number(manualBalanceOverride),
+        calendar_mode: calendarMode,
+      })
       .eq('id', 1);
 
-    if (!error) {
-      setProjectionDays(days);
-      setBalanceThreshold(threshold);
+    if (error) {
+      showNotification('Error saving settings.', 'error');
+    } else {
+      showNotification('Settings saved!', 'success');
     }
+  }
 
-    setSaving(false);
-    setSaveMessage(error ? 'Error saving settings.' : 'Settings saved!');
+  async function saveSettings() {
+    const { error } = await supabase
+      .from('settings')
+      .update({
+        projection_days: Number(localProjectionDays),
+        balance_threshold: Number(localBalanceThreshold),
+        manual_balance_override: manualBalanceOverride === '' ? null : Number(manualBalanceOverride),
+        calendar_mode: calendarMode,
+      })
+      .eq('id', 1);
+
+    if (error) {
+      showNotification('Error saving settings.', 'error');
+      throw error;
+    }
+  }
+
+  function showNotification(message: string, type: 'success' | 'error' = 'success') {
+    setNotification({ message, type });
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      {/* Last action / error messages */}
-      {lastAction && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-4 rounded">
-          {lastAction}
-        </div>
-      )}
-      {error && (
-        <div className="text-red-600 dark:text-red-400">
-          {error}
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Page header with Save button */}
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-2xl font-bold">Settings</h1>
+        <button
+          onClick={handleSave}
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded shadow disabled:opacity-50 disabled:cursor-not-allowed transition"
+          style={{ minWidth: 100 }}
+        >
+          Save
+        </button>
+      </div>
+      {saveMessage && <div className="mb-2">{saveMessage}</div>}
+
+      {notification && (
+        <div
+          className={`mb-4 p-4 rounded border-l-4 ${
+            notification.type === 'success'
+              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-900 dark:text-blue-100'
+              : 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-900 dark:text-red-100'
+          }`}
+        >
+          {notification.message}
         </div>
       )}
 
@@ -213,10 +217,12 @@ export function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Budget Projection Settings</CardTitle>
-          <CardDescription>Configure how far ahead to project balances and set low balance alerts.</CardDescription>
+          <CardDescription>
+            Configure how far ahead to project balances and set low balance alerts.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <label htmlFor="projectionDays" className="text-sm font-medium">
                 Days to Project
@@ -225,14 +231,12 @@ export function SettingsPage() {
                 id="projectionDays"
                 type="text"
                 inputMode="numeric"
-                value={formatNumberWithCommas(localProjectionDays)}
+                value={localProjectionDays}
                 onChange={e => {
-                  const raw = e.target.value.replace(/,/g, "");
-                  let value = raw === "" ? 1 : Number(raw);
+                  let value = Number(e.target.value.replace(/,/g, ""));
                   if (value > 365) value = 365;
                   if (value < 1) value = 1;
                   setLocalProjectionDays(value);
-                  setDaysError(null); // No error, since we always clamp
                 }}
                 className="w-full"
               />
@@ -248,7 +252,7 @@ export function SettingsPage() {
                 id="balanceThreshold"
                 type="text"
                 inputMode="numeric"
-                value={formatCurrency(localBalanceThreshold)}
+                value={localBalanceThreshold.toLocaleString("en-US", { style: "currency", currency: "USD" }).replace("$", "$")}
                 onChange={e => {
                   const raw = e.target.value.replace(/[^0-9]/g, "");
                   setLocalBalanceThreshold(raw === "" ? 0 : Number(raw));
@@ -259,16 +263,27 @@ export function SettingsPage() {
                 Alert when projected balance falls below this amount
               </p>
             </div>
+            <div className="space-y-2">
+              <label htmlFor="manualBalanceOverride" className="text-sm font-medium">
+                Manual Balance Override
+              </label>
+              <Input
+                id="manualBalanceOverride"
+                type="text"
+                inputMode="numeric"
+                value={manualBalanceOverride === "" ? "" : Number(manualBalanceOverride).toLocaleString("en-US", { style: "currency", currency: "USD" }).replace("$", "$")}
+                onChange={e => {
+                  const raw = e.target.value.replace(/[^0-9]/g, "");
+                  setManualBalanceOverride(raw === "" ? "" : Number(raw).toString());
+                }}
+                className="w-full"
+                placeholder="Optional"
+              />
+              <p className="text-sm text-gray-500">
+                Override live balance for projections (optional)
+              </p>
+            </div>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="mt-6 px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded shadow disabled:opacity-50 disabled:cursor-not-allowed transition mx-auto block"
-            style={{ maxWidth: 200 }}
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          {saveMessage && <div>{saveMessage}</div>}
         </CardContent>
       </Card>
 
@@ -316,31 +331,75 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* CSV import */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Import Bills from CSV</CardTitle>
-          <CardDescription>
-            CSV columns: Name, Category, Amount, Frequency, Repeats Every, Start Date, End Date, Owner, Note.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            isLoading={busy}
-            leftIcon={<Upload size={16} />}
-          >
-            Import CSV
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Calendar Mode and Import CSV side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Calendar Mode Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Calendar Mode</CardTitle>
+            <CardDescription>
+              Choose which Google Calendars to sync with.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="calendarMode"
+                  value="prod"
+                  checked={calendarMode === 'prod'}
+                  onChange={() => setCalendarMode('prod')}
+                />
+                <span>
+                  <span className="font-semibold">Main Calendars</span> <span className="text-xs text-gray-500">(bradyjennytx@gmail.com)</span>
+                </span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="calendarMode"
+                  value="dev"
+                  checked={calendarMode === 'dev'}
+                  onChange={() => setCalendarMode('dev')}
+                />
+                <span>
+                  <span className="font-semibold">Testing Calendars</span> <span className="text-xs text-gray-500">(baespey@gmail.com)</span>
+                </span>
+              </label>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Import Bills from CSV Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Import Bills from CSV</CardTitle>
+                <CardDescription>
+                  CSV columns: Name, Category, Amount, Frequency, Repeats Every, Start Date, End Date, Owner, Note.
+                </CardDescription>
+              </div>
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                isLoading={busy}
+                leftIcon={<Upload size={16} />}
+                className="ml-4"
+              >
+                Import CSV
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </div>
+          </CardHeader>
+        </Card>
+      </div>
     </div>
   )
 }

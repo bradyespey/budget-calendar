@@ -1,0 +1,249 @@
+import { serve } from "https://deno.land/std@0.220.1/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { google } from "npm:googleapis"
+import { addDays, format, parseISO } from "https://esm.sh/date-fns@3.4.0"
+
+serve(async (req) => {
+  // Handle preflight OPTIONS requests
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    })
+  }
+
+  // Step 1: Service account
+  let key;
+  try {
+    const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if (!serviceAccountJson) throw new Error("Missing Google service account secret")
+    key = JSON.parse(serviceAccountJson)
+  } catch (e) {
+    return new Response("Step 1 error: " + e.message, {
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    })
+  }
+
+  // Step 2: Google Auth
+  let calendar;
+  try {
+    const auth = new google.auth.JWT(
+      key.client_email,
+      undefined,
+      key.private_key,
+      ["https://www.googleapis.com/auth/calendar"]
+    )
+    await auth.authorize()
+    calendar = google.calendar({ version: "v3", auth })
+  } catch (e) {
+    return new Response("Step 2 error: " + e.message, {
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    })
+  }
+
+  // Step 3: Calendar IDs
+  let balanceCalId, billsCalId;
+  try {
+    const url = new URL(req.url)
+    const env = url.searchParams.get("env") || "prod"
+    balanceCalId = env === "dev"
+      ? Deno.env.get("DEV_BALANCE_CALENDAR_ID")
+      : Deno.env.get("PROD_BALANCE_CALENDAR_ID")
+    billsCalId = env === "dev"
+      ? Deno.env.get("DEV_BILLS_CALENDAR_ID")
+      : Deno.env.get("PROD_BILLS_CALENDAR_ID")
+
+    if (!balanceCalId || !billsCalId) throw new Error("Missing calendar IDs")
+  } catch (e) {
+    return new Response("Step 3 error: " + e.message, {
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    })
+  }
+
+  // Step 4: Supabase
+  let projections;
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    )
+    const { data, error } = await supabase
+      .from("projections")
+      .select("*")
+      .order("date", { ascending: true })
+      .limit(100)
+
+    if (error) throw new Error(error.message)
+    projections = data
+  } catch (e) {
+    return new Response("Step 4 error: " + e.message, {
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    })
+  }
+
+  // Step 5: Google Calendar Insert
+  try {
+    for (const proj of projections) {
+      // Add balance event
+      await calendar.events.insert({
+        calendarId: balanceCalId,
+        requestBody: {
+          summary: `Projected Balance: $${proj.balance}`,
+          start: { date: proj.date },
+          end: { date: proj.date },
+        },
+      })
+      // Add bill events (if any)
+      if (proj.bills) {
+        for (const bill of proj.bills) {
+          await calendar.events.insert({
+            calendarId: billsCalId,
+            requestBody: {
+              summary: bill.name,
+              description: `Amount: $${bill.amount}`,
+              start: { date: proj.date },
+              end: { date: proj.date },
+            },
+          })
+        }
+      }
+    }
+
+    return new Response("Calendar sync complete", {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    })
+  } catch (e) {
+    return new Response("Step 5 error: " + e.message, {
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    })
+  }
+})
+
+// Fetch US holidays for the projection window
+export async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
+  const holidays = new Set<string>();
+  for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/US`);
+    if (res.ok) {
+      const data = await res.json();
+      data.forEach((h: { date: string }) => holidays.add(h.date));
+    }
+  }
+  return holidays;
+}
+
+// Adjust transaction date for weekends/holidays
+export function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<string>): Date {
+  let d = new Date(date);
+  const dateStr = (d: Date) => format(d, "yyyy-MM-dd");
+  if (isPaycheck) {
+    // Move to previous business day
+    while (d.getDay() === 0 || d.getDay() === 6 || holidays.has(dateStr(d))) {
+      d.setDate(d.getDate() - 1);
+    }
+  } else {
+    // Move to next business day
+    while (d.getDay() === 0 || d.getDay() === 6 || holidays.has(dateStr(d))) {
+      d.setDate(d.getDate() + 1);
+    }
+  }
+  return d;
+}
+
+function billOccursOnDate(
+  bill: any,
+  currentDate: Date,
+  holidays: Set<string>
+): boolean {
+  const frequency = (bill.frequency || "").toLowerCase();
+  const repeatsEvery = bill.repeats_every || 1;
+  const startDate = bill.start_date ? parseISO(bill.start_date) : null;
+  const endDate = bill.end_date ? parseISO(bill.end_date) : null;
+  const isPaycheck = (bill.category || "").toLowerCase() === "paycheck";
+
+  if (!startDate) return false;
+  if (currentDate < startDate) return false;
+  if (endDate && currentDate > endDate) return false;
+
+  // Helper for date equality
+  const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  // One-time
+  if (frequency === "one-time" || frequency === "one time") {
+    return sameDay(startDate, currentDate);
+  }
+
+  // Daily
+  if (frequency === "days" || frequency === "daily") {
+    const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / 86400000);
+    return daysDiff >= 0 && daysDiff % repeatsEvery === 0;
+  }
+
+  // Weekly
+  if (frequency === "weeks" || frequency === "weekly") {
+    const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / 86400000);
+    const weeksDiff = Math.floor(daysDiff / 7);
+    return weeksDiff >= 0 && weeksDiff % repeatsEvery === 0 && currentDate.getDay() === startDate.getDay();
+  }
+
+  // Monthly
+  if (frequency === "months" || frequency === "monthly") {
+    const monthsDiff = (currentDate.getFullYear() - startDate.getFullYear()) * 12 + (currentDate.getMonth() - startDate.getMonth());
+    if (monthsDiff < 0 || monthsDiff % repeatsEvery !== 0) return false;
+    // If bill is set to last day of month, match last day of current month
+    const isLast = isLastDayOfMonth(startDate);
+    if (isLast) {
+      return isLastDayOfMonth(currentDate);
+    }
+    return currentDate.getDate() === startDate.getDate();
+  }
+
+  // Yearly
+  if (frequency === "years" || frequency === "yearly") {
+    const yearsDiff = currentDate.getFullYear() - startDate.getFullYear();
+    return yearsDiff >= 0 && yearsDiff % repeatsEvery === 0 &&
+      currentDate.getMonth() === startDate.getMonth() &&
+      currentDate.getDate() === startDate.getDate();
+  }
+
+  return false;
+}
+
+function isLastDayOfMonth(date: Date): boolean {
+  const test = new Date(date);
+  test.setDate(test.getDate() + 1);
+  return test.getDate() === 1;
+}

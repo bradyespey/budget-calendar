@@ -25,4 +25,4 @@ deploy:
 	clear
 	# Deploy Supabase Edge Functions
 	@echo "⮀ Deploying Supabase Edge Functions"
-	supabase functions deploy refresh-accounts chase-balance transactions-review budget-projection
+	supabase functions deploy nightly-projection refresh-accounts chase-balance transactions-review budget-projection sync-calendar

@@ -61,7 +61,6 @@ Deno.serve(async (req: Request) => {
   try {
     // Get JWT from request
     const authHeader = req.headers.get("Authorization");
-    
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
@@ -74,16 +73,7 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-    
-    const token = authHeader.replace("Bearer ", "");
-    
-    // Optionally decode for logging, but you do NOT need to fetch user from Supabase
-    try {
-      const payload = decode(token)[1] as { sub: string };
-      // You can log payload.sub if you want, but you don't need it for data access
-    } catch (e) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: corsHeaders });
-    }
+    // No need to decode the token unless you want to check claims
 
     // Fetch settings from DB
     const { data: settings, error } = await supabase
@@ -106,6 +96,12 @@ Deno.serve(async (req: Request) => {
     
     // Check for low balance alerts
     await checkLowBalanceAlerts(userSettings.balanceThreshold);
+    
+    // After projections are inserted, add:
+    await supabase
+      .from('settings')
+      .update({ last_projected_at: new Date().toISOString() })
+      .eq('id', 1);
     
     return new Response(
       JSON.stringify({ 
@@ -248,15 +244,15 @@ async function computeProjections(settings: Settings) {
     });
   }
   
-  // 5. Delete existing projections and insert new ones
+  // 5. Delete old projections for today and future
   const { error: deleteError } = await supabase
     .from('projections')
     .delete()
     .gte('proj_date', format(today, "yyyy-MM-dd"));
-  
+
   if (deleteError) {
-    console.error("Error deleting existing projections:", deleteError);
-    throw new Error("Failed to delete existing projections");
+    console.error("Delete error details:", deleteError);
+    throw new Error("Failed to delete existing projections: " + deleteError.message);
   }
   
   // 6. Insert new projections in batches to avoid request size limits
@@ -269,7 +265,7 @@ async function computeProjections(settings: Settings) {
     
     if (insertError) {
       console.error("Error inserting projections:", insertError);
-      throw new Error("Failed to insert projections");
+      throw new Error("Failed to insert projections: " + insertError.message);
     }
   }
   

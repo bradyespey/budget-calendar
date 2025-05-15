@@ -1,3 +1,5 @@
+//supabase/functions/budget-projection/index.ts
+
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
 import { format, addDays, parseISO } from "npm:date-fns@3.4.0";
 import { decode } from "https://deno.land/x/djwt@v2.8/mod.ts";
@@ -28,6 +30,7 @@ interface Projection {
   projected_balance: number;
   lowest: boolean;
   highest: boolean;
+  bills?: Bill[];
 }
 
 interface Settings {
@@ -173,7 +176,9 @@ async function computeProjections(settings: Settings) {
     const currentDate = addDays(today, i);
     const dateStr = format(currentDate, "yyyy-MM-dd");
     
-    // Apply any bills that occur on this date
+    // Collect bills for this day
+    const billsForDay: Bill[] = [];
+
     bills.forEach((bill: Bill) => {
       const startDate = parseISO(bill.start_date);
       const endDate = bill.end_date ? parseISO(bill.end_date) : null;
@@ -207,15 +212,29 @@ async function computeProjections(settings: Settings) {
       
       if (occurs) {
         runningBalance += bill.amount;
+        // Add a simplified bill object for the day
+        billsForDay.push({
+          id: bill.id,
+          name: bill.name,
+          amount: bill.amount,
+          category: bill.category,
+          frequency: bill.frequency,
+          repeats_every: bill.repeats_every,
+          start_date: bill.start_date,
+          end_date: bill.end_date,
+          owner: bill.owner,
+          note: bill.note,
+        });
       }
     });
     
-    // Add projection for this date
+    // Add projection for this date, including the bills array
     projections.push({
       proj_date: dateStr,
       projected_balance: runningBalance,
       lowest: false,
-      highest: false
+      highest: false,
+      bills: billsForDay,
     });
   }
   
@@ -259,6 +278,7 @@ async function computeProjections(settings: Settings) {
   const BATCH_SIZE = 50;
   for (let i = 0; i < projections.length; i += BATCH_SIZE) {
     const batch = projections.slice(i, i + BATCH_SIZE);
+    console.log("First 3 projections:", JSON.stringify(batch.slice(0, 3), null, 2));
     const { error: insertError } = await supabase
       .from('projections')
       .insert(batch);
@@ -298,14 +318,9 @@ async function checkLowBalanceAlerts(threshold: number) {
   }
 }
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-    minimumFractionDigits: 0,
-  }).format(Math.round(amount));
-};
+function formatCurrency(amount: number) {
+  return (amount < 0 ? "-$" : "$") + Math.abs(amount).toLocaleString();
+}
 
 // Helper functions
 function formatNumberWithCommas(num) {

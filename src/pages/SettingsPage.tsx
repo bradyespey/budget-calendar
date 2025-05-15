@@ -112,7 +112,25 @@ export function SettingsPage() {
     setBusy(true);
     try {
       await saveSettings();
-      const res = await fetch(
+      // Get latest settings for projection_days
+      const { data: settings } = await supabase.from('settings').select('projection_days').eq('id', 1).maybeSingle();
+      const days = settings?.projection_days || 30;
+
+      // Clear calendars first
+      const clearRes = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clear-calendars?env=${calendarMode}&days=${days}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!clearRes.ok) throw new Error('Clear calendars failed');
+
+      // Now sync calendar
+      const syncRes = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-calendar?env=${calendarMode}`,
         {
           method: 'POST',
@@ -121,13 +139,16 @@ export function SettingsPage() {
             'Content-Type': 'application/json',
           },
         }
-      )
-      if (!res.ok) throw new Error('Calendar sync failed')
-      showNotification('Calendar sync completed.', 'success')
+      );
+      if (!syncRes.ok) throw new Error('Calendar sync failed');
+      const email = calendarMode === 'dev'
+        ? 'baespey@gmail.com'
+        : 'bradyjennytx@gmail.com';
+      showNotification(`Calendar sync completed for ${email}.`, 'success');
     } catch (e: any) {
-      showNotification(`Error syncing calendar: ${e.message}`, 'error')
+      showNotification(`Error syncing calendar: ${e.message}`, 'error');
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
   }
 
@@ -186,8 +207,60 @@ export function SettingsPage() {
     setNotification({ message, type });
   }
 
+  async function handleClearCalendars() {
+    setBusy(true);
+    try {
+      await saveSettings();
+      // Get latest settings for projection_days
+      const { data: settings } = await supabase.from('settings').select('projection_days').eq('id', 1).maybeSingle();
+      const days = settings?.projection_days || 30;
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clear-calendars?env=${calendarMode}&days=${days}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!res.ok) throw new Error('Clear calendars failed');
+      const email = calendarMode === 'dev'
+        ? 'baespey@gmail.com'
+        : 'bradyjennytx@gmail.com';
+      showNotification(`Calendars cleared for ${email}.`, 'success');
+    } catch (e: any) {
+      showNotification(`Error clearing calendars: ${e.message}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAllActions() {
+    setBusy(true);
+    try {
+      await handleRefreshAccounts();
+      await handleUpdateBalance();
+      await handleRecalculate();
+      await handleSyncCalendar();
+      await handleClearCalendars();
+      showNotification('All actions completed.', 'success');
+    } catch (e: any) {
+      showNotification(`Error running all actions: ${e.message}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
+      {busy && (
+        <div className="flex items-center justify-center mb-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mr-2"></div>
+          <span className="text-blue-600 dark:text-blue-200 font-semibold">Working...</span>
+        </div>
+      )}
       {/* Page header with Save button */}
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-bold">Settings</h1>
@@ -295,37 +368,23 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button
-              onClick={handleRefreshAccounts}
-              disabled={busy}
-              className="w-full"
-            >
-              <RefreshCcw className="mr-2 h-4 w-4" />
-              Refresh Accounts
+            <Button onClick={handleRefreshAccounts} disabled={busy} className="w-full">
+              <RefreshCcw className="mr-2 h-4 w-4" /> Refresh Accounts
             </Button>
-            <Button
-              onClick={handleUpdateBalance}
-              disabled={busy}
-              className="w-full"
-            >
-              <Calculator className="mr-2 h-4 w-4" />
-              Update Balance
+            <Button onClick={handleUpdateBalance} disabled={busy} className="w-full">
+              <Calculator className="mr-2 h-4 w-4" /> Update Balance
             </Button>
-            <Button
-              onClick={handleRecalculate}
-              disabled={busy}
-              className="w-full"
-            >
-              <Calculator className="mr-2 h-4 w-4" />
-              Budget Projection
+            <Button onClick={handleRecalculate} disabled={busy} className="w-full">
+              <Calculator className="mr-2 h-4 w-4" /> Budget Projection
             </Button>
-            <Button
-              onClick={handleSyncCalendar}
-              disabled={busy}
-              className="w-full"
-            >
-              <Calendar className="mr-2 h-4 w-4" />
-              Sync Calendar
+            <Button onClick={handleSyncCalendar} disabled={busy} className="w-full">
+              <Calendar className="mr-2 h-4 w-4" /> Sync Calendar
+            </Button>
+            <Button onClick={handleClearCalendars} disabled={busy} className="w-full">
+              <Calendar className="mr-2 h-4 w-4" /> Clear Calendars
+            </Button>
+            <Button onClick={handleAllActions} disabled={busy} className="w-full">
+              <RefreshCcw className="mr-2 h-4 w-4" /> Run All Actions
             </Button>
           </div>
         </CardContent>

@@ -1,4 +1,4 @@
-//src/pages/SettingsPage.tsx
+//src/pages/SettingsPage_old.tsx
 
 import { useState, useRef, useEffect } from 'react'
 import {

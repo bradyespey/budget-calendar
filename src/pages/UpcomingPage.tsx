@@ -170,89 +170,89 @@ export function UpcomingPage() {
       
       <div className="flex justify-center">
         <div className="w-full max-w-2xl space-y-4">
-          {upcomingDays.map((day, index) => (
-            <Card 
-              key={day.date}
-              className={`
-                transition-all border-l-4
-                ${day.isHighest ? 'border-l-green-500' : ''}
-                ${day.isLowest ? 'border-l-red-500' : ''}
-                ${!day.isHighest && !day.isLowest ? 'border-l-transparent' : ''}
-              `}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-center">
-                  <CardTitle className="flex items-center">
-                    <span className="text-lg font-bold">
-                      {format(parseISO(day.date), 'EEEE, MMMM d')}
+        {upcomingDays.map((day, index) => (
+          <Card 
+            key={day.date}
+            className={`
+              transition-all border-l-4
+              ${day.isHighest ? 'border-l-green-500' : ''}
+              ${day.isLowest ? 'border-l-red-500' : ''}
+              ${!day.isHighest && !day.isLowest ? 'border-l-transparent' : ''}
+            `}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-center">
+                <CardTitle className="flex items-center">
+                  <span className="text-lg font-bold">
+                    {format(parseISO(day.date), 'EEEE, MMMM d')}
+                  </span>
+                  {day.isHighest && (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      <TrendingUp size={14} className="mr-1" /> Highest
                     </span>
-                    {day.isHighest && (
-                      <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                        <TrendingUp size={14} className="mr-1" /> Highest
-                      </span>
-                    )}
-                    {day.isLowest && (
-                      <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                        <TrendingDown size={14} className="mr-1" /> Lowest
-                      </span>
-                    )}
-                  </CardTitle>
-                  <div className="text-right">
-                    <div className="text-lg font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(day.balance)}
+                  )}
+                  {day.isLowest && (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                      <TrendingDown size={14} className="mr-1" /> Lowest
+                    </span>
+                  )}
+                </CardTitle>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-gray-900 dark:text-white">
+                    {formatCurrency(day.balance)}
+                  </div>
+                  {index > 0 && (
+                    <div className={`flex items-center text-sm ${
+                      getBalanceChange(day, index) >= 0 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {getBalanceChange(day, index) >= 0 ? (
+                        <>
+                          <ArrowUpRight size={14} className="mr-1" />
+                          +{formatCurrency(getBalanceChange(day, index))}
+                        </>
+                      ) : (
+                        <>
+                          <ArrowDownRight size={14} className="mr-1" />
+                          {formatCurrency(getBalanceChange(day, index))}
+                        </>
+                      )}
                     </div>
-                    {index > 0 && (
-                      <div className={`flex items-center text-sm ${
-                        getBalanceChange(day, index) >= 0 
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {day.transactions.length > 0 ? (
+                <ul className="space-y-2">
+                  {day.transactions.map(transaction => (
+                    <li key={`${day.date}-${transaction.id}`} className="flex justify-between items-center py-1 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <div className="flex items-center">
+                        <span className={`w-2 h-2 rounded-full mr-2 ${
+                          transaction.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
+                        }`}></span>
+                        <span className="font-medium text-gray-900 dark:text-white">{transaction.name}</span>
+                        <span className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400">
+                          {transaction.category}
+                        </span>
+                      </div>
+                      <span className={`font-medium ${
+                        transaction.amount >= 0 
                           ? 'text-green-600 dark:text-green-400' 
                           : 'text-red-600 dark:text-red-400'
                       }`}>
-                        {getBalanceChange(day, index) >= 0 ? (
-                          <>
-                            <ArrowUpRight size={14} className="mr-1" />
-                            +{formatCurrency(getBalanceChange(day, index))}
-                          </>
-                        ) : (
-                          <>
-                            <ArrowDownRight size={14} className="mr-1" />
-                            {formatCurrency(getBalanceChange(day, index))}
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {day.transactions.length > 0 ? (
-                  <ul className="space-y-2">
-                    {day.transactions.map(transaction => (
-                      <li key={`${day.date}-${transaction.id}`} className="flex justify-between items-center py-1 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800">
-                        <div className="flex items-center">
-                          <span className={`w-2 h-2 rounded-full mr-2 ${
-                            transaction.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
-                          }`}></span>
-                          <span className="font-medium text-gray-900 dark:text-white">{transaction.name}</span>
-                          <span className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400">
-                            {transaction.category}
-                          </span>
-                        </div>
-                        <span className={`font-medium ${
-                          transaction.amount >= 0 
-                            ? 'text-green-600 dark:text-green-400' 
-                            : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {formatCurrency(transaction.amount)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">No transactions on this day.</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                        {formatCurrency(transaction.amount)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 text-sm">No transactions on this day.</p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
         </div>
       </div>
     </div>

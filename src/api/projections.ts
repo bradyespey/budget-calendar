@@ -11,12 +11,12 @@ export async function getProjections() {
     .select('*')
     .gte('proj_date', format(today, 'yyyy-MM-dd'))
     .order('proj_date', { ascending: true });
-
+    
   if (error) {
     console.error('Error fetching projections:', error);
     throw error;
   }
-
+  
   return data as Projection[];
 }
 

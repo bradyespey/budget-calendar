@@ -4,21 +4,23 @@
 import { serve } from "https://deno.land/std@0.178.0/http/server.ts";
 import { init, wasm_data, totp } from "https://deno.land/x/totp_wasm/deno/mod.ts";
 
-// ── Init TOTP WASM ─────────────────────────────────────────────────────────
+// ── INIT TOTP WASM ─────────────────────────────────────────────────────────
 await init(wasm_data);
 
+// ── CORS HEADERS ────────────────────────────────────────────────────────────
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type, apikey",
 };
 
+// ── MAIN ENTRYPOINT ─────────────────────────────────────────────────────────
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS });
   }
-
   try {
+    // ── ENV & PARAMS ─────────────────────────────────────────────────---
     const env = Deno.env.toObject();
     const email  = env.MONARCH_EMAIL!;
     const pass   = env.MONARCH_PASSWORD!;
@@ -28,9 +30,11 @@ serve(async (req: Request) => {
       throw new Error("Missing one or more MONARCH_* env vars");
     }
 
+    // ── GENERATE MFA TOKEN ─────────────────────────────────────────────
     const timestamp = Math.floor(Date.now() / 1000);
     const mfaToken  = totp(secret, timestamp, 6, 30);
 
+    // ── LOGIN TO MONARCH ─────────────────────────────────────────────--
     const loginRes = await fetch("https://api.monarchmoney.com/auth/login/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -42,6 +46,7 @@ serve(async (req: Request) => {
     }
     const token = (loginJson as any).token as string;
 
+    // ── REFRESH ACCOUNT ─────────────────────────────────────────────---
     const refreshRes = await fetch(
       `https://api.monarchmoney.com/accounts/${acctId}/refresh`,
       { method: "POST", headers: { Authorization: `Token ${token}` } }
@@ -51,11 +56,11 @@ serve(async (req: Request) => {
       throw new Error(`Refresh failed: ${errText}`);
     }
 
+    // ── SUCCESS RESPONSE ─────────────────────────────────────────────--
     return new Response(
       JSON.stringify({ success: true }),
       { status: 200, headers: { ...CORS, "Content-Type": "application/json" } }
     );
-
   } catch (err: any) {
     console.error("refresh-accounts error:", err);
     return new Response(

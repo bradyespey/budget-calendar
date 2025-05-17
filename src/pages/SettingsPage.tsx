@@ -19,18 +19,47 @@ import { Input } from '../components/ui/Input'
 import {
   refreshAccountsViaFlask,
   refreshChaseBalanceInDb,
-  getLastSyncTime,            // ← import this
+  getLastSyncTime,
 } from '../api/accounts'
 import { triggerManualRecalculation } from '../api/projections'
 import { useBalance } from '../context/BalanceContext'
 import { supabase } from '../lib/supabase'
 import { useLocation } from 'react-router-dom'
 
+type CurrencyInputProps = React.ComponentProps<typeof Input> & {
+  value: string;
+  setValue: (val: string) => void;
+};
+
+function formatCurrencyInput(val: string) {
+  if (!val) return '';
+  const digits = val.replace(/\D/g, '');
+  if (!digits) return '';
+  return '$' + Number(digits).toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+export function CurrencyInput({ value, setValue, ...props }: CurrencyInputProps) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/\D/g, '');
+    setValue(raw);
+  }
+
+  const displayValue = formatCurrencyInput(value);
+
+  return (
+    <Input
+      {...props}
+      value={displayValue}
+      onChange={handleChange}
+    />
+  );
+}
+
 export function SettingsPage() {
   const [busy, setBusy] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { setBalance, setLastSync } = useBalance()
-  const [localProjectionDays, setLocalProjectionDays] = useState<number>(30)
+  const [localProjectionDays, setLocalProjectionDays] = useState<number | null>(null)
   const [localBalanceThreshold, setLocalBalanceThreshold] = useState<number>(1000)
   const [saveMessage] = useState('')
   const [calendarMode, setCalendarMode] = useState<'dev' | 'prod'>('prod')
@@ -38,7 +67,11 @@ export function SettingsPage() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const location = useLocation()
 
-  // Load settings on mount
+  // State for focus
+  const [balanceThresholdFocused, setBalanceThresholdFocused] = useState(false);
+  const [manualOverrideFocused, setManualOverrideFocused] = useState(false);
+  const [balanceThresholdInput, setBalanceThresholdInput] = useState<string | null>(null);
+
   useEffect(() => {
     async function fetchSettings() {
       const { data } = await supabase
@@ -46,23 +79,30 @@ export function SettingsPage() {
         .select('*')
         .limit(1)
         .maybeSingle();
-
       if (data) {
         setLocalProjectionDays(data.projection_days ?? 30)
         setLocalBalanceThreshold(data.balance_threshold ?? 1000)
         setManualBalanceOverride(data.manual_balance_override?.toString() ?? '')
         setCalendarMode(data.calendar_mode ?? 'prod')
+        setBalanceThresholdInput((data.balance_threshold ?? 1000).toString())
+      } else {
+        setBalanceThresholdInput('');
       }
     }
     fetchSettings()
   }, [])
 
-  // Clear notification on route change
+  // Keep balanceThresholdInput in sync with localBalanceThreshold when not focused
+  useEffect(() => {
+    if (!balanceThresholdFocused && balanceThresholdInput !== null) {
+      setBalanceThresholdInput(localBalanceThreshold.toString());
+    }
+  }, [localBalanceThreshold, balanceThresholdFocused]);
+
   useEffect(() => {
     setNotification(null);
   }, [location.pathname]);
 
-  // ── Refresh all accounts ──────────────────────────────────────────────
   async function handleRefreshAccounts() {
     setBusy(true);
     try {
@@ -76,7 +116,6 @@ export function SettingsPage() {
     }
   }
 
-  // ── Update Chase balance ──────────────────────────────────────────────
   async function handleUpdateBalance() {
     setBusy(true);
     try {
@@ -93,7 +132,6 @@ export function SettingsPage() {
     }
   }
 
-  // ── Recalculate projections ──────────────────────────────────────────
   async function handleRecalculate() {
     setBusy(true);
     try {
@@ -107,16 +145,12 @@ export function SettingsPage() {
     }
   }
 
-  // ── Sync Google Calendar ─────────────────────────────────────────────
   async function handleSyncCalendar() {
     setBusy(true);
     try {
       await saveSettings();
-      // Get latest settings for projection_days
       const { data: settings } = await supabase.from('settings').select('projection_days').eq('id', 1).maybeSingle();
       const days = settings?.projection_days || 30;
-
-      // Clear calendars first
       const clearRes = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clear-calendars?env=${calendarMode}&days=${days}`,
         {
@@ -128,8 +162,6 @@ export function SettingsPage() {
         }
       );
       if (!clearRes.ok) throw new Error('Clear calendars failed');
-
-      // Now sync calendar
       const syncRes = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-calendar?env=${calendarMode}`,
         {
@@ -152,7 +184,6 @@ export function SettingsPage() {
     }
   }
 
-  // ── Import bills CSV ────────────────────────────────────────────────
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -167,7 +198,6 @@ export function SettingsPage() {
     }
   }
 
-  // Save handler for all settings
   async function handleSave() {
     const { error } = await supabase
       .from('settings')
@@ -178,7 +208,6 @@ export function SettingsPage() {
         calendar_mode: calendarMode,
       })
       .eq('id', 1);
-
     if (error) {
       showNotification('Error saving settings.', 'error');
     } else {
@@ -196,7 +225,6 @@ export function SettingsPage() {
         calendar_mode: calendarMode,
       })
       .eq('id', 1);
-
     if (error) {
       showNotification('Error saving settings.', 'error');
       throw error;
@@ -211,10 +239,8 @@ export function SettingsPage() {
     setBusy(true);
     try {
       await saveSettings();
-      // Get latest settings for projection_days
       const { data: settings } = await supabase.from('settings').select('projection_days').eq('id', 1).maybeSingle();
       const days = settings?.projection_days || 30;
-
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clear-calendars?env=${calendarMode}&days=${days}`,
         {
@@ -253,6 +279,12 @@ export function SettingsPage() {
     }
   }
 
+  // Helper to format as $X,XXX (no cents)
+  function formatCurrencyNoCents(val: string | number) {
+    if (val === "" || val === null || isNaN(Number(val))) return "";
+    return "$" + Number(val).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  }
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {busy && (
@@ -288,7 +320,7 @@ export function SettingsPage() {
 
       {/* Budget Projection Settings */}
       <Card>
-        <CardHeader>
+        <CardHeader className="!border-b-0">
           <CardTitle>Budget Projection Settings</CardTitle>
           <CardDescription>
             Configure how far ahead to project balances and set low balance alerts.
@@ -304,7 +336,7 @@ export function SettingsPage() {
                 id="projectionDays"
                 type="text"
                 inputMode="numeric"
-                value={localProjectionDays}
+                value={localProjectionDays === null ? '' : localProjectionDays}
                 onChange={e => {
                   let value = Number(e.target.value.replace(/,/g, ""));
                   if (value > 365) value = 365;
@@ -312,6 +344,7 @@ export function SettingsPage() {
                   setLocalProjectionDays(value);
                 }}
                 className="w-full"
+                disabled={localProjectionDays === null}
               />
               <p className="text-sm text-gray-500">
                 How many days ahead to project balances (1-365)
@@ -321,16 +354,15 @@ export function SettingsPage() {
               <label htmlFor="balanceThreshold" className="text-sm font-medium">
                 Low Balance Alert
               </label>
-              <Input
+              <CurrencyInput
                 id="balanceThreshold"
-                type="text"
-                inputMode="numeric"
-                value={localBalanceThreshold.toLocaleString("en-US", { style: "currency", currency: "USD" }).replace("$", "$")}
-                onChange={e => {
-                  const raw = e.target.value.replace(/[^0-9]/g, "");
-                  setLocalBalanceThreshold(raw === "" ? 0 : Number(raw));
+                value={balanceThresholdInput === null ? '' : balanceThresholdInput}
+                setValue={val => {
+                  setBalanceThresholdInput(val);
+                  setLocalBalanceThreshold(val === "" ? 0 : Number(val));
                 }}
                 className="w-full"
+                disabled={balanceThresholdInput === null}
               />
               <p className="text-sm text-gray-500">
                 Alert when projected balance falls below this amount
@@ -340,18 +372,31 @@ export function SettingsPage() {
               <label htmlFor="manualBalanceOverride" className="text-sm font-medium">
                 Manual Balance Override
               </label>
-              <Input
-                id="manualBalanceOverride"
-                type="text"
-                inputMode="numeric"
-                value={manualBalanceOverride === "" ? "" : Number(manualBalanceOverride).toLocaleString("en-US", { style: "currency", currency: "USD" }).replace("$", "$")}
-                onChange={e => {
-                  const raw = e.target.value.replace(/[^0-9]/g, "");
-                  setManualBalanceOverride(raw === "" ? "" : Number(raw).toString());
-                }}
-                className="w-full"
-                placeholder="Optional"
-              />
+              <div className="flex gap-2 items-center">
+                <CurrencyInput
+                  id="manualBalanceOverride"
+                  value={manualBalanceOverride}
+                  setValue={val => setManualBalanceOverride(val)}
+                  className="w-full"
+                  placeholder="Optional"
+                />
+                {manualBalanceOverride && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-xs px-2 py-1 h-auto"
+                    onClick={async () => {
+                      setManualBalanceOverride("");
+                      await supabase
+                        .from('settings')
+                        .update({ manual_balance_override: null })
+                        .eq('id', 1);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
               <p className="text-sm text-gray-500">
                 Override live balance for projections (optional)
               </p>
@@ -390,10 +435,9 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Calendar Mode and Import CSV side by side */}
+      {/* Top row: Calendar Mode (left), (right column can be empty or another card) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Calendar Mode Card */}
-        <Card>
+        <Card className="flex flex-col h-full">
           <CardHeader>
             <CardTitle>Calendar Mode</CardTitle>
             <CardDescription>
@@ -431,8 +475,8 @@ export function SettingsPage() {
         </Card>
 
         {/* Import Bills from CSV Card */}
-        <Card>
-          <CardHeader>
+        <Card className="import-bills-card">
+          <CardHeader className="import-bills-header">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Import Bills from CSV</CardTitle>

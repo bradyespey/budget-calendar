@@ -4,7 +4,7 @@
 import { serve } from "https://deno.land/std@0.178.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers
+// ── CORS HEADERS ────────────────────────────────────────────────────────────
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -12,13 +12,14 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
 };
 
-// service-role credentials
+// ── SUPABASE CLIENT ─────────────────────────────────────────────────────────
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // admin client (service-role)
 const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+// ── MAIN ENTRYPOINT ─────────────────────────────────────────────────────────
 serve(async (req: Request) => {
   // handle preflight
   if (req.method === "OPTIONS") {
@@ -26,11 +27,11 @@ serve(async (req: Request) => {
   }
 
   try {
-    // 1) get Monarch token from env
+    // ── GET MONARCH TOKEN ────────────────────────────────────────────────
     const token = Deno.env.get("MONARCH_TOKEN");
     if (!token) throw new Error("Missing MONARCH_TOKEN");
 
-    // 2) call Monarch GraphQL
+    // ── CALL MONARCH GRAPHQL ─────────────────────────────────────────────
     const res = await fetch("https://api.monarchmoney.com/graphql", {
       method: "POST",
       headers: {
@@ -58,7 +59,7 @@ serve(async (req: Request) => {
       .find((a: any) => String(a.id) === String(accountId));
     if (!checking) throw new Error("Chase Checking account ID not found");
 
-    // 4) persist to Supabase
+    // ── UPSERT TO SUPABASE ───────────────────────────────────────────────
     const { error: dbError } = await supabaseAdmin
       .from("accounts")
       .upsert(
@@ -72,7 +73,7 @@ serve(async (req: Request) => {
       );
     if (dbError) throw dbError;
 
-    // 5) return new balance
+    // ── RETURN NEW BALANCE ───────────────────────────────────────────────
     return new Response(
       JSON.stringify({ balance: checking.displayBalance }),
       { status: 200, headers: { ...CORS, "Content-Type": "application/json" } }

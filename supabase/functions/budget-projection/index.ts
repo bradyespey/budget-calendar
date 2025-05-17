@@ -278,7 +278,6 @@ async function computeProjections(settings: Settings) {
   const BATCH_SIZE = 50;
   for (let i = 0; i < projections.length; i += BATCH_SIZE) {
     const batch = projections.slice(i, i + BATCH_SIZE);
-    console.log("First 3 projections:", JSON.stringify(batch.slice(0, 3), null, 2));
     const { error: insertError } = await supabase
       .from('projections')
       .insert(batch);
@@ -323,7 +322,7 @@ function formatCurrency(amount: number) {
 }
 
 // Helper functions
-function formatNumberWithCommas(num) {
+function formatNumberWithCommas(num: number) {
   if (num === null || num === undefined || num === "") return "";
   return num.toLocaleString("en-US");
 }

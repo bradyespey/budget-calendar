@@ -1,9 +1,13 @@
 //src/stores/settingsStore.ts
 
+// ── ZUSTAND SETTINGS STORE (PERSISTED) ─────────────────────────────────────
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-// ── Settings store interface ─────────────────────────────────────────────────
+// This store provides persistent settings for projectionDays and balanceThreshold.
+// If you are not using this for global state, consider removing it. (Flagged for review)
+
+// ── Settings store interface ────────────────────────────────────────────────
 interface SettingsState {
   projectionDays: number
   balanceThreshold: number

@@ -38,7 +38,7 @@ export function Navbar({ toggleTheme, isDarkMode }: NavbarProps) {
             </Link>
             {/* Navigation Links */}
             <div className="flex items-center space-x-1">
-              {['/Dashboard', '/Transactions', '/Upcoming', '/Settings'].map((path) => (
+              {['/dashboard', '/transactions', '/upcoming', '/settings'].map((path) => (
                 <Link
                   key={path}
                   to={path}

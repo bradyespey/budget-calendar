@@ -56,7 +56,7 @@ function App() {
 
           {/* Redirects */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to={window.location.pathname.toLowerCase()} replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

@@ -38,7 +38,12 @@ export function Navbar({ toggleTheme, isDarkMode }: NavbarProps) {
             </Link>
             {/* Navigation Links */}
             <div className="flex items-center space-x-1">
-              {['/dashboard', '/transactions', '/upcoming', '/settings'].map((path) => (
+              {[
+                { path: '/dashboard', label: 'Dashboard' },
+                { path: '/transactions', label: 'Transactions' },
+                { path: '/upcoming', label: 'Upcoming' },
+                { path: '/settings', label: 'Settings' },
+              ].map(({ path, label }) => (
                 <Link
                   key={path}
                   to={path}
@@ -48,7 +53,7 @@ export function Navbar({ toggleTheme, isDarkMode }: NavbarProps) {
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                   }`}
                 >
-                  {path.replace('/', '') || 'dashboard'}
+                  {label}
                 </Link>
               ))}
             </div>

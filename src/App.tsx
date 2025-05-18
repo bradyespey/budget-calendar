@@ -13,7 +13,7 @@ import { SettingsPage } from './pages/SettingsPage'
 
 function App() {
   return (
-    <BrowserRouter basename="/budget">
+    <BrowserRouter>
       <AuthProvider>
         <Routes>
           {/* Public */}

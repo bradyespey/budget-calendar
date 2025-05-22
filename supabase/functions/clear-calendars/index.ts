@@ -2,6 +2,7 @@
 
 import { serve } from "https://deno.land/std@0.220.1/http/server.ts";
 import { google } from "npm:googleapis";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ── CORS HEADERS ────────────────────────────────────────────────────────────
 const corsHeaders = {
@@ -41,9 +42,14 @@ serve(async (req) => {
   }
   try {
     // ── PARSE ENV & PARAMS ───────────────────────────────────────────────
-    const url = new URL(req.url);
-    const env = url.searchParams.get("env") || "prod";
-    const projectionDays = Number(url.searchParams.get("days")) || 30;
+    // Fetch calendar_mode from Supabase settings
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const { data: settings, error: settingsError } = await supabase.from('settings').select('calendar_mode').limit(1).maybeSingle();
+    if (settingsError) throw new Error('Failed to fetch settings: ' + settingsError.message);
+    const calendarMode = settings?.calendar_mode || 'prod';
 
     // ── GOOGLE AUTH ─────────────────────────────────────────────────-----
     const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
@@ -59,43 +65,55 @@ serve(async (req) => {
     const calendar = google.calendar({ version: "v3", auth });
 
     // ── GET CALENDAR IDS ─────────────────────────────────────────────---
-    const { balanceCalId, billsCalId } = getCalendarIds(env);
+    const balanceCalId = calendarMode === "dev"
+      ? Deno.env.get("DEV_BALANCE_CALENDAR_ID")
+      : Deno.env.get("PROD_BALANCE_CALENDAR_ID");
+    const billsCalId = calendarMode === "dev"
+      ? Deno.env.get("DEV_BILLS_CALENDAR_ID")
+      : Deno.env.get("PROD_BILLS_CALENDAR_ID");
     if (!balanceCalId || !billsCalId) throw new Error("Missing calendar IDs");
 
-    // ── DATE RANGE ─────────────────────────────────────────────────-----
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endDate = new Date(today);
-    endDate.setDate(today.getDate() + projectionDays);
-    const timeMin = toRFC3339LocalMidnight(today);
-    const timeMax = toRFC3339LocalMidnight(endDate);
-
-    // ── CLEAR EVENTS ─────────────────────────────────────────────────---
-    async function clearEvents(calendarId: string) {
-      let pageToken: string | undefined = undefined;
+    // ── CLEAR ALL EVENTS ─────────────────────────────────────────────---
+    async function clearAllEvents(calendarId) {
+      let pageToken = undefined;
+      let deletedCount = 0;
+      let seenRecurring = new Set();
       do {
         const res = await calendar.events.list({
           calendarId,
-          timeMin,
-          timeMax,
           singleEvents: true,
-          maxResults: 2500,
+          maxResults: 100,
           pageToken,
+          showDeleted: false,
         });
         const events = res.data.items || [];
         for (const event of events) {
-          await calendar.events.delete({ calendarId, eventId: event.id });
+          // If this is an instance of a recurring event, delete the parent series only once
+          if (event.recurringEventId && !seenRecurring.has(event.recurringEventId)) {
+            await calendar.events.delete({ calendarId, eventId: event.recurringEventId });
+            seenRecurring.add(event.recurringEventId);
+            console.log('Deleting recurring series:', event.recurringEventId);
+          } else if (!event.recurringEventId) {
+            await calendar.events.delete({ calendarId, eventId: event.id });
+            console.log('Deleting event:', event.id);
+          }
+          deletedCount++;
         }
         pageToken = res.data.nextPageToken || undefined;
+        if (events.length === 100 || pageToken) {
+          break; // Stop after 100 deletions per call
+        }
       } while (pageToken);
+      return deletedCount;
     }
-    await clearEvents(balanceCalId);
-    await clearEvents(billsCalId);
+    const moreBalance = await clearAllEvents(balanceCalId);
+    const moreBills = await clearAllEvents(billsCalId);
+    const more = moreBalance || moreBills;
     return new Response(
-      JSON.stringify({ success: true, message: `Cleared events in ${env} calendars.` }),
+      JSON.stringify({ success: true, more, message: more ? 'More events to delete, run again.' : `Cleared all events in ${calendarMode} calendars.` }),
       { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
-  } catch (e: any) {
+  } catch (e) {
     console.error("Clear calendars error:", e);
     return new Response(
       JSON.stringify({ success: false, error: e.message || String(e) }),

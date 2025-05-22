@@ -151,17 +151,6 @@ export function SettingsPage() {
       await saveSettings();
       const { data: settings } = await supabase.from('settings').select('projection_days').eq('id', 1).maybeSingle();
       const days = settings?.projection_days || 30;
-      const clearRes = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clear-calendars?env=${calendarMode}&days=${days}`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      if (!clearRes.ok) throw new Error('Clear calendars failed');
       const syncRes = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-calendar?env=${calendarMode}`,
         {

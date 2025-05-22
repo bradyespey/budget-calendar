@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { format, parseISO, isSameDay } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { getProjections } from '../api/projections';
-import { getBills } from '../api/bills';
-import { Bill, Projection } from '../types';
+import { Projection } from '../types';
 import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { useLocation } from 'react-router-dom';
+import { formatInTimeZone } from 'date-fns-tz';
 
 interface DayData {
   date: string;
@@ -33,7 +33,6 @@ export function UpcomingPage() {
   useEffect(() => {
     fetchUpcomingData();
     async function fetchLastProjected() {
-      // Get the last_projected_at from settings
       const { data } = await supabase
         .from('settings')
         .select('last_projected_at')
@@ -50,14 +49,11 @@ export function UpcomingPage() {
     try {
       setLoading(true);
       
-      // Fetch projections and bills in parallel
-      const [projections, bills] = await Promise.all([
-        getProjections(),
-        getBills()
-      ]);
+      // We only need projections now since they contain the bills
+      const projections = await getProjections();
       
       // Process the data to create a day-by-day view
-      const days = processDayData(projections, bills);
+      const days = processDayData(projections);
       setUpcomingDays(days);
     } catch (error) {
       console.error('Error fetching upcoming data:', error);
@@ -66,66 +62,18 @@ export function UpcomingPage() {
     }
   };
 
-  const processDayData = (projections: Projection[], bills: Bill[]): DayData[] => {
-    // Create a map of date -> bill transactions
-    const dateTransactionsMap: Record<string, {id: string; name: string; amount: number; category: string}[]> = {};
-    
-    // Process bills to find which ones occur on which dates in the next 30 days
-    bills.forEach(bill => {
-      const startDate = parseISO(bill.start_date);
-      
-      // Skip bills that haven't started yet or have ended
-      if (bill.end_date && parseISO(bill.end_date) < new Date()) {
-        return;
-      }
-      
-      // Find occurrences in the next 30 days based on frequency
-      projections.forEach(proj => {
-        const projDate = parseISO(proj.proj_date);
-        
-        // Simple calculation to check if a bill occurs on a given date
-        // Note: This is a simplified approach and doesn't handle all cases perfectly
-        let occurs = false;
-        const daysSinceStart = Math.floor((projDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (isSameDay(projDate, startDate)) {
-          occurs = true;
-        } else if (bill.frequency === 'daily') {
-          occurs = daysSinceStart % bill.repeats_every === 0;
-        } else if (bill.frequency === 'weekly') {
-          occurs = daysSinceStart % (7 * bill.repeats_every) === 0;
-        } else if (bill.frequency === 'monthly') {
-          occurs = projDate.getDate() === startDate.getDate() && 
-                  (projDate.getMonth() - startDate.getMonth() + 
-                  (projDate.getFullYear() - startDate.getFullYear()) * 12) % bill.repeats_every === 0;
-        } else if (bill.frequency === 'yearly') {
-          occurs = projDate.getDate() === startDate.getDate() && 
-                  projDate.getMonth() === startDate.getMonth() && 
-                  (projDate.getFullYear() - startDate.getFullYear()) % bill.repeats_every === 0;
-        }
-        
-        if (occurs) {
-          const dateKey = proj.proj_date;
-          if (!dateTransactionsMap[dateKey]) {
-            dateTransactionsMap[dateKey] = [];
-          }
-          
-          dateTransactionsMap[dateKey].push({
-            id: bill.id,
-            name: bill.name,
-            amount: bill.amount,
-            category: bill.category
-          });
-        }
-      });
-    });
-    
-    // Create the day data objects
+  const processDayData = (projections: Projection[]): DayData[] => {
+    // Create the day data objects directly from projections
     return projections.map(proj => {
       return {
         date: proj.proj_date,
         balance: proj.projected_balance,
-        transactions: dateTransactionsMap[proj.proj_date] || [],
+        transactions: (proj.bills || []).map(bill => ({
+          id: bill.id,
+          name: bill.name,
+          amount: bill.amount,
+          category: bill.category
+        })),
         isHighest: proj.highest,
         isLowest: proj.lowest
       };
@@ -144,6 +92,10 @@ export function UpcomingPage() {
   const getBalanceChange = (day: DayData, index: number): number => {
     if (index === 0) return 0;
     return day.balance - upcomingDays[index - 1].balance;
+  };
+
+  const formatDate = (dateStr: string) => {
+    return formatInTimeZone(parseISO(dateStr), 'America/Chicago', 'EEEE, MMMM d');
   };
 
   if (loading) {
@@ -184,7 +136,7 @@ export function UpcomingPage() {
               <div className="flex justify-between items-center">
                 <CardTitle className="flex items-center">
                   <span className="text-lg font-bold">
-                    {format(parseISO(day.date), 'EEEE, MMMM d')}
+                    {formatDate(day.date)}
                   </span>
                   {day.isHighest && (
                     <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">

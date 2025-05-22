@@ -3,7 +3,7 @@
 import { serve } from "https://deno.land/std@0.220.1/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { google } from "npm:googleapis"
-import { addDays, format, parseISO, isValid } from "https://esm.sh/date-fns@3.4.0"
+import { format } from "https://esm.sh/date-fns@3.4.0"
 
 // ── CORS HEADERS ────────────────────────────────────────────────────────────
 const corsHeaders = {
@@ -53,16 +53,18 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-    const { data: settings } = await supabase.from('settings').select('projection_days').limit(1).maybeSingle();
-    const projectionDays = settings?.projection_days || 30;
     const today = new Date();
-    const endDate = addDays(today, projectionDays);
     const { data: projections, error } = await supabase
       .from('projections')
       .select('*')
       .gte('proj_date', format(today, 'yyyy-MM-dd'))
-      .lte('proj_date', format(endDate, 'yyyy-MM-dd'));
+      .order('proj_date', { ascending: true });
     if (error) throw new Error(error.message);
+
+    // Get the last projection date to use as end date for calendar sync
+    const endDate = projections.length > 0 
+      ? new Date(projections[projections.length - 1].proj_date)
+      : today;
 
     // ── FETCH CALENDAR EVENTS FOR BOTH CALENDARS ───────────────────────
     async function fetchAllEvents(calendarId) {
@@ -82,26 +84,26 @@ serve(async (req) => {
       } while (pageToken);
       return events;
     }
-    const balanceEvents = await fetchAllEvents(balanceCalId);
-    const billsEvents = await fetchAllEvents(billsCalId);
 
-    console.log('RAW BALANCE EVENTS:', JSON.stringify(balanceEvents));
-    console.log('RAW BILLS EVENTS:', JSON.stringify(billsEvents));
+    // Fetch events in parallel for better performance
+    const [balanceEvents, billsEvents] = await Promise.all([
+      fetchAllEvents(balanceCalId),
+      fetchAllEvents(billsCalId)
+    ]);
 
-    // ── BUILD MAPS FOR QUICK LOOKUP ─────────────────────────────────────
-    // For balances: key = date + summary
+    // ── BUILD BALANCE MAPS ──────────────────────────────────────────────
     const balanceProjMap = new Map();
     for (const proj of projections) {
       if (proj.proj_date && proj.projected_balance !== null) {
-        const dateKey = format(parseISO(proj.proj_date), 'yyyy-MM-dd');
+        const dateKey = format(new Date(proj.proj_date), 'yyyy-MM-dd');
         const summary = `Projected Balance: $${Math.round(proj.projected_balance)}`;
         const key = `${dateKey.trim()}|${summary.trim()}`.normalize();
         balanceProjMap.set(key, proj);
-        console.log('BALANCE PROJ KEY:', key);
       }
     }
-    // Group all events by key
-    const balanceEventGroups = {};
+
+    // Group existing balance events by date and summary
+    const balanceEventGroups = new Map();
     for (const event of balanceEvents) {
       let date = event.start?.date;
       if (!date && event.start?.dateTime) {
@@ -111,14 +113,17 @@ serve(async (req) => {
         const dateKey = format(new Date(date), 'yyyy-MM-dd');
         const summary = event.summary;
         const key = `${dateKey.trim()}|${summary.trim()}`.normalize();
-        if (!balanceEventGroups[key]) balanceEventGroups[key] = [];
-        balanceEventGroups[key].push(event);
+        if (!balanceEventGroups.has(key)) {
+          balanceEventGroups.set(key, []);
+        }
+        balanceEventGroups.get(key).push(event);
       }
     }
-    // For each group, keep only one event, delete the rest
-    for (const [key, events] of Object.entries(balanceEventGroups)) {
+
+    // Delete duplicate balance events
+    for (const [key, events] of balanceEventGroups.entries()) {
       if (events.length > 1) {
-        // Keep the first, delete the rest
+        // Keep the first event, delete the rest
         for (let i = 1; i < events.length; i++) {
           await calendar.events.delete({
             calendarId: balanceCalId,
@@ -127,44 +132,55 @@ serve(async (req) => {
         }
       }
     }
-    // Rebuild the event map after deleting duplicates
+
+    // Create or update balance events
     const balanceEventMap = new Map();
-    for (const [key, events] of Object.entries(balanceEventGroups)) {
+    for (const [key, events] of balanceEventGroups.entries()) {
       if (events.length > 0) {
         balanceEventMap.set(key, events[0]);
       }
     }
-    // Insert or update as needed
+
+    // Batch create missing balance events
+    const balanceEventsToCreate = [];
     for (const [key, proj] of balanceProjMap.entries()) {
       if (!balanceEventMap.has(key)) {
-        try {
-          await calendar.events.insert({
-            calendarId: balanceCalId,
-            requestBody: {
-              summary: `Projected Balance: $${Math.round(proj.projected_balance)}`,
-              start: { date: proj.proj_date },
-              end: { date: proj.proj_date },
-            },
-          });
-        } catch (e) {
-          console.error('Error inserting event:', key, e);
-        }
+        balanceEventsToCreate.push({
+          calendarId: balanceCalId,
+          requestBody: {
+            summary: `Projected Balance: $${Math.round(proj.projected_balance)}`,
+            start: { date: proj.proj_date },
+            end: { date: proj.proj_date },
+          },
+        });
       }
     }
 
-    // For bills: key = date + summary
+    // Create balance events in batches
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < balanceEventsToCreate.length; i += BATCH_SIZE) {
+      const batch = balanceEventsToCreate.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(event => 
+        calendar.events.insert(event).catch(e => 
+          console.error('Error inserting balance event:', e)
+        )
+      ));
+    }
+
+    // ── BUILD BILLS MAPS ──────────────────────────────────────────────
     const billsProjMap = new Map();
     for (const proj of projections) {
       if (proj.proj_date && proj.bills && proj.bills.length > 0) {
-        const dateKey = format(parseISO(proj.proj_date), 'yyyy-MM-dd');
+        const dateKey = format(new Date(proj.proj_date), 'yyyy-MM-dd');
         for (const bill of proj.bills) {
           const summary = `${bill.name} ${formatCurrency(bill.amount)}`;
           const key = `${dateKey.trim()}|${summary.trim()}`.normalize();
           billsProjMap.set(key, { proj, bill });
-          console.log('BILL PROJ KEY:', key);
         }
       }
     }
+
+    // Group existing bill events by date and summary
     const billsEventMap = new Map();
     for (const event of billsEvents) {
       let date = event.start?.date;
@@ -176,20 +192,14 @@ serve(async (req) => {
         const summary = event.summary;
         const key = `${dateKey.trim()}|${summary.trim()}`.normalize();
         billsEventMap.set(key, event);
-        console.log('BILL EVENT KEY:', key);
       }
     }
 
-    console.log('ALL BALANCE PROJ KEYS:', Array.from(balanceProjMap.keys()));
-    console.log('ALL BALANCE EVENT KEYS:', Array.from(balanceEventMap.keys()));
-    console.log('ALL BILL PROJ KEYS:', Array.from(billsProjMap.keys()));
-    console.log('ALL BILL EVENT KEYS:', Array.from(billsEventMap.keys()));
-
-    // ── SYNC BILLS EVENTS ───────────────────────────────────────────────
+    // Batch create missing bill events
+    const billsEventsToCreate = [];
     for (const [key, { proj, bill }] of billsProjMap.entries()) {
       if (!billsEventMap.has(key)) {
-        // Insert new bill event
-        await calendar.events.insert({
+        billsEventsToCreate.push({
           calendarId: billsCalId,
           requestBody: {
             summary: `${bill.name} ${formatCurrency(bill.amount)}`,
@@ -198,19 +208,38 @@ serve(async (req) => {
             end: { date: proj.proj_date },
           },
         });
-      } else {
-        // Optionally, update if details differ (not implemented here for brevity)
       }
     }
-    // Delete bill events not in projections
+
+    // Create bill events in batches
+    for (let i = 0; i < billsEventsToCreate.length; i += BATCH_SIZE) {
+      const batch = billsEventsToCreate.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(event => 
+        calendar.events.insert(event).catch(e => 
+          console.error('Error inserting bill event:', e)
+        )
+      ));
+    }
+
+    // Delete bill events that no longer exist in projections
+    const billsEventsToDelete = [];
     for (const [key, event] of billsEventMap.entries()) {
       if (!billsProjMap.has(key)) {
-        console.log('DELETING BILL EVENT:', key);
-        await calendar.events.delete({
+        billsEventsToDelete.push({
           calendarId: billsCalId,
           eventId: event.id,
         });
       }
+    }
+
+    // Delete bill events in batches
+    for (let i = 0; i < billsEventsToDelete.length; i += BATCH_SIZE) {
+      const batch = billsEventsToDelete.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(event => 
+        calendar.events.delete(event).catch(e => 
+          console.error('Error deleting bill event:', e)
+        )
+      ));
     }
 
     return new Response("Calendar sync complete", { status: 200, headers: corsHeaders });
@@ -220,90 +249,7 @@ serve(async (req) => {
   }
 });
 
-// ── HOLIDAY HELPERS ────────────────────────────────────────────────────────
-export async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
-  const holidays = new Set<string>();
-  for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
-    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/US`);
-    if (res.ok) {
-      const data = await res.json();
-      data.forEach((h: { date: string }) => holidays.add(h.date));
-    }
-  }
-  return holidays;
-}
-
-// ── DATE HELPERS ───────────────────────────────────────────────────────────
-export function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<string>): Date {
-  let d = new Date(date);
-  const dateStr = (d: Date) => format(d, "yyyy-MM-dd");
-  if (isPaycheck) {
-    while (d.getDay() === 0 || d.getDay() === 6 || holidays.has(dateStr(d))) {
-      d.setDate(d.getDate() - 1);
-    }
-  } else {
-    while (d.getDay() === 0 || d.getDay() === 6 || holidays.has(dateStr(d))) {
-      d.setDate(d.getDate() + 1);
-    }
-  }
-  return d;
-}
-
 // ── BILL HELPERS ───────────────────────────────────────────────────────────
-function billOccursOnDate(bill: any, currentDate: Date, holidays: Set<string>): boolean {
-  const frequency = (bill.frequency || "").toLowerCase();
-  const repeatsEvery = bill.repeats_every || 1;
-  const startDate = bill.start_date ? parseISO(bill.start_date) : null;
-  const endDate = bill.end_date ? parseISO(bill.end_date) : null;
-  const isPaycheck = (bill.category || "").toLowerCase() === "paycheck";
-
-  if (!startDate) return false;
-  if (currentDate < startDate) return false;
-  if (endDate && currentDate > endDate) return false;
-
-  const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-
-  if (frequency === "one-time" || frequency === "one time") {
-    return sameDay(startDate, currentDate);
-  }
-
-  if (frequency === "days" || frequency === "daily") {
-    const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / 86400000);
-    return daysDiff >= 0 && daysDiff % repeatsEvery === 0;
-  }
-
-  if (frequency === "weeks" || frequency === "weekly") {
-    const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / 86400000);
-    const weeksDiff = Math.floor(daysDiff / 7);
-    return weeksDiff >= 0 && weeksDiff % repeatsEvery === 0 && currentDate.getDay() === startDate.getDay();
-  }
-
-  if (frequency === "months" || frequency === "monthly") {
-    const monthsDiff = (currentDate.getFullYear() - startDate.getFullYear()) * 12 + (currentDate.getMonth() - startDate.getMonth());
-    if (monthsDiff < 0 || monthsDiff % repeatsEvery !== 0) return false;
-    const isLast = isLastDayOfMonth(startDate);
-    if (isLast) {
-      return isLastDayOfMonth(currentDate);
-    }
-    return currentDate.getDate() === startDate.getDate();
-  }
-
-  if (frequency === "years" || frequency === "yearly") {
-    const yearsDiff = currentDate.getFullYear() - startDate.getFullYear();
-    return yearsDiff >= 0 && yearsDiff % repeatsEvery === 0 &&
-      currentDate.getMonth() === startDate.getMonth() &&
-      currentDate.getDate() === startDate.getDate();
-  }
-
-  return false;
-}
-
-function isLastDayOfMonth(date: Date): boolean {
-  const test = new Date(date);
-  test.setDate(test.getDate() + 1);
-  return test.getDate() === 1;
-}
-
 function formatCurrency(amount: number) {
   const abs = Math.abs(amount).toLocaleString();
   if (amount < 0) return `-$${abs}`;

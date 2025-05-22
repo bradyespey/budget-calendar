@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.220.1/http/server.ts";
 import { google } from "npm:googleapis";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// ── CORS HEADERS ────────────────────────────────────────────────────────────
+// ── CORS HEADERS ────────────────────────────────────────────────────────
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -35,14 +35,13 @@ function toRFC3339LocalMidnight(date: Date) {
   return `${yyyy}-${mm}-${dd}T00:00:00${sign}${hh}:${min}`;
 }
 
-// ── MAIN ENTRYPOINT ─────────────────────────────────────────────────────────
+// ── MAIN ENTRYPOINT ─────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
   try {
-    // ── PARSE ENV & PARAMS ───────────────────────────────────────────────
-    // Fetch calendar_mode from Supabase settings
+    // ── FETCH SETTINGS ─────────────────────────────────────────────---
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -51,7 +50,7 @@ serve(async (req) => {
     if (settingsError) throw new Error('Failed to fetch settings: ' + settingsError.message);
     const calendarMode = settings?.calendar_mode || 'prod';
 
-    // ── GOOGLE AUTH ─────────────────────────────────────────────────-----
+    // ── GOOGLE AUTH ─────────────────────────────────────────────────--
     const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
     if (!serviceAccountJson) throw new Error("Missing Google service account secret");
     const key = JSON.parse(serviceAccountJson);
@@ -64,7 +63,7 @@ serve(async (req) => {
     await auth.authorize();
     const calendar = google.calendar({ version: "v3", auth });
 
-    // ── GET CALENDAR IDS ─────────────────────────────────────────────---
+    // ── CALENDAR IDS ─────────────────────────────────────────────---
     const balanceCalId = calendarMode === "dev"
       ? Deno.env.get("DEV_BALANCE_CALENDAR_ID")
       : Deno.env.get("PROD_BALANCE_CALENDAR_ID");
@@ -73,7 +72,7 @@ serve(async (req) => {
       : Deno.env.get("PROD_BILLS_CALENDAR_ID");
     if (!balanceCalId || !billsCalId) throw new Error("Missing calendar IDs");
 
-    // ── CLEAR ALL EVENTS ─────────────────────────────────────────────---
+    // ── CLEAR ALL EVENTS ─────────────────────────────────────────---
     async function clearAllEvents(calendarId) {
       let pageToken = undefined;
       let deletedCount = 0;
@@ -88,16 +87,17 @@ serve(async (req) => {
         });
         const events = res.data.items || [];
         for (const event of events) {
-          // If this is an instance of a recurring event, delete the parent series only once
-          if (event.recurringEventId && !seenRecurring.has(event.recurringEventId)) {
-            await calendar.events.delete({ calendarId, eventId: event.recurringEventId });
-            seenRecurring.add(event.recurringEventId);
-            console.log('Deleting recurring series:', event.recurringEventId);
-          } else if (!event.recurringEventId) {
-            await calendar.events.delete({ calendarId, eventId: event.id });
-            console.log('Deleting event:', event.id);
+          try {
+            if (event.recurringEventId && !seenRecurring.has(event.recurringEventId)) {
+              await calendar.events.delete({ calendarId, eventId: event.recurringEventId });
+              seenRecurring.add(event.recurringEventId);
+            } else if (!event.recurringEventId) {
+              await calendar.events.delete({ calendarId, eventId: event.id });
+            }
+            deletedCount++;
+          } catch (err) {
+            console.error('Failed to delete event:', event.id, err);
           }
-          deletedCount++;
         }
         pageToken = res.data.nextPageToken || undefined;
         if (events.length === 100 || pageToken) {

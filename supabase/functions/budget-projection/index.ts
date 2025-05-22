@@ -1,42 +1,12 @@
-import { createClient } from "npm:@supabase/supabase-js@2.39.8";
-import { format, addDays, parseISO, isWeekend, startOfDay } from "npm:date-fns@3.4.0";
-import { decode } from "https://deno.land/x/djwt@v2.8/mod.ts";
+//supabase/functions/budget-projection/index.ts
+
+import { format, addDays, isWeekend } from "npm:date-fns@3.4.0";
 import { formatInTimeZone, zonedTimeToUtc } from "npm:date-fns-tz@3.0.0-beta.3";
 
-// Type definitions
-interface Bill {
-  id: string;
-  name: string;
-  category: string;
-  amount: number;
-  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'one-time';
-  repeats_every: number;
-  start_date: string;
-  end_date?: string;
-  owner?: string;
-  note?: string;
-}
+// Imports: Supabase client
+import { createClient } from "npm:@supabase/supabase-js@2.39.8";
 
-interface Account {
-  id: string;
-  display_name: string;
-  last_balance: number;
-  last_synced: string;
-}
-
-interface Projection {
-  proj_date: string;
-  projected_balance: number;
-  lowest: boolean;
-  highest: boolean;
-  bills?: Bill[];
-}
-
-interface Settings {
-  projectionDays: number;
-  balanceThreshold: number;
-}
-
+// Constants
 // Cors headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,6 +15,7 @@ const corsHeaders = {
   "Access-Control-Allow-Credentials": "true",
 };
 
+// Supabase client setup
 // Create Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -53,6 +24,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Define timezone at the top level since it's used in multiple functions
 const TIMEZONE = 'America/Chicago';
 
+// Main HTTP handler
 // Main function to handle the request
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight request
@@ -141,6 +113,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
+// Helper functions
 // Helper function to fetch US holidays
 async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
   const holidays = new Set<string>();
@@ -173,6 +146,17 @@ function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<st
   return d;
 }
 
+function formatCurrency(amount: number) {
+  return (amount < 0 ? "-$" : "$") + Math.abs(amount).toLocaleString();
+}
+
+// Helper functions
+function formatNumberWithCommas(num: number) {
+  if (num === null || num === undefined || num === "") return "";
+  return num.toLocaleString("en-US");
+}
+
+// Projection logic
 // Function to compute projections
 async function computeProjections(settings: Settings) {
   const today = formatInTimeZone(new Date(), TIMEZONE, "yyyy-MM-dd");
@@ -241,7 +225,12 @@ async function computeProjections(settings: Settings) {
           intendedDate = rawDate;
         }
       } else if (bill.frequency === 'yearly') {
-        if (currentDate.getMonth() === billStart.getMonth() && currentDate.getDate() === billStart.getDate() && (currentDate.getFullYear() - billStart.getFullYear()) % bill.repeats_every === 0) intendedDate = currentDate;
+        const yearDiff = currentDate.getFullYear() - billStart.getFullYear();
+        if (yearDiff >= 0 && yearDiff % bill.repeats_every === 0) {
+          const rawDate = new Date(billStart);
+          rawDate.setFullYear(billStart.getFullYear() + yearDiff);
+          intendedDate = rawDate;
+        }
       }
 
       if (intendedDate) {
@@ -305,6 +294,7 @@ async function computeProjections(settings: Settings) {
   }
 }
 
+// Low balance alerts
 // Function to check for low balance alerts
 async function checkLowBalanceAlerts(threshold: number) {
   console.log("Checking for low balance alerts...");
@@ -331,12 +321,36 @@ async function checkLowBalanceAlerts(threshold: number) {
   }
 }
 
-function formatCurrency(amount: number) {
-  return (amount < 0 ? "-$" : "$") + Math.abs(amount).toLocaleString();
+// Type definitions
+interface Bill {
+  id: string;
+  name: string;
+  category: string;
+  amount: number;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'one-time';
+  repeats_every: number;
+  start_date: string;
+  end_date?: string;
+  owner?: string;
+  note?: string;
 }
 
-// Helper functions
-function formatNumberWithCommas(num: number) {
-  if (num === null || num === undefined || num === "") return "";
-  return num.toLocaleString("en-US");
+interface Account {
+  id: string;
+  display_name: string;
+  last_balance: number;
+  last_synced: string;
+}
+
+interface Projection {
+  proj_date: string;
+  projected_balance: number;
+  lowest: boolean;
+  highest: boolean;
+  bills?: Bill[];
+}
+
+interface Settings {
+  projectionDays: number;
+  balanceThreshold: number;
 }

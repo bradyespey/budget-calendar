@@ -1,9 +1,7 @@
-//supabase/functions/sync-calendar/index.ts
-
 import { serve } from "https://deno.land/std@0.220.1/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { google } from "npm:googleapis"
-import { format } from "https://esm.sh/date-fns@3.4.0"
+import { format, isValid } from "https://esm.sh/date-fns@3.4.0"
 
 // ── CORS HEADERS ────────────────────────────────────────────────────────────
 const corsHeaders = {
@@ -66,15 +64,23 @@ serve(async (req) => {
       ? new Date(projections[projections.length - 1].proj_date)
       : today;
 
+    // Batch size for calendar sync operations
+    const BATCH_SIZE = 50;
+
     // ── FETCH CALENDAR EVENTS FOR BOTH CALENDARS ───────────────────────
     async function fetchAllEvents(calendarId) {
+      // Use projection date range for fetching all-day events
+      const startDateProj = projections.length > 0
+        ? new Date(projections[0].proj_date)
+        : today;
+      const maxDateProj = new Date(endDate.getTime() + 24 * 60 * 60 * 1000);
       let events = [];
       let pageToken = undefined;
       do {
         const res = await calendar.events.list({
           calendarId,
-          timeMin: today.toISOString(),
-          timeMax: endDate.toISOString(),
+          timeMin: startDateProj.toISOString(),
+          timeMax: maxDateProj.toISOString(),
           singleEvents: true,
           maxResults: 2500,
           pageToken,
@@ -91,155 +97,67 @@ serve(async (req) => {
       fetchAllEvents(billsCalId)
     ]);
 
-    // ── BUILD BALANCE MAPS ──────────────────────────────────────────────
-    const balanceProjMap = new Map();
+    // ── SYNC BALANCE EVENTS ──────────────────────────────────────────────
+    // Remove all existing balance events
+    await Promise.all(
+      balanceEvents.map(ev =>
+        calendar.events.delete({ calendarId: balanceCalId, eventId: ev.id })
+      )
+    );
+
+    // Recreate all balance events to exactly match projections
+    const balanceInserts = projections.map(proj => ({
+      calendarId: balanceCalId,
+      requestBody: {
+        summary: `Projected Balance: $${Math.round(proj.projected_balance)}`,
+        start: { date: proj.proj_date },
+        end: { date: proj.proj_date },
+      },
+    }));
+
+    for (let i = 0; i < balanceInserts.length; i += BATCH_SIZE) {
+      await Promise.all(
+        balanceInserts.slice(i, i + BATCH_SIZE).map(event =>
+          calendar.events.insert(event).catch(e =>
+            console.error('Error inserting balance event:', e)
+          )
+        )
+      );
+    }
+
+    // ── SYNC BILL EVENTS ──────────────────────────────────────────────
+    // Remove all existing bill events
+    await Promise.all(
+      billsEvents.map(ev =>
+        calendar.events.delete({ calendarId: billsCalId, eventId: ev.id })
+      )
+    );
+
+    // Recreate all bill events to exactly match projections
+    const billInserts = [];
     for (const proj of projections) {
-      if (proj.proj_date && proj.projected_balance !== null) {
-        const dateKey = format(new Date(proj.proj_date), 'yyyy-MM-dd');
-        const summary = `Projected Balance: $${Math.round(proj.projected_balance)}`;
-        const key = `${dateKey.trim()}|${summary.trim()}`.normalize();
-        balanceProjMap.set(key, proj);
-      }
-    }
-
-    // Group existing balance events by date and summary
-    const balanceEventGroups = new Map();
-    for (const event of balanceEvents) {
-      let date = event.start?.date;
-      if (!date && event.start?.dateTime) {
-        date = format(new Date(event.start.dateTime), 'yyyy-MM-dd');
-      }
-      if (date && isValid(new Date(date))) {
-        const dateKey = format(new Date(date), 'yyyy-MM-dd');
-        const summary = event.summary;
-        const key = `${dateKey.trim()}|${summary.trim()}`.normalize();
-        if (!balanceEventGroups.has(key)) {
-          balanceEventGroups.set(key, []);
-        }
-        balanceEventGroups.get(key).push(event);
-      }
-    }
-
-    // Delete duplicate balance events
-    for (const [key, events] of balanceEventGroups.entries()) {
-      if (events.length > 1) {
-        // Keep the first event, delete the rest
-        for (let i = 1; i < events.length; i++) {
-          await calendar.events.delete({
-            calendarId: balanceCalId,
-            eventId: events[i].id,
+      if (proj.proj_date && proj.bills?.length) {
+        for (const bill of proj.bills) {
+          billInserts.push({
+            calendarId: billsCalId,
+            requestBody: {
+              summary: `${bill.name} ${formatCurrency(bill.amount)}`,
+              description: `Amount: ${formatCurrency(bill.amount)}`,
+              start: { date: proj.proj_date },
+              end: { date: proj.proj_date },
+            },
           });
         }
       }
     }
-
-    // Create or update balance events
-    const balanceEventMap = new Map();
-    for (const [key, events] of balanceEventGroups.entries()) {
-      if (events.length > 0) {
-        balanceEventMap.set(key, events[0]);
-      }
-    }
-
-    // Batch create missing balance events
-    const balanceEventsToCreate = [];
-    for (const [key, proj] of balanceProjMap.entries()) {
-      if (!balanceEventMap.has(key)) {
-        balanceEventsToCreate.push({
-          calendarId: balanceCalId,
-          requestBody: {
-            summary: `Projected Balance: $${Math.round(proj.projected_balance)}`,
-            start: { date: proj.proj_date },
-            end: { date: proj.proj_date },
-          },
-        });
-      }
-    }
-
-    // Create balance events in batches
-    const BATCH_SIZE = 50;
-    for (let i = 0; i < balanceEventsToCreate.length; i += BATCH_SIZE) {
-      const batch = balanceEventsToCreate.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map(event => 
-        calendar.events.insert(event).catch(e => 
-          console.error('Error inserting balance event:', e)
+    for (let i = 0; i < billInserts.length; i += BATCH_SIZE) {
+      await Promise.all(
+        billInserts.slice(i, i + BATCH_SIZE).map(event =>
+          calendar.events.insert(event).catch(e =>
+            console.error('Error inserting bill event:', e)
+          )
         )
-      ));
-    }
-
-    // ── BUILD BILLS MAPS ──────────────────────────────────────────────
-    const billsProjMap = new Map();
-    for (const proj of projections) {
-      if (proj.proj_date && proj.bills && proj.bills.length > 0) {
-        const dateKey = format(new Date(proj.proj_date), 'yyyy-MM-dd');
-        for (const bill of proj.bills) {
-          const summary = `${bill.name} ${formatCurrency(bill.amount)}`;
-          const key = `${dateKey.trim()}|${summary.trim()}`.normalize();
-          billsProjMap.set(key, { proj, bill });
-        }
-      }
-    }
-
-    // Group existing bill events by date and summary
-    const billsEventMap = new Map();
-    for (const event of billsEvents) {
-      let date = event.start?.date;
-      if (!date && event.start?.dateTime) {
-        date = format(new Date(event.start.dateTime), 'yyyy-MM-dd');
-      }
-      if (date && isValid(new Date(date))) {
-        const dateKey = format(new Date(date), 'yyyy-MM-dd');
-        const summary = event.summary;
-        const key = `${dateKey.trim()}|${summary.trim()}`.normalize();
-        billsEventMap.set(key, event);
-      }
-    }
-
-    // Batch create missing bill events
-    const billsEventsToCreate = [];
-    for (const [key, { proj, bill }] of billsProjMap.entries()) {
-      if (!billsEventMap.has(key)) {
-        billsEventsToCreate.push({
-          calendarId: billsCalId,
-          requestBody: {
-            summary: `${bill.name} ${formatCurrency(bill.amount)}`,
-            description: `Amount: ${formatCurrency(bill.amount)}`,
-            start: { date: proj.proj_date },
-            end: { date: proj.proj_date },
-          },
-        });
-      }
-    }
-
-    // Create bill events in batches
-    for (let i = 0; i < billsEventsToCreate.length; i += BATCH_SIZE) {
-      const batch = billsEventsToCreate.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map(event => 
-        calendar.events.insert(event).catch(e => 
-          console.error('Error inserting bill event:', e)
-        )
-      ));
-    }
-
-    // Delete bill events that no longer exist in projections
-    const billsEventsToDelete = [];
-    for (const [key, event] of billsEventMap.entries()) {
-      if (!billsProjMap.has(key)) {
-        billsEventsToDelete.push({
-          calendarId: billsCalId,
-          eventId: event.id,
-        });
-      }
-    }
-
-    // Delete bill events in batches
-    for (let i = 0; i < billsEventsToDelete.length; i += BATCH_SIZE) {
-      const batch = billsEventsToDelete.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map(event => 
-        calendar.events.delete(event).catch(e => 
-          console.error('Error deleting bill event:', e)
-        )
-      ));
+      );
     }
 
     return new Response("Calendar sync complete", { status: 200, headers: corsHeaders });

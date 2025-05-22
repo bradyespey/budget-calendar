@@ -6,6 +6,7 @@ import {
   RefreshCcw,
   Calendar,
   Upload,
+  Download,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import {
@@ -463,31 +464,71 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Import Bills from CSV Card */}
+        {/* Import/Export Bills Card */}
         <Card className="import-bills-card">
           <CardHeader className="import-bills-header">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Import Bills from CSV</CardTitle>
+                <CardTitle>Import/Export Bills</CardTitle>
                 <CardDescription>
-                  CSV columns: Name, Category, Amount, Frequency, Repeats Every, Start Date, End Date, Owner, Note.
+                  Import or export bills in CSV format. CSV columns: Name, Category, Amount, Frequency, Repeats Every, Start Date, End Date, Owner, Note.
                 </CardDescription>
               </div>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                isLoading={busy}
-                leftIcon={<Upload size={16} />}
-                className="ml-4"
-              >
-                Import CSV
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  isLoading={busy}
+                  leftIcon={<Upload size={16} />}
+                >
+                  Import CSV
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      const { data: bills } = await supabase
+                        .from('bills')
+                        .select('*')
+                        .order('start_date', { ascending: true });
+                      
+                      if (!bills) return;
+                      
+                      const headers = ['Name', 'Category', 'Amount', 'Frequency', 'Repeats Every', 'Start Date', 'End Date', 'Owner', 'Note'];
+                      const csvContent = [
+                        headers.join(','),
+                        ...bills.map(bill => [
+                          `"${bill.name}"`,
+                          `"${bill.category}"`,
+                          bill.amount,
+                          `"${bill.frequency}"`,
+                          bill.repeats_every,
+                          `"${bill.start_date}"`,
+                          bill.end_date ? `"${bill.end_date}"` : '',
+                          bill.owner ? `"${bill.owner}"` : '',
+                          bill.note ? `"${bill.note}"` : ''
+                        ].join(','))
+                      ].join('\n');
+                      
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const link = document.createElement('a');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `bills-export-${new Date().toISOString().split('T')[0]}.csv`;
+                      link.click();
+                    } catch (error) {
+                      showNotification('Error exporting bills: ' + error.message, 'error');
+                    }
+                  }}
+                  leftIcon={<Download size={16} />}
+                >
+                  Export CSV
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
             </div>
           </CardHeader>
         </Card>

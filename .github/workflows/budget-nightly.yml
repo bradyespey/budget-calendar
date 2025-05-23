@@ -1,0 +1,34 @@
+name: Budget Calendar Nightly Automation
+
+on:
+  schedule:
+    - cron: '30 12 * * *'   # 7:30 AM CT (12:30 UTC)
+    - cron: '45 12 * * *'   # 7:45 AM CT (12:45 UTC)
+  workflow_dispatch:
+
+jobs:
+  refresh-accounts:
+    if: github.event.schedule == '30 12 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh Accounts
+        run: |
+          curl -X POST "https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/refresh-accounts" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+
+  chase-balance-and-projection:
+    if: github.event.schedule == '45 12 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Chase Balance
+        run: |
+          curl -X POST "https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/chase-balance" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+      - name: Run Budget Projection
+        run: |
+          curl -X POST "https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/budget-projection" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+      - name: Sync Calendar
+        run: |
+          curl -X POST "https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/sync-calendar" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"

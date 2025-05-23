@@ -1,3 +1,5 @@
+//supabase/functions/sync-calendar/index.ts
+
 import { serve } from "https://deno.land/std@0.220.1/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { google } from "npm:googleapis"
@@ -100,7 +102,7 @@ serve(async (req) => {
               .catch(e => console.error("Delete event failed:", e))
           )
         );
-        await delay(200);
+        await delay(150);
       }
     }
     await deleteEvents(balanceCalId, balanceEvents);
@@ -111,10 +113,12 @@ serve(async (req) => {
       const abs = Math.abs(amount).toLocaleString();
       return amount < 0 ? `-$${abs}` : `$${abs}`;
     }
-    const balanceInserts = projections.map(proj => ({
+    const balanceInserts = projections.map((proj, index) => ({
       calendarId: balanceCalId,
       requestBody: {
-        summary: `Projected Balance: $${Math.round(proj.projected_balance)}`,
+        summary: index === 0 
+          ? `Balance: $${Math.round(proj.projected_balance)}`
+          : `Projected Balance: $${Math.round(proj.projected_balance)}`,
         start: { date: proj.proj_date },
         end: { date: proj.proj_date }
       }
@@ -143,7 +147,7 @@ serve(async (req) => {
               .catch(e => console.error("Insert event failed:", e))
           )
         );
-        await delay(250);
+        await delay(200);
       }
     }
     await insertEvents(balanceInserts);

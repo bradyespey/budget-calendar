@@ -74,37 +74,37 @@ serve(async (req) => {
 
     // ── CLEAR ALL EVENTS ─────────────────────────────────────────---
     async function clearAllEvents(calendarId) {
-      let pageToken = undefined;
-      let deletedCount = 0;
-      let seenRecurring = new Set();
+      let totalDeleted = 0;
+      let deletedThisPass;
       do {
-        const res = await calendar.events.list({
-          calendarId,
-          singleEvents: true,
-          maxResults: 100,
-          pageToken,
-          showDeleted: false,
-        });
-        const events = res.data.items || [];
-        for (const event of events) {
-          try {
-            if (event.recurringEventId && !seenRecurring.has(event.recurringEventId)) {
-              await calendar.events.delete({ calendarId, eventId: event.recurringEventId });
-              seenRecurring.add(event.recurringEventId);
-            } else if (!event.recurringEventId) {
+        deletedThisPass = 0;
+        let pageToken = undefined;
+        do {
+          const res = await calendar.events.list({
+            calendarId,
+            singleEvents: false,
+            maxResults: 2500,
+            pageToken,
+            showDeleted: false,
+          });
+          const events = res.data.items || [];
+          for (const event of events) {
+            try {
               await calendar.events.delete({ calendarId, eventId: event.id });
+              deletedThisPass++;
+            } catch (err) {
+              console.error('Failed to delete event:', event.id, err);
             }
-            deletedCount++;
-          } catch (err) {
-            console.error('Failed to delete event:', event.id, err);
           }
+          pageToken = res.data.nextPageToken;
+        } while (pageToken);
+        totalDeleted += deletedThisPass;
+        if (deletedThisPass > 0) {
+          // Wait a bit to avoid rate limits
+          await new Promise(res => setTimeout(res, 500));
         }
-        pageToken = res.data.nextPageToken || undefined;
-        if (events.length === 100 || pageToken) {
-          break; // Stop after 100 deletions per call
-        }
-      } while (pageToken);
-      return deletedCount;
+      } while (deletedThisPass > 0);
+      return totalDeleted;
     }
     const moreBalance = await clearAllEvents(balanceCalId);
     const moreBills = await clearAllEvents(billsCalId);

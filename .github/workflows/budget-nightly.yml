@@ -8,7 +8,7 @@ on:
 
 jobs:
   refresh-accounts:
-    if: github.event.schedule == '30 12 * * *'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Refresh Accounts
@@ -17,8 +17,9 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
 
   chase-balance-and-projection:
-    if: github.event.schedule == '45 12 * * *'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    needs: refresh-accounts
     steps:
       - name: Update Chase Balance
         run: |

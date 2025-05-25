@@ -129,20 +129,47 @@ async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
 }
 
 // Helper function to adjust transaction date based on weekends and holidays
-function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<string>): Date {
-  const d = new Date(date);
+function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<string>, label: string = ""): Date {
+  let d = new Date(date);
   const dateStr = (d: Date) => formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
-  
-  if (isPaycheck) {
-    // For paychecks, move backwards to Friday
-    while (isWeekend(d) || holidays.has(dateStr(d))) {
-      d.setDate(d.getDate() - 1);
+  let original = dateStr(d);
+  let step = 0;
+
+  // Helper to log each step
+  function logStep(reason: string) {
+    console.log(`[${label}] Step ${++step}: ${reason} -> ${dateStr(d)}`);
+  }
+
+  // Repeat until not weekend/holiday
+  while (true) {
+    if (isPaycheck) {
+      if (isWeekend(d)) {
+        d.setDate(d.getDate() - 1);
+        logStep("Paycheck fell on weekend, move back");
+        continue;
+      }
+      if (holidays.has(dateStr(d))) {
+        d.setDate(d.getDate() - 1);
+        logStep("Paycheck fell on holiday, move back");
+        continue;
+      }
+    } else {
+      if (isWeekend(d)) {
+        // Move forward to Monday
+        d.setDate(d.getDate() + (8 - d.getDay()) % 7);
+        logStep("Bill fell on weekend, move forward");
+        continue;
+      }
+      if (holidays.has(dateStr(d))) {
+        d.setDate(d.getDate() + 1);
+        logStep("Bill fell on holiday, move forward");
+        continue;
+      }
     }
-  } else {
-    // For bills, move forwards to Monday
-    while (isWeekend(d) || holidays.has(dateStr(d))) {
-      d.setDate(d.getDate() + 1);
-    }
+    break;
+  }
+  if (dateStr(d) !== original) {
+    console.log(`[${label}] Final adjusted date: ${original} -> ${dateStr(d)}`);
   }
   return d;
 }
@@ -155,6 +182,19 @@ function formatCurrency(amount: number) {
 function formatNumberWithCommas(num: number) {
   if (num === null || num === undefined || num === "") return "";
   return num.toLocaleString("en-US");
+}
+
+// Helper function to get last day of month
+function getLastDayOfMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+// Helper function to adjust monthly date
+function adjustMonthlyDate(date: Date, targetDay: number): Date {
+  const lastDay = getLastDayOfMonth(date);
+  const adjustedDate = new Date(date);
+  adjustedDate.setDate(Math.min(targetDay, lastDay));
+  return adjustedDate;
 }
 
 // Projection logic
@@ -211,7 +251,7 @@ async function computeProjections(settings: Settings) {
       const intervalDays = 7 * bill.repeats_every;
       let occDate = new Date(billStart);
       while (occDate <= lastDate) {
-        const adjusted = adjustTransactionDate(new Date(occDate), isPaycheck, holidays);
+        const adjusted = adjustTransactionDate(new Date(occDate), isPaycheck, holidays, bill.name);
         if (formatInTimeZone(adjusted, TIMEZONE, "yyyy-MM-dd") === today) {
           intendedDate = occDate;
           break;
@@ -219,37 +259,17 @@ async function computeProjections(settings: Settings) {
         occDate.setDate(occDate.getDate() + intervalDays);
       }
     } else if (bill.frequency === 'monthly') {
-      // Compute the intended day-of-month (clamp if month too short)
-      const BASE = startDate;
-      const origDay = new Date(bill.start_date + 'T00:00:00').getDate();
-      const year = BASE.getFullYear();
-      const month = BASE.getMonth();
-      const lastDay = new Date(year, month + 1, 0).getDate();
-      const day = Math.min(origDay, lastDay);
-      // Only occurs if this projection day matches the bill day
-      if (BASE.getDate() === day) {
-        intendedDate = BASE;
-      }
+      const targetDay = new Date(bill.start_date + 'T00:00:00').getDate();
+      const adjustedDate = adjustMonthlyDate(new Date(billStart), targetDay);
+      intendedDate = adjustedDate;
     }
 
     if (intendedDate) {
-      // Do not re-adjust monthly items—they already land on the correct day
-      const skipAdjust = bill.frequency === 'daily' || bill.frequency === 'monthly';
+      const skipAdjust = bill.frequency === 'daily';
       let adjustedDate = new Date(intendedDate);
       if (!skipAdjust) {
         const isPaycheck = bill.category.toLowerCase() === 'paycheck';
-        const dateStrFn = (d: Date) => formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
-        if (isWeekend(adjustedDate) || holidays.has(dateStrFn(adjustedDate))) {
-          if (isPaycheck) {
-            while (isWeekend(adjustedDate) || holidays.has(dateStrFn(adjustedDate))) {
-              adjustedDate.setDate(adjustedDate.getDate() - 1);
-            }
-          } else {
-            while (isWeekend(adjustedDate) || holidays.has(dateStrFn(adjustedDate))) {
-              adjustedDate.setDate(adjustedDate.getDate() + 1);
-            }
-          }
-        }
+        adjustedDate = adjustTransactionDate(adjustedDate, isPaycheck, holidays, bill.name);
       }
       const dateStrFn = (d: Date) => formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
       if (dateStrFn(adjustedDate) === today) {
@@ -298,8 +318,7 @@ async function computeProjections(settings: Settings) {
         const intervalDays = 7 * bill.repeats_every;
         let occDate = new Date(billStart);
         while (occDate <= lastDate) {
-          // Adjust for weekends/holidays
-          const adjusted = adjustTransactionDate(new Date(occDate), isPaycheck, holidays);
+          const adjusted = adjustTransactionDate(new Date(occDate), isPaycheck, holidays, bill.name);
           if (formatInTimeZone(adjusted, TIMEZONE, "yyyy-MM-dd") === dateStr) {
             intendedDate = occDate;
             break;
@@ -307,41 +326,19 @@ async function computeProjections(settings: Settings) {
           occDate.setDate(occDate.getDate() + intervalDays);
         }
       } else if (bill.frequency === 'monthly') {
-        // Compute the intended day-of-month (clamp if month too short)
-        const BASE = currentDate;
-        const origDay = new Date(bill.start_date + 'T00:00:00').getDate();
-        const year = BASE.getFullYear();
-        const month = BASE.getMonth();
-        const lastDay = new Date(year, month + 1, 0).getDate();
-        const day = Math.min(origDay, lastDay);
-        // Only occurs if this projection day matches the bill day
-        if (BASE.getDate() === day) {
-          intendedDate = BASE;
-        }
+        const targetDay = new Date(bill.start_date + 'T00:00:00').getDate();
+        const adjustedDate = adjustMonthlyDate(currentDate, targetDay);
+        intendedDate = adjustedDate;
       }
 
       if (intendedDate) {
-        // Do not re-adjust monthly items—they already land on the correct day
-        const skipAdjust = bill.frequency === 'daily' || bill.frequency === 'monthly';
-        // Weekend/holiday adjustment (skip for daily/monthly)
+        const skipAdjust = bill.frequency === 'daily';
         let adjustedDate = new Date(intendedDate);
         if (!skipAdjust) {
           const isPaycheck = bill.category.toLowerCase() === 'paycheck';
-          const dateStrFn = (d: Date) => formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
-          if (isWeekend(adjustedDate) || holidays.has(dateStrFn(adjustedDate))) {
-            if (isPaycheck) {
-              while (isWeekend(adjustedDate) || holidays.has(dateStrFn(adjustedDate))) {
-                adjustedDate.setDate(adjustedDate.getDate() - 1);
-              }
-            } else {
-              while (isWeekend(adjustedDate) || holidays.has(dateStrFn(adjustedDate))) {
-                adjustedDate.setDate(adjustedDate.getDate() + 1);
-              }
-            }
-          }
+          adjustedDate = adjustTransactionDate(adjustedDate, isPaycheck, holidays, bill.name);
         }
         const dateStrFn = (d: Date) => formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
-        // Only add if the *adjusted* date matches the current projection day
         if (dateStrFn(adjustedDate) === dateStr) {
           occurs = true;
         }

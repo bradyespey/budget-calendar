@@ -219,25 +219,22 @@ async function computeProjections(settings: Settings) {
         occDate.setDate(occDate.getDate() + intervalDays);
       }
     } else if (bill.frequency === 'monthly') {
-      const monthsDiff = 
-        (startDate.getFullYear() - billStart.getFullYear()) * 12 +
-        (startDate.getMonth() - billStart.getMonth());
-      if (monthsDiff % bill.repeats_every === 0 && monthsDiff >= 0) {
-        const rawDate = new Date(billStart);
-        rawDate.setMonth(rawDate.getMonth() + monthsDiff);
-        intendedDate = rawDate;
-      }
-    } else if (bill.frequency === 'yearly') {
-      const yearDiff = startDate.getFullYear() - billStart.getFullYear();
-      if (yearDiff >= 0 && yearDiff % bill.repeats_every === 0) {
-        const rawDate = new Date(billStart);
-        rawDate.setFullYear(billStart.getFullYear() + yearDiff);
-        intendedDate = rawDate;
+      // Compute the intended day-of-month (clamp if month too short)
+      const BASE = startDate;
+      const origDay = new Date(bill.start_date + 'T00:00:00').getDate();
+      const year = BASE.getFullYear();
+      const month = BASE.getMonth();
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const day = Math.min(origDay, lastDay);
+      // Only occurs if this projection day matches the bill day
+      if (BASE.getDate() === day) {
+        intendedDate = BASE;
       }
     }
 
     if (intendedDate) {
-      const skipAdjust = bill.frequency === 'daily';
+      // Do not re-adjust monthly items—they already land on the correct day
+      const skipAdjust = bill.frequency === 'daily' || bill.frequency === 'monthly';
       let adjustedDate = new Date(intendedDate);
       if (!skipAdjust) {
         const isPaycheck = bill.category.toLowerCase() === 'paycheck';
@@ -310,26 +307,23 @@ async function computeProjections(settings: Settings) {
           occDate.setDate(occDate.getDate() + intervalDays);
         }
       } else if (bill.frequency === 'monthly') {
-        const monthsDiff = 
-          (currentDate.getFullYear() - billStart.getFullYear()) * 12 +
-          (currentDate.getMonth() - billStart.getMonth());
-        if (monthsDiff % bill.repeats_every === 0 && monthsDiff >= 0) {
-          const rawDate = new Date(billStart);
-          rawDate.setMonth(rawDate.getMonth() + monthsDiff);
-          intendedDate = rawDate;
-        }
-      } else if (bill.frequency === 'yearly') {
-        const yearDiff = currentDate.getFullYear() - billStart.getFullYear();
-        if (yearDiff >= 0 && yearDiff % bill.repeats_every === 0) {
-          const rawDate = new Date(billStart);
-          rawDate.setFullYear(billStart.getFullYear() + yearDiff);
-          intendedDate = rawDate;
+        // Compute the intended day-of-month (clamp if month too short)
+        const BASE = currentDate;
+        const origDay = new Date(bill.start_date + 'T00:00:00').getDate();
+        const year = BASE.getFullYear();
+        const month = BASE.getMonth();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const day = Math.min(origDay, lastDay);
+        // Only occurs if this projection day matches the bill day
+        if (BASE.getDate() === day) {
+          intendedDate = BASE;
         }
       }
 
       if (intendedDate) {
-        const skipAdjust = bill.frequency === 'daily';
-        // Weekend/holiday adjustment (skip for daily)
+        // Do not re-adjust monthly items—they already land on the correct day
+        const skipAdjust = bill.frequency === 'daily' || bill.frequency === 'monthly';
+        // Weekend/holiday adjustment (skip for daily/monthly)
         let adjustedDate = new Date(intendedDate);
         if (!skipAdjust) {
           const isPaycheck = bill.category.toLowerCase() === 'paycheck';

@@ -26,6 +26,9 @@ import { triggerManualRecalculation } from '../api/projections'
 import { useBalance } from '../context/BalanceContext'
 import { supabase } from '../lib/supabase'
 import { useLocation } from 'react-router-dom'
+import { importBillsFromCSV } from '../utils/importBills'
+import { validateProjections } from '../utils/validateProjections'
+import { format, parseISO } from 'date-fns'
 
 type CurrencyInputProps = React.ComponentProps<typeof Input> & {
   value: string;
@@ -179,9 +182,11 @@ export function SettingsPage() {
     if (!file) return
     setBusy(true);
     try {
-      await file.text()
-    } catch {
-      console.error('Error importing CSV. Check file format.')
+      const csvData = await file.text()
+      const { total, imported } = await importBillsFromCSV(csvData)
+      showNotification(`Successfully imported ${imported} of ${total} bills.`, 'success')
+    } catch (error: any) {
+      showNotification(`Error importing CSV: ${error.message}`, 'error')
     } finally {
       fileInputRef.current!.value = ''
       setBusy(false)
@@ -253,6 +258,34 @@ export function SettingsPage() {
     }
   }
 
+  async function handleValidateProjections() {
+    setBusy(true);
+    try {
+      await saveSettings();
+      const result = await validateProjections();
+
+      // Get unique missing bill names
+      const missingNames = [
+        ...new Set(result.missingInProjections.map(({ bill }) => bill.name))
+      ];
+      const expectedCount = result.summary.totalProjections + result.missingInProjections.length;
+      const foundCount = result.summary.totalProjections;
+
+      let message = `${foundCount}/${expectedCount} bills found`;
+      if (missingNames.length > 0) {
+        message += `, ${missingNames.length} bill${missingNames.length > 1 ? 's' : ''} missing: ${missingNames.join(', ')}`;
+      } else {
+        message += `, no bills missing!`;
+      }
+
+      showNotification(message, 'success');
+    } catch (e: any) {
+      showNotification(`Error validating projections: ${e.message}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleAllActions() {
     setBusy(true);
     try {
@@ -261,6 +294,7 @@ export function SettingsPage() {
       await handleRecalculate();
       await handleSyncCalendar();
       await handleClearCalendars();
+      await handleValidateProjections();
       showNotification('All actions completed.', 'success');
     } catch (e: any) {
       showNotification(`Error running all actions: ${e.message}`, 'error');
@@ -418,6 +452,9 @@ export function SettingsPage() {
             <Button onClick={handleClearCalendars} disabled={busy} className="w-full">
               <Calendar className="mr-2 h-4 w-4" /> Clear Calendars
             </Button>
+            <Button onClick={handleValidateProjections} disabled={busy} className="w-full">
+              <Calculator className="mr-2 h-4 w-4" /> Validate Projections
+            </Button>
             <Button onClick={handleAllActions} disabled={busy} className="w-full">
               <RefreshCcw className="mr-2 h-4 w-4" /> Run All Actions
             </Button>
@@ -471,7 +508,7 @@ export function SettingsPage() {
               <div>
                 <CardTitle>Import/Export Bills</CardTitle>
                 <CardDescription>
-                  Import or export bills in CSV format. CSV columns: Name, Category, Amount, Frequency, Repeats Every, Start Date, End Date, Owner, Note.
+                  Import or export bills in CSV format. Download a sample template to get started.
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -498,11 +535,11 @@ export function SettingsPage() {
                         ...bills.map(bill => [
                           `"${bill.name}"`,
                           `"${bill.category}"`,
-                          bill.amount,
+                          bill.amount < 0 ? `-$${Math.abs(bill.amount).toFixed(2)}` : `$${bill.amount.toFixed(2)}`,
                           `"${bill.frequency}"`,
                           bill.repeats_every,
-                          `"${bill.start_date}"`,
-                          bill.end_date ? `"${bill.end_date}"` : '',
+                          `"${format(parseISO(bill.start_date), 'M/d/yyyy')}"`,
+                          bill.end_date ? `"${format(parseISO(bill.end_date), 'M/d/yyyy')}"` : '',
                           bill.owner ? `"${bill.owner}"` : '',
                           bill.note ? `"${bill.note}"` : ''
                         ].join(','))
@@ -520,6 +557,29 @@ export function SettingsPage() {
                   leftIcon={<Download size={16} />}
                 >
                   Export CSV
+                </Button>
+                <Button
+                  onClick={() => {
+                    const headers = ['Name', 'Category', 'Amount', 'Frequency', 'Repeats Every', 'Start Date', 'End Date', 'Owner', 'Note'];
+                    const sampleData = [
+                      ['Rent', 'Housing', '-$2,000.00', 'monthly', '1', '1/1/2025', '', 'Both', 'Monthly rent payment'],
+                      ['Paycheck', 'Paycheck', '$5,000.00', 'weekly', '2', '1/15/2025', '', 'Brady', 'Biweekly salary (every 2 weeks)'],
+                      ['Netflix', 'Subscription', '-$15.99', 'monthly', '1', '1/1/2025', '', 'Both', 'Streaming service']
+                    ];
+                    const csvContent = [
+                      headers.join(','),
+                      ...sampleData.map(row => row.map(cell => `"${cell}"`).join(','))
+                    ].join('\n');
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'bills-template.csv';
+                    link.click();
+                  }}
+                  leftIcon={<Download size={16} />}
+                >
+                  Sample CSV
                 </Button>
                 <input
                   ref={fileInputRef}

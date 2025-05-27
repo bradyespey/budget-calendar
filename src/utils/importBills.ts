@@ -5,11 +5,12 @@ import type { Bill } from '../types'
 import { importBills } from '../api/bills'
 
 // ── Parse CSV and import bills ───────────────────────────────────────────────
-export async function importBillsFromCSV(csvData: string): Promise<number> {
+export async function importBillsFromCSV(csvData: string): Promise<{ total: number; imported: number }> {
   const lines = csvData.split('\n')
   const headers = lines.shift()!.split(',').map(h => h.trim())
 
   const bills: Omit<Bill, 'id'>[] = []
+  const totalRows = lines.filter(line => line.trim()).length
 
   for (const line of lines) {
     const trimmed = line.trim()
@@ -43,7 +44,7 @@ export async function importBillsFromCSV(csvData: string): Promise<number> {
     // ── Parse amount ──────────────────────────────────────────────────────
     const amount = parseFloat(data.Amount.replace(/[$,]/g, '')) || 0
 
-    // ── Parse dates ───────────────────────────────────────────────────────
+    // ── Parse dates ──────────────────────────────────────────────────────
     let start_date = new Date().toISOString()
     try {
       start_date = parse(data['Start Date'], 'M/d/yyyy', new Date()).toISOString()
@@ -89,5 +90,5 @@ export async function importBillsFromCSV(csvData: string): Promise<number> {
 
   // ── Send to API ────────────────────────────────────────────────────────
   await importBills(bills)
-  return bills.length
+  return { total: totalRows, imported: bills.length }
 }

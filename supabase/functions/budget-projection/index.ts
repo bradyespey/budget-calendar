@@ -267,8 +267,29 @@ async function computeProjections(settings: Settings) {
         intendedDate = startDate;
       }
     } else if (bill.frequency === 'monthly') {
-      // Skip monthly bills here - they're handled in the main projection loop
-      continue;
+      // Handle monthly bills for today
+      const targetDay    = parseISO(bill.start_date).getDate();
+      const lastDay     = getLastDayOfMonth(startDate);
+      const day         = Math.min(targetDay, lastDay);
+      let intended      = new Date(startDate);
+      intended.setDate(day);
+    
+      const isPaycheck  = bill.category.toLowerCase() === 'paycheck';
+      let adjusted      = new Date(intended);
+      // backward for paychecks, forward for bills
+      if (isPaycheck) {
+        while (isWeekend(adjusted) || holidays.has(formatInTimeZone(adjusted, TIMEZONE, "yyyy-MM-dd"))) {
+          adjusted.setDate(adjusted.getDate() - 1);
+        }
+      } else {
+        while (isWeekend(adjusted) || holidays.has(formatInTimeZone(adjusted, TIMEZONE, "yyyy-MM-dd"))) {
+          adjusted.setDate(adjusted.getDate() + 1);
+        }
+      }
+    
+      if (formatInTimeZone(adjusted, TIMEZONE, "yyyy-MM-dd") === today) {
+        occurs = true;
+      }
     } else if (bill.frequency === 'yearly') {
       // Get the target month/day from the bill's start date
       const targetMonth = new Date(bill.start_date + 'T00:00:00').getMonth();

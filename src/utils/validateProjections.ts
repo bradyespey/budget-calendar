@@ -261,32 +261,4 @@ export async function validateProjections(): Promise<ValidationResult> {
       extraCount: extraInProjections.length
     }
   }
-}
-
-async function handleValidateProjections() {
-  setBusy(true);
-  try {
-    await saveSettings();
-    const result = await validateProjections();
-
-    // Get unique missing bill names
-    const missingNames = [
-      ...new Set(result.missingInProjections.map(({ bill }) => bill.name))
-    ];
-    const expectedCount = result.summary.totalProjections + result.missingInProjections.length;
-    const foundCount = result.summary.totalProjections;
-
-    let message = `${foundCount}/${expectedCount} bills found`;
-    if (missingNames.length > 0) {
-      message += `, ${missingNames.length} bill${missingNames.length > 1 ? 's' : ''} missing: ${missingNames.join(', ')}`;
-    } else {
-      message += `, no bills missing!`;
-    }
-
-    showNotification(message, 'success');
-  } catch (e: any) {
-    showNotification(`Error validating projections: ${e.message}`, 'error');
-  } finally {
-    setBusy(false);
-  }
 } 

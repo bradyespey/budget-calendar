@@ -271,7 +271,7 @@ export function SettingsPage() {
       const expectedCount = result.summary.totalProjections + result.missingInProjections.length;
       const foundCount = result.summary.totalProjections;
 
-      let message = `${foundCount}/${expectedCount} bills found`;
+      let message = `${foundCount}/${expectedCount} days found`;
       if (missingNames.length > 0) {
         message += `, ${missingNames.length} bill${missingNames.length > 1 ? 's' : ''} missing: ${missingNames.join(', ')}`;
       } else {

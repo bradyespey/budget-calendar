@@ -193,7 +193,14 @@ function getLastDayOfMonth(date: Date): number {
 function adjustMonthlyDate(date: Date, targetDay: number): Date {
   const lastDay = getLastDayOfMonth(date);
   const adjustedDate = new Date(date);
-  adjustedDate.setDate(Math.min(targetDay, lastDay));
+  
+  // If target day is greater than last day of month, use last day
+  if (targetDay > lastDay) {
+    adjustedDate.setDate(lastDay);
+  } else {
+    adjustedDate.setDate(targetDay);
+  }
+  
   return adjustedDate;
 }
 
@@ -203,31 +210,30 @@ async function computeProjections(settings: Settings) {
   const today = formatInTimeZone(new Date(), TIMEZONE, "yyyy-MM-dd");
   const startDate = zonedTimeToUtc(`${today}T00:00:00`, TIMEZONE);
   const projectionDates: string[] = [];
-  // Start from tomorrow for projections
   for (let i = 1; i < settings.projectionDays; i++) {
     projectionDates.push(formatInTimeZone(addDays(startDate, i), TIMEZONE, "yyyy-MM-dd"));
   }
-  // Last projection date for weekly calculation
   const lastDate = addDays(startDate, settings.projectionDays);
 
   const [{ data: accounts }, { data: bills }, holidays] = await Promise.all([
     supabase.from('accounts').select('*'),
     supabase.from('bills').select('*'),
-    fetchUSHolidays(startDate, addDays(startDate, settings.projectionDays + 7)), // +7 for possible adjustments
+    fetchUSHolidays(startDate, addDays(startDate, settings.projectionDays + 7)),
   ]);
   if (!accounts || !Array.isArray(accounts)) throw new Error('Failed to fetch accounts');
   if (!bills || !Array.isArray(bills)) throw new Error('Failed to fetch bills');
   if (!holidays || !(holidays instanceof Set)) throw new Error('Failed to fetch holidays');
 
-  // Force delete all future projections before insert
   await supabase.from('projections').delete().gte('proj_date', today);
 
-  // Use manual balance override if set, otherwise use account balance
   const totalBalance = settings.manual_balance_override !== null && settings.manual_balance_override !== undefined
     ? settings.manual_balance_override
     : accounts.reduce((sum, a) => sum + a.last_balance, 0);
   let runningBalance = totalBalance;
   const projections: Projection[] = [];
+
+  // Declare billsByDate ONCE here
+  const billsByDate: Record<string, Bill[]> = {};
 
   // First, add today's balance and transactions
   const todayBills: Bill[] = [];
@@ -261,11 +267,8 @@ async function computeProjections(settings: Settings) {
         intendedDate = startDate;
       }
     } else if (bill.frequency === 'monthly') {
-      const targetDay = parseISO(bill.start_date).getDate();
-      const monthsDiff = differenceInCalendarMonths(startDate, billStart);
-      if (monthsDiff >= 0 && monthsDiff % bill.repeats_every === 0) {
-        intendedDate = adjustMonthlyDate(startDate, targetDay);
-      }
+      // Skip monthly bills here - they're handled in the main projection loop
+      continue;
     } else if (bill.frequency === 'yearly') {
       // Get the target month/day from the bill's start date
       const targetMonth = new Date(bill.start_date + 'T00:00:00').getMonth();
@@ -315,13 +318,48 @@ async function computeProjections(settings: Settings) {
     // Now process future dates
     // --- NEW LOGIC: For each bill, generate all intended dates in the window, adjust, and add to correct day ---
     // Build a map of dateStr -> bills for that day
-    const billsByDate: Record<string, Bill[]> = {};
     for (const bill of bills) {
       const billStart = zonedTimeToUtc(`${bill.start_date}T00:00:00`, TIMEZONE);
       const billEnd = bill.end_date ? zonedTimeToUtc(`${bill.end_date}T00:00:00`, TIMEZONE) : null;
       const isPaycheck = bill.category.toLowerCase() === 'paycheck';
+
+      if (bill.frequency === 'monthly') {
+        // For each month in the projection window, generate the intended date
+        let monthCursor = new Date(startDate);
+        // Always start at the first of the month for each iteration
+        monthCursor.setDate(1);
+
+        while (monthCursor <= addDays(startDate, settings.projectionDays)) {
+          const targetDay = parseISO(bill.start_date).getDate();
+          const lastDay = getLastDayOfMonth(monthCursor);
+          let intended = new Date(monthCursor);
+          intended.setDate(targetDay > lastDay ? lastDay : targetDay);
+
+          // Adjust for business day (back for paychecks, forward for others)
+          if (isPaycheck) {
+            while (isWeekend(intended) || holidays.has(formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd"))) {
+              intended.setDate(intended.getDate() - 1);
+            }
+          } else {
+            while (isWeekend(intended) || holidays.has(formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd"))) {
+              intended.setDate(intended.getDate() + 1);
+            }
+          }
+
+          const intendedStr = formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd");
+          if (projectionDates.includes(intendedStr) && intended >= startDate && (!billEnd || intended <= billEnd)) {
+            if (!billsByDate[intendedStr]) billsByDate[intendedStr] = [];
+            billsByDate[intendedStr].push(bill);
+          }
+
+          // Move to next month
+          monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
+        }
+        continue; // Skip the rest of the loop for monthly bills
+      }
+
+      // Handle non-monthly bills
       let current = new Date(billStart);
-      // Only consider bills that could occur in the window
       while (current <= addDays(startDate, settings.projectionDays)) {
         // Skip if before projection window
         if (current < startDate) {
@@ -337,14 +375,22 @@ async function computeProjections(settings: Settings) {
         }
         // Stop if after end date
         if (billEnd && current > billEnd) break;
-        // For monthly, adjust to correct day
+        
         let intended = new Date(current);
         if (bill.frequency === 'monthly') {
           const targetDay = new Date(bill.start_date + 'T00:00:00').getDate();
-          intended = adjustMonthlyDate(current, targetDay);
-        }
-        // For yearly, adjust to correct day
-        if (bill.frequency === 'yearly') {
+          const lastDay = getLastDayOfMonth(current);
+          // If the bill's target day is greater than this month's last day, use the last day
+          if (targetDay > lastDay) {
+            intended.setDate(lastDay);
+          } else {
+            intended.setDate(targetDay);
+          }
+          // Now adjust for business day if needed (for all monthly bills)
+          while (isWeekend(intended) || holidays.has(formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd"))) {
+            intended.setDate(intended.getDate() - 1);
+          }
+        } else if (bill.frequency === 'yearly') {
           const targetMonth = new Date(bill.start_date + 'T00:00:00').getMonth();
           const targetDay = new Date(bill.start_date + 'T00:00:00').getDate();
           if (intended.getMonth() !== targetMonth) {
@@ -356,7 +402,7 @@ async function computeProjections(settings: Settings) {
         }
         // Adjust for holidays/weekends (skip for daily)
         let adjusted = new Date(intended);
-        if (bill.frequency !== 'daily') {
+        if (bill.frequency !== 'daily' && bill.frequency !== 'monthly') {
           adjusted = adjustTransactionDate(adjusted, isPaycheck, holidays, bill.name);
         }
         const adjustedStr = formatInTimeZone(adjusted, TIMEZONE, "yyyy-MM-dd");

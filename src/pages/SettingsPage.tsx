@@ -7,6 +7,7 @@ import {
   Calendar,
   Upload,
   Download,
+  Loader,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import {
@@ -75,6 +76,8 @@ export function SettingsPage() {
   const [balanceThresholdFocused, setBalanceThresholdFocused] = useState(false);
   const [manualOverrideFocused, setManualOverrideFocused] = useState(false);
   const [balanceThresholdInput, setBalanceThresholdInput] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [runAllStep, setRunAllStep] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -108,7 +111,9 @@ export function SettingsPage() {
   }, [location.pathname]);
 
   async function handleRefreshAccounts() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
+    setActiveAction('refresh');
     try {
       await saveSettings();
       await refreshAccountsViaFlask();
@@ -117,11 +122,14 @@ export function SettingsPage() {
       showNotification(`Error refreshing accounts: ${e.message}`, 'error');
     } finally {
       setBusy(false);
+      setActiveAction(null);
     }
   }
 
   async function handleUpdateBalance() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
+    setActiveAction('balance');
     try {
       await saveSettings();
       const bal = await refreshChaseBalanceInDb();
@@ -133,11 +141,14 @@ export function SettingsPage() {
       showNotification(`Error updating balance: ${e.message}`, 'error');
     } finally {
       setBusy(false);
+      setActiveAction(null);
     }
   }
 
   async function handleRecalculate() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
+    setActiveAction('projection');
     try {
       await saveSettings();
       await triggerManualRecalculation();
@@ -146,11 +157,14 @@ export function SettingsPage() {
       showNotification('Error recalculating projections.', 'error');
     } finally {
       setBusy(false);
+      setActiveAction(null);
     }
   }
 
   async function handleSyncCalendar() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
+    setActiveAction('calendar');
     try {
       await saveSettings();
       const { data: settings } = await supabase.from('settings').select('projection_days').eq('id', 1).maybeSingle();
@@ -174,13 +188,20 @@ export function SettingsPage() {
       showNotification(`Error syncing calendar: ${e.message}`, 'error');
     } finally {
       setBusy(false);
+      setActiveAction(null);
     }
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
+    setActiveAction('import');
+    const file = e.target.files?.[0]
+    if (!file) {
+      setBusy(false);
+      setActiveAction(null);
+      return;
+    }
     try {
       const csvData = await file.text()
       const { total, imported } = await importBillsFromCSV(csvData)
@@ -189,11 +210,15 @@ export function SettingsPage() {
       showNotification(`Error importing CSV: ${error.message}`, 'error')
     } finally {
       fileInputRef.current!.value = ''
-      setBusy(false)
+      setBusy(false);
+      setActiveAction(null);
     }
   }
 
   async function handleSave() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+    setBusy(true);
+    setActiveAction('save');
     const { error } = await supabase
       .from('settings')
       .update({
@@ -208,6 +233,8 @@ export function SettingsPage() {
     } else {
       showNotification('Settings saved!', 'success');
     }
+    setBusy(false);
+    setActiveAction(null);
   }
 
   async function saveSettings() {
@@ -231,7 +258,9 @@ export function SettingsPage() {
   }
 
   async function handleClearCalendars() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
+    setActiveAction('clear');
     try {
       await saveSettings();
       const { data: settings } = await supabase.from('settings').select('projection_days').eq('id', 1).maybeSingle();
@@ -255,11 +284,14 @@ export function SettingsPage() {
       showNotification(`Error clearing calendars: ${e.message}`, 'error');
     } finally {
       setBusy(false);
+      setActiveAction(null);
     }
   }
 
   async function handleValidateProjections() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
+    setActiveAction('validate');
     try {
       await saveSettings();
       const result = await validateProjections();
@@ -283,23 +315,80 @@ export function SettingsPage() {
       showNotification(`Error validating projections: ${e.message}`, 'error');
     } finally {
       setBusy(false);
+      setActiveAction(null);
     }
   }
 
   async function handleAllActions() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
+    setActiveAction('all');
+    setRunAllStep('Step 1/5: Refreshing Accounts...');
     try {
-      await handleRefreshAccounts();
-      await handleUpdateBalance();
-      await handleRecalculate();
-      await handleSyncCalendar();
-      await handleClearCalendars();
-      await handleValidateProjections();
-      showNotification('All actions completed.', 'success');
+      // 1. Refresh Accounts (ignore errors)
+      try {
+        await saveSettings();
+        await refreshAccountsViaFlask();
+      } catch (e) {
+        // ignore error
+      }
+      // 2. Wait 60 seconds
+      setRunAllStep('Step 2/5: Waiting 60 seconds for account refresh...');
+      await new Promise(res => setTimeout(res, 60000));
+      // 3. Update Balance (ignore errors)
+      setRunAllStep('Step 3/5: Updating Balance...');
+      try {
+        await saveSettings();
+        const bal = await refreshChaseBalanceInDb();
+        const freshSync = await getLastSyncTime();
+        if (freshSync) setLastSync(freshSync);
+        await setBalance(bal);
+      } catch (e) {
+        // ignore error
+      }
+      // 4. Budget Projection (must finish)
+      setRunAllStep('Step 4/5: Running Budget Projection...');
+      try {
+        await saveSettings();
+        await triggerManualRecalculation();
+      } catch (e: any) {
+        showNotification('Error running Budget Projection: ' + (e.message || e), 'error');
+        setBusy(false);
+        setActiveAction(null);
+        setRunAllStep(null);
+        return;
+      }
+      // 5. Sync Calendar (must finish)
+      setRunAllStep('Step 5/5: Syncing Calendar...');
+      try {
+        await saveSettings();
+        const { data: settings } = await supabase.from('settings').select('projection_days').eq('id', 1).maybeSingle();
+        const days = settings?.projection_days || 30;
+        const syncRes = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-calendar?env=${calendarMode}`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        if (!syncRes.ok) throw new Error('Calendar sync failed');
+      } catch (e: any) {
+        showNotification('Error syncing calendar: ' + (e.message || e), 'error');
+        setBusy(false);
+        setActiveAction(null);
+        setRunAllStep(null);
+        return;
+      }
+      showNotification('All actions completed successfully.', 'success');
     } catch (e: any) {
-      showNotification(`Error running all actions: ${e.message}`, 'error');
+      showNotification('Error running all actions: ' + (e.message || e), 'error');
     } finally {
       setBusy(false);
+      setActiveAction(null);
+      setRunAllStep(null);
     }
   }
 
@@ -309,24 +398,39 @@ export function SettingsPage() {
     return "$" + Number(val).toLocaleString("en-US", { maximumFractionDigits: 0 });
   }
 
+  // Helper to get contextual feedback for busy state
+  function getBusyMessage() {
+    if (activeAction === 'refresh') return 'Refreshing Accounts...';
+    if (activeAction === 'balance') return 'Updating Balance...';
+    if (activeAction === 'projection') return 'Running Budget Projection...';
+    if (activeAction === 'calendar') return 'Syncing Calendar...';
+    if (activeAction === 'validate') return 'Validating Projections...';
+    if (activeAction === 'clear') return 'Clearing Calendars...';
+    if (activeAction === 'import') return 'Importing Bills from CSV...';
+    if (activeAction === 'save') return 'Saving Settings...';
+    if (runAllStep) return runAllStep;
+    return 'Working...';
+  }
+
   return (
-    <div className="space-y-6 max-w-5xl mx-auto px-2 sm:px-4">
+    <div className="space-y-6 max-w-3xl mx-auto px-2 sm:px-4">
       {busy && (
         <div className="flex items-center justify-center mb-4">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mr-2"></div>
-          <span className="text-blue-600 dark:text-blue-200 font-semibold">Working...</span>
+          <span className="text-blue-600 dark:text-blue-200 font-semibold">{getBusyMessage()}</span>
         </div>
       )}
       {/* Page header with Save button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-2">
         <h1 className="text-2xl font-bold">Settings</h1>
-        <button
+        <Button
           onClick={handleSave}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded shadow disabled:opacity-50 disabled:cursor-not-allowed transition"
-          style={{ minWidth: 100 }}
+          className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto"
+          disabled={busy}
         >
+          {busy && activeAction === 'save' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="save">💾</span>}
           Save
-        </button>
+        </Button>
       </div>
       {saveMessage && <div className="mb-2">{saveMessage}</div>}
 
@@ -346,7 +450,7 @@ export function SettingsPage() {
       <Card className="w-full">
         <CardHeader className="!border-b-0">
           <CardTitle>Budget Projection Settings</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-600 dark:text-gray-200">
             Configure how far ahead to project balances and set low balance alerts.
           </CardDescription>
         </CardHeader>
@@ -367,10 +471,10 @@ export function SettingsPage() {
                   if (value < 1) value = 1;
                   setLocalProjectionDays(value);
                 }}
-                className="w-full"
+                className="w-full max-w-xs"
                 disabled={localProjectionDays === null}
               />
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-600 dark:text-gray-200">
                 How many days ahead to project balances (1-365)
               </p>
             </div>
@@ -385,10 +489,10 @@ export function SettingsPage() {
                   setBalanceThresholdInput(val);
                   setLocalBalanceThreshold(val === "" ? 0 : Number(val));
                 }}
-                className="w-full"
+                className="w-full max-w-xs"
                 disabled={balanceThresholdInput === null}
               />
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-600 dark:text-gray-200">
                 Alert when projected balance falls below this amount
               </p>
             </div>
@@ -401,7 +505,7 @@ export function SettingsPage() {
                   id="manualBalanceOverride"
                   value={manualBalanceOverride}
                   setValue={val => setManualBalanceOverride(val)}
-                  className="w-full"
+                  className="w-full max-w-xs"
                   placeholder="Optional"
                 />
                 {manualBalanceOverride && (
@@ -421,7 +525,7 @@ export function SettingsPage() {
                   </Button>
                 )}
               </div>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-600 dark:text-gray-200">
                 Override live balance for projections (optional)
               </p>
             </div>
@@ -431,33 +535,53 @@ export function SettingsPage() {
 
       {/* Quick actions */}
       <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Manual triggers for account updates and calculations.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-200">Manual triggers for account updates and calculations.</CardDescription>
+          </div>
+          <Button
+            onClick={handleAllActions}
+            className="ml-2 px-4 py-2 text-base font-semibold shadow"
+            variant="primary"
+            title="Run All"
+            disabled={busy}
+          >
+            {busy && activeAction === 'all' ? <Loader className="animate-spin" size={18} /> : '🚀'} {busy && activeAction === 'all' && runAllStep ? 'Running...' : 'Run All'}
+          </Button>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button onClick={handleRefreshAccounts} disabled={busy} className="w-full">
-              <RefreshCcw className="mr-2 h-4 w-4" /> Refresh Accounts
+        <CardContent>
+          {/* Main Actions */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto" onClick={handleRefreshAccounts} disabled={busy}>
+              {busy && activeAction === 'refresh' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="refresh">🔄</span>}
+              Refresh Accounts
             </Button>
-            <Button onClick={handleUpdateBalance} disabled={busy} className="w-full">
-              <Calculator className="mr-2 h-4 w-4" /> Update Balance
+            <Button className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto" onClick={handleUpdateBalance} disabled={busy}>
+              {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="balance">💰</span>}
+              Update Balance
             </Button>
-            <Button onClick={handleRecalculate} disabled={busy} className="w-full">
-              <Calculator className="mr-2 h-4 w-4" /> Budget Projection
+            <Button className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto" onClick={handleRecalculate} disabled={busy}>
+              {busy && activeAction === 'projection' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="projection">📊</span>}
+              Budget Projection
             </Button>
-            <Button onClick={handleSyncCalendar} disabled={busy} className="w-full">
-              <Calendar className="mr-2 h-4 w-4" /> Sync Calendar
+            <Button className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto" onClick={handleSyncCalendar} disabled={busy}>
+              {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="calendar">📅</span>}
+              Sync Calendar
             </Button>
-            <Button onClick={handleClearCalendars} disabled={busy} className="w-full">
-              <Calendar className="mr-2 h-4 w-4" /> Clear Calendars
-            </Button>
-            <Button onClick={handleValidateProjections} disabled={busy} className="w-full">
-              <Calculator className="mr-2 h-4 w-4" /> Validate Projections
-            </Button>
-            <Button onClick={handleAllActions} disabled={busy} className="w-full">
-              <RefreshCcw className="mr-2 h-4 w-4" /> Run All Actions
-            </Button>
+          </div>
+          <div className="border-t border-gray-200 dark:border-gray-700 my-4" />
+          {/* Maintenance Actions */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-200 mb-2">Maintenance</h4>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button onClick={handleValidateProjections} variant="outline" className="w-full sm:w-auto" disabled={busy}>
+                {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : '🧮'} Validate Projections
+              </Button>
+              <Button onClick={handleClearCalendars} variant="outline" className="w-full sm:w-auto" disabled={busy}>
+                {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : '🧹'} Clear Calendars
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -467,7 +591,7 @@ export function SettingsPage() {
         <Card className="flex flex-col h-full w-full">
           <CardHeader>
             <CardTitle>Calendar Mode</CardTitle>
-            <CardDescription>
+            <CardDescription className="text-gray-600 dark:text-gray-200">
               Choose which Google Calendars to sync with.
             </CardDescription>
           </CardHeader>
@@ -482,7 +606,7 @@ export function SettingsPage() {
                   onChange={() => setCalendarMode('prod')}
                 />
                 <span>
-                  <span className="font-semibold">Main Calendars</span> <span className="text-xs text-gray-500">(bradyjennytx@gmail.com)</span>
+                  <span className="font-semibold">Main Calendars</span> <span className="text-xs text-gray-600 dark:text-gray-200">(bradyjennytx@gmail.com)</span>
                 </span>
               </label>
               <label className="flex items-center gap-2">
@@ -494,7 +618,7 @@ export function SettingsPage() {
                   onChange={() => setCalendarMode('dev')}
                 />
                 <span>
-                  <span className="font-semibold">Testing Calendars</span> <span className="text-xs text-gray-500">(baespey@gmail.com)</span>
+                  <span className="font-semibold">Testing Calendars</span> <span className="text-xs text-gray-600 dark:text-gray-200">(baespey@gmail.com)</span>
                 </span>
               </label>
             </div>
@@ -503,94 +627,97 @@ export function SettingsPage() {
 
         {/* Import/Export Bills Card */}
         <Card className="import-bills-card w-full">
-          <CardHeader className="import-bills-header">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Import/Export Bills</CardTitle>
-                <CardDescription>
-                  Import or export bills in CSV format. Download a sample template to get started.
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  isLoading={busy}
-                  leftIcon={<Upload size={16} />}
-                >
-                  Import CSV
-                </Button>
-                <Button
-                  onClick={async () => {
-                    try {
-                      const { data: bills } = await supabase
-                        .from('bills')
-                        .select('*')
-                        .order('start_date', { ascending: true });
-                      
-                      if (!bills) return;
-                      
-                      const headers = ['Name', 'Category', 'Amount', 'Frequency', 'Repeats Every', 'Start Date', 'End Date', 'Owner', 'Note'];
-                      const csvContent = [
-                        headers.join(','),
-                        ...bills.map(bill => [
-                          `"${bill.name}"`,
-                          `"${bill.category}"`,
-                          bill.amount < 0 ? `-$${Math.abs(bill.amount).toFixed(2)}` : `$${bill.amount.toFixed(2)}`,
-                          `"${bill.frequency}"`,
-                          bill.repeats_every,
-                          `"${format(parseISO(bill.start_date), 'M/d/yyyy')}"`,
-                          bill.end_date ? `"${format(parseISO(bill.end_date), 'M/d/yyyy')}"` : '',
-                          bill.owner ? `"${bill.owner}"` : '',
-                          bill.note ? `"${bill.note}"` : ''
-                        ].join(','))
-                      ].join('\n');
-                      
-                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                      const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
-                      link.download = `bills-export-${new Date().toISOString().split('T')[0]}.csv`;
-                      link.click();
-                    } catch (error) {
-                      showNotification('Error exporting bills: ' + error.message, 'error');
-                    }
-                  }}
-                  leftIcon={<Download size={16} />}
-                >
-                  Export CSV
-                </Button>
-                <Button
-                  onClick={() => {
+          <CardHeader>
+            <CardTitle>Import/Export Bills</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-200">
+              Import, export, or download a sample CSV of your bills.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                isLoading={busy && activeAction === 'import'}
+                leftIcon={busy && activeAction === 'import' ? <Loader className="animate-spin" size={16} /> : <Upload size={16} />}
+                disabled={busy}
+                className="min-w-[140px]"
+              >
+                Import CSV
+              </Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    const { data: bills } = await supabase
+                      .from('bills')
+                      .select('*')
+                      .order('start_date', { ascending: true });
+                    
+                    if (!bills) return;
+                    
                     const headers = ['Name', 'Category', 'Amount', 'Frequency', 'Repeats Every', 'Start Date', 'End Date', 'Owner', 'Note'];
-                    const sampleData = [
-                      ['Rent', 'Housing', '-$2,000.00', 'monthly', '1', '1/1/2025', '', 'Both', 'Monthly rent payment'],
-                      ['Paycheck', 'Paycheck', '$5,000.00', 'weekly', '2', '1/15/2025', '', 'Brady', 'Biweekly salary (every 2 weeks)'],
-                      ['Netflix', 'Subscription', '-$15.99', 'monthly', '1', '1/1/2025', '', 'Both', 'Streaming service']
-                    ];
                     const csvContent = [
                       headers.join(','),
-                      ...sampleData.map(row => row.map(cell => `"${cell}"`).join(','))
+                      ...bills.map(bill => [
+                        `"${bill.name}"`,
+                        `"${bill.category}"`,
+                        bill.amount < 0 ? `-$${Math.abs(bill.amount).toFixed(2)}` : `$${bill.amount.toFixed(2)}`,
+                        `"${bill.frequency}"`,
+                        bill.repeats_every,
+                        `"${format(parseISO(bill.start_date), 'M/d/yyyy')}"`,
+                        bill.end_date ? `"${format(parseISO(bill.end_date), 'M/d/yyyy')}"` : '',
+                        bill.owner ? `"${bill.owner}"` : '',
+                        bill.note ? `"${bill.note}"` : ''
+                      ].join(','))
                     ].join('\n');
                     
                     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                     const link = document.createElement('a');
                     link.href = URL.createObjectURL(blob);
-                    link.download = 'bills-template.csv';
+                    link.download = `bills-export-${new Date().toISOString().split('T')[0]}.csv`;
                     link.click();
-                  }}
-                  leftIcon={<Download size={16} />}
-                >
-                  Sample CSV
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </div>
+                  } catch (error) {
+                    showNotification('Error exporting bills: ' + error.message, 'error');
+                  }
+                }}
+                leftIcon={<Download size={16} />}
+                disabled={busy}
+              >
+                Export CSV
+              </Button>
+              <Button
+                onClick={() => {
+                  const headers = ['Name', 'Category', 'Amount', 'Frequency', 'Repeats Every', 'Start Date', 'End Date', 'Owner', 'Note'];
+                  const sampleData = [
+                    ['Rent', 'Housing', '-$2,000.00', 'monthly', '1', '1/1/2025', '', 'Both', 'Monthly rent payment'],
+                    ['Paycheck', 'Paycheck', '$5,000.00', 'weekly', '2', '1/15/2025', '', 'Brady', 'Biweekly salary (every 2 weeks)'],
+                    ['Netflix', 'Subscription', '-$15.99', 'monthly', '1', '1/1/2025', '', 'Both', 'Streaming service']
+                  ];
+                  const csvContent = [
+                    headers.join(','),
+                    ...sampleData.map(row => row.map(cell => `"${cell}"`).join(','))
+                  ].join('\n');
+                  
+                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                  const link = document.createElement('a');
+                  link.href = URL.createObjectURL(blob);
+                  link.download = 'bills-template.csv';
+                  link.click();
+                }}
+                leftIcon={<Download size={16} />}
+                disabled={busy}
+                className="min-w-[140px]"
+              >
+                Sample CSV
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
             </div>
-          </CardHeader>
+          </CardContent>
         </Card>
       </div>
     </div>

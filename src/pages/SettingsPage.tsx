@@ -542,7 +542,7 @@ export function SettingsPage() {
           </div>
           <Button
             onClick={handleAllActions}
-            className="ml-2 px-4 py-2 text-base font-semibold shadow"
+            className="ml-2 px-4 py-2 text-base font-semibold shadow whitespace-nowrap min-w-[120px]"
             variant="primary"
             title="Run All"
             disabled={busy}
@@ -552,20 +552,20 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent>
           {/* Main Actions */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <Button className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto" onClick={handleRefreshAccounts} disabled={busy}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+            <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRefreshAccounts} disabled={busy}>
               {busy && activeAction === 'refresh' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="refresh">🔄</span>}
               Refresh Accounts
             </Button>
-            <Button className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto" onClick={handleUpdateBalance} disabled={busy}>
+            <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleUpdateBalance} disabled={busy}>
               {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="balance">💰</span>}
               Update Balance
             </Button>
-            <Button className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto" onClick={handleRecalculate} disabled={busy}>
+            <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRecalculate} disabled={busy}>
               {busy && activeAction === 'projection' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="projection">📊</span>}
               Budget Projection
             </Button>
-            <Button className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto" onClick={handleSyncCalendar} disabled={busy}>
+            <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleSyncCalendar} disabled={busy}>
               {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="calendar">📅</span>}
               Sync Calendar
             </Button>

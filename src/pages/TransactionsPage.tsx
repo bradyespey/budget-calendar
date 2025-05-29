@@ -298,7 +298,7 @@ export function TransactionsPage() {
   };
 
   return (
-    <div className="space-y-6 px-2 sm:px-4 md:px-8 max-w-3xl mx-auto">
+    <div className="space-y-8 px-4 max-w-3xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transactions</h1>
         {mode === 'view' && (

@@ -38,7 +38,7 @@ export function Navbar({ toggleTheme, isDarkMode }: NavbarProps) {
 
   return (
     <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto px-4">
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center space-x-8">
             {/* Logo */}

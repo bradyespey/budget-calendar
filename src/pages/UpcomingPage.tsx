@@ -107,7 +107,7 @@ export function UpcomingPage() {
   }
 
   return (
-    <div className="space-y-6 px-2 sm:px-4 max-w-2xl mx-auto">
+    <div className="space-y-8 px-4 max-w-3xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-2 mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white md:mr-8">
           {upcomingDays.length}-Day Projection

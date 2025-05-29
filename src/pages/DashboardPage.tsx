@@ -170,7 +170,7 @@ export function DashboardPage() {
 
   // ── UI ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-8 px-2 sm:px-4 md:px-8 max-w-5xl mx-auto">
+    <div className="space-y-8 px-4 max-w-5xl mx-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Current Balance */}
         <Card>

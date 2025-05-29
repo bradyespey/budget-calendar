@@ -49,6 +49,8 @@ export function DashboardPage() {
   })
   const [monthlyTotals, setMonthlyTotals] = useState({ income: 0, bills: 0, leftover: 0 })
   const [loading, setLoading] = useState(true)
+  const [sortField, setSortField] = useState<'category' | 'monthly' | 'yearly'>('category')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   const { projectionDays } = useSettingsStore()
   const { balance: totalBalance, lastSync } = useBalance()
@@ -144,6 +146,20 @@ export function DashboardPage() {
       maximumFractionDigits: 0,
     }).format(amount)
 
+  const handleSort = (field: 'category' | 'monthly' | 'yearly') => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const getSortIcon = (field: 'category' | 'monthly' | 'yearly') => {
+    if (field !== sortField) return '↕️'
+    return sortDirection === 'asc' ? '↑' : '↓'
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -154,7 +170,7 @@ export function DashboardPage() {
 
   // ── UI ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-8 px-2 sm:px-4 md:px-8 max-w-7xl mx-auto">
+    <div className="space-y-8 px-2 sm:px-4 md:px-8 max-w-5xl mx-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Current Balance */}
         <Card>
@@ -284,6 +300,9 @@ export function DashboardPage() {
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {formatCurrency(monthlyTotals.leftover)}
                 </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Income minus bills
+                </p>
               </div>
             </div>
           </CardContent>
@@ -299,20 +318,43 @@ export function DashboardPage() {
               <table className="w-full min-w-[400px]">
                 <thead>
                   <tr className="border-b dark:border-gray-700">
-                    <th className="text-left py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                      Category
+                    <th 
+                      className="text-left py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => handleSort('category')}
+                    >
+                      Category {getSortIcon('category')}
                     </th>
-                    <th className="text-right py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                      Monthly
+                    <th 
+                      className="text-right py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => handleSort('monthly')}
+                    >
+                      Monthly {getSortIcon('monthly')}
                     </th>
-                    <th className="text-right py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                      Yearly
+                    <th 
+                      className="text-right py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => handleSort('yearly')}
+                    >
+                      Yearly {getSortIcon('yearly')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(categoryAverages)
-                    .sort(([a], [b]) => a.localeCompare(b))
+                    .sort(([a, aData], [b, bData]) => {
+                      let comparison = 0
+                      switch (sortField) {
+                        case 'category':
+                          comparison = a.localeCompare(b)
+                          break
+                        case 'monthly':
+                          comparison = aData.monthly - bData.monthly
+                          break
+                        case 'yearly':
+                          comparison = aData.yearly - bData.yearly
+                          break
+                      }
+                      return sortDirection === 'asc' ? comparison : -comparison
+                    })
                     .map(([category, averages]) => (
                       <tr key={category} className="border-b dark:border-gray-700">
                         <td className="py-2 capitalize">{category}</td>
@@ -338,27 +380,12 @@ export function DashboardPage() {
               <table className="w-full min-w-[400px]">
                 <thead>
                   <tr className="border-b dark:border-gray-700">
-                    <th className="text-left py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                      Type
-                    </th>
-                    <th className="text-right py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                      Bills
-                    </th>
-                    <th className="text-right py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                      Income
-                    </th>
+                    <th className="text-left py-2">Type</th>
+                    <th className="text-right py-2">Bills</th>
+                    <th className="text-right py-2">Income</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b dark:border-gray-700">
-                    <td className="py-2">One-Time</td>
-                    <td className="text-right text-red-600 dark:text-red-400">
-                      -{formatCurrency(billsSummary.oneTime.bills)}
-                    </td>
-                    <td className="text-right text-green-600 dark:text-green-400">
-                      {formatCurrency(billsSummary.oneTime.income)}
-                    </td>
-                  </tr>
                   <tr className="border-b dark:border-gray-700">
                     <td className="py-2">Daily</td>
                     <td className="text-right text-red-600 dark:text-red-400">
@@ -386,13 +413,22 @@ export function DashboardPage() {
                       {formatCurrency(billsSummary.monthly.income)}
                     </td>
                   </tr>
-                  <tr>
+                  <tr className="border-b dark:border-gray-700">
                     <td className="py-2">Yearly</td>
                     <td className="text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.yearly.bills)}
                     </td>
                     <td className="text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.yearly.income)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2">One-Time</td>
+                    <td className="text-right text-red-600 dark:text-red-400">
+                      -{formatCurrency(billsSummary.oneTime.bills)}
+                    </td>
+                    <td className="text-right text-green-600 dark:text-green-400">
+                      {formatCurrency(billsSummary.oneTime.income)}
                     </td>
                   </tr>
                 </tbody>

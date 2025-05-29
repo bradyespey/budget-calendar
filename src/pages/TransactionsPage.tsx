@@ -98,7 +98,7 @@ export function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
-  const [sortField, setSortField] = useState<SortField>('start_date');
+  const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [mode, setMode] = useState<FormMode>('view');
   const [formData, setFormData] = useState<Omit<Bill, 'id'>>({
@@ -132,7 +132,7 @@ export function TransactionsPage() {
     setSearchTerm('');
     setCategoryFilter('');
     setOwnerFilter('');
-    setSortField('start_date');
+    setSortField('name');
     setSortDirection('asc');
   };
 
@@ -298,7 +298,7 @@ export function TransactionsPage() {
   };
 
   return (
-    <div className="space-y-6 px-2 sm:px-4 md:px-8 max-w-5xl mx-auto">
+    <div className="space-y-6 px-2 sm:px-4 md:px-8 max-w-3xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transactions</h1>
         {mode === 'view' && (

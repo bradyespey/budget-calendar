@@ -154,7 +154,7 @@ export function DashboardPage() {
 
   // ── UI ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 px-2 sm:px-4 md:px-8 max-w-7xl mx-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Current Balance */}
         <Card>
@@ -296,7 +296,7 @@ export function DashboardPage() {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Category Averages</h3>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[400px]">
                 <thead>
                   <tr className="border-b dark:border-gray-700">
                     <th className="text-left py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -330,12 +330,12 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-                {/* Bills/Income Summary */}
-                <Card>
+        {/* Bills/Income Summary */}
+        <Card>
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Bills/Income Summary</h3>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[400px]">
                 <thead>
                   <tr className="border-b dark:border-gray-700">
                     <th className="text-left py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">

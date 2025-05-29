@@ -310,7 +310,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto px-2 sm:px-4">
       {busy && (
         <div className="flex items-center justify-center mb-4">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mr-2"></div>
@@ -318,7 +318,7 @@ export function SettingsPage() {
         </div>
       )}
       {/* Page header with Save button */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-2">
         <h1 className="text-2xl font-bold">Settings</h1>
         <button
           onClick={handleSave}
@@ -343,7 +343,7 @@ export function SettingsPage() {
       )}
 
       {/* Budget Projection Settings */}
-      <Card>
+      <Card className="w-full">
         <CardHeader className="!border-b-0">
           <CardTitle>Budget Projection Settings</CardTitle>
           <CardDescription>
@@ -430,7 +430,7 @@ export function SettingsPage() {
       </Card>
 
       {/* Quick actions */}
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
           <CardDescription>Manual triggers for account updates and calculations.</CardDescription>
@@ -464,7 +464,7 @@ export function SettingsPage() {
 
       {/* Top row: Calendar Mode (left), (right column can be empty or another card) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="flex flex-col h-full">
+        <Card className="flex flex-col h-full w-full">
           <CardHeader>
             <CardTitle>Calendar Mode</CardTitle>
             <CardDescription>
@@ -502,7 +502,7 @@ export function SettingsPage() {
         </Card>
 
         {/* Import/Export Bills Card */}
-        <Card className="import-bills-card">
+        <Card className="import-bills-card w-full">
           <CardHeader className="import-bills-header">
             <div className="flex items-center justify-between">
               <div>

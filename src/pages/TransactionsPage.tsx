@@ -298,7 +298,7 @@ export function TransactionsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4 md:px-8 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transactions</h1>
         {mode === 'view' && (
@@ -313,7 +313,7 @@ export function TransactionsPage() {
       
       {/* Form */}
       {(mode === 'create' || mode === 'edit') && (
-        <Card>
+        <Card className="w-full">
           <CardHeader>
             <CardTitle>{mode === 'create' ? 'Add New Transaction' : 'Edit Transaction'}</CardTitle>
           </CardHeader>
@@ -433,7 +433,7 @@ export function TransactionsPage() {
       
       {/* Filters */}
       {mode === 'view' && (
-        <div className="flex justify-center items-center gap-3">
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
           <div className="flex items-center gap-3">
             <Input
               className="w-48"
@@ -472,10 +472,10 @@ export function TransactionsPage() {
       
       {/* Transactions Table */}
       {mode === 'view' && (
-        <Card>
+        <Card className="w-full">
           <CardContent className="p-0">
-            <div className="overflow-auto">
-              <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <th 

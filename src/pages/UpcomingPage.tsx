@@ -107,7 +107,7 @@ export function UpcomingPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4 max-w-2xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-2 mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white md:mr-8">
           {upcomingDays.length}-Day Projection
@@ -125,8 +125,7 @@ export function UpcomingPage() {
         {upcomingDays.map((day, index) => (
           <Card 
             key={day.date}
-            className={`
-              transition-all border-l-4
+            className={`w-full transition-all border-l-4
               ${day.isHighest ? 'border-l-green-500' : ''}
               ${day.isLowest ? 'border-l-red-500' : ''}
               ${!day.isHighest && !day.isLowest ? 'border-l-transparent' : ''}

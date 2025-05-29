@@ -268,14 +268,14 @@ async function computeProjections(settings: Settings) {
       }
     } else if (bill.frequency === 'monthly') {
       // Handle monthly bills for today
-      const targetDay    = parseISO(bill.start_date).getDate();
-      const lastDay     = getLastDayOfMonth(startDate);
-      const day         = Math.min(targetDay, lastDay);
-      let intended      = new Date(startDate);
+      const targetDay = parseISO(bill.start_date).getDate();
+      const lastDay = getLastDayOfMonth(startDate);
+      const day = Math.min(targetDay, lastDay);
+      let intended = new Date(startDate);
       intended.setDate(day);
     
-      const isPaycheck  = bill.category.toLowerCase() === 'paycheck';
-      let adjusted      = new Date(intended);
+      const isPaycheck = bill.category.toLowerCase() === 'paycheck';
+      let adjusted = new Date(intended);
       // backward for paychecks, forward for bills
       if (isPaycheck) {
         while (isWeekend(adjusted) || holidays.has(formatInTimeZone(adjusted, TIMEZONE, "yyyy-MM-dd"))) {
@@ -346,11 +346,17 @@ async function computeProjections(settings: Settings) {
 
       if (bill.frequency === 'monthly') {
         // For each month in the projection window, generate the intended date
-        let monthCursor = new Date(startDate);
+        let monthCursor = new Date(billStart); // Start from bill's start date
         // Always start at the first of the month for each iteration
         monthCursor.setDate(1);
 
         while (monthCursor <= addDays(startDate, settings.projectionDays)) {
+          // Skip today since it's handled in the "today" logic above
+          if (formatInTimeZone(monthCursor, TIMEZONE, "yyyy-MM-dd") === today) {
+            monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
+            continue;
+          }
+
           const targetDay = parseISO(bill.start_date).getDate();
           const lastDay = getLastDayOfMonth(monthCursor);
           let intended = new Date(monthCursor);
@@ -373,7 +379,7 @@ async function computeProjections(settings: Settings) {
             billsByDate[intendedStr].push(bill);
           }
 
-          // Move to next month
+          // Move to next month based on repeats_every
           monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
         }
         continue; // Skip the rest of the loop for monthly bills

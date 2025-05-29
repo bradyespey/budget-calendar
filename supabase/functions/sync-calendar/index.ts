@@ -1,5 +1,3 @@
-//supabase/functions/sync-calendar/index.ts
-
 import { serve } from "https://deno.land/std@0.220.1/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { google } from "npm:googleapis"
@@ -93,65 +91,77 @@ serve(async (req) => {
       fetchAllEvents(billsCalId)
     ]);
 
-    // ── SERIAL DELETE ───────────────────────
-    async function deleteEvents(calendarId, events) {
-      for (let i = 0; i < events.length; i += 10) {
-        await Promise.all(
-          events.slice(i, i + 10).map(ev =>
-            withRetry(() => calendar.events.delete({ calendarId, eventId: ev.id }))
-              .catch(e => console.error("Delete event failed:", e))
-          )
-        );
-        await delay(150);
-      }
-    }
-    await deleteEvents(balanceCalId, balanceEvents);
-    await deleteEvents(billsCalId, billsEvents);
-
-    // ── INSERT EVENTS SERIAL ─────────────────
+    // ── UPSERT EVENTS ─────────────────────────
     function formatCurrency(amount: number) {
-      const abs = Math.abs(amount).toLocaleString();
-      return amount < 0 ? `-$${abs}` : `$${abs}`;
+      return amount.toLocaleString("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
     }
-    const balanceInserts = projections.map((proj, index) => ({
-      calendarId: balanceCalId,
-      requestBody: {
-        summary: index === 0 
-          ? `Balance: $${Math.round(proj.projected_balance)}`
-          : `Projected Balance: $${Math.round(proj.projected_balance)}`,
-        start: { date: proj.proj_date },
-        end: { date: proj.proj_date }
-      }
-    }));
-    const billInserts = [];
-    for (const proj of projections) {
-      if (proj.proj_date && proj.bills?.length) {
-        for (const bill of proj.bills) {
-          billInserts.push({
-            calendarId: billsCalId,
+    for (const [index, proj] of projections.entries()) {
+      const dateStr = proj.proj_date;
+      // Balance events
+      const expectedBalanceSummary = index === 0
+        ? `Balance: ${formatCurrency(proj.projected_balance)}`
+        : `Projected Balance: ${formatCurrency(proj.projected_balance)}`;
+      const existingBal = balanceEvents.find(ev =>
+        ev.start?.date === dateStr && ev.summary === expectedBalanceSummary
+      );
+      if (!existingBal) {
+        const anyBalOnDate = balanceEvents.find(ev => ev.start?.date === dateStr);
+        if (anyBalOnDate) {
+          // update wrong summary
+          await withRetry(() => calendar.events.patch({
+            calendarId: balanceCalId,
+            eventId: anyBalOnDate.id!,
+            requestBody: { summary: expectedBalanceSummary }
+          }));
+        } else {
+          // insert new
+          await withRetry(() => calendar.events.insert({
+            calendarId: balanceCalId,
             requestBody: {
-              summary: `${bill.name} ${formatCurrency(bill.amount)}`,
-              description: `Amount: ${formatCurrency(bill.amount)}`,
-              start: { date: proj.proj_date },
-              end: { date: proj.proj_date }
+              summary: expectedBalanceSummary,
+              start: { date: dateStr },
+              end:   { date: dateStr }
             }
-          });
+          }));
+        }
+      }
+      // Bills events
+      if (proj.bills?.length) {
+        for (const bill of proj.bills) {
+          const expectedBillSummary = `${bill.name} ${formatCurrency(bill.amount)}`;
+          const existingBill = billsEvents.find(ev =>
+            ev.start?.date === dateStr && ev.summary === expectedBillSummary
+          );
+          if (!existingBill) {
+            const anyBillOnDate = billsEvents.find(ev =>
+              ev.start?.date === dateStr && ev.summary?.startsWith(bill.name)
+            );
+            if (anyBillOnDate) {
+              await withRetry(() => calendar.events.patch({
+                calendarId: billsCalId,
+                eventId: anyBillOnDate.id!,
+                requestBody: { summary: expectedBillSummary, description: `Amount: ${formatCurrency(bill.amount)}` }
+              }));
+            } else {
+              await withRetry(() => calendar.events.insert({
+                calendarId: billsCalId,
+                requestBody: {
+                  summary: expectedBillSummary,
+                  description: `Amount: ${formatCurrency(bill.amount)}`,
+                  start: { date: dateStr },
+                  end:   { date: dateStr }
+                }
+              }));
+            }
+          }
         }
       }
     }
-    async function insertEvents(inserts) {
-      for (let i = 0; i < inserts.length; i += 10) {
-        await Promise.all(
-          inserts.slice(i, i + 10).map(event =>
-            withRetry(() => calendar.events.insert(event))
-              .catch(e => console.error("Insert event failed:", e))
-          )
-        );
-        await delay(200);
-      }
-    }
-    await insertEvents(balanceInserts);
-    await insertEvents(billInserts);
 
     return new Response("Calendar sync complete", { status: 200, headers: corsHeaders });
   } catch (e) {

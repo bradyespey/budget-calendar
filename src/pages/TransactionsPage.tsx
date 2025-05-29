@@ -63,25 +63,30 @@ function pluralize(frequency: string) {
   return frequency;
 }
 
-// CurrencyInput component for dollar sign and formatting
-function formatCurrencyInput(val: string) {
+// CurrencyInput component for dollar sign and formatting, with sign and color
+function formatCurrencyInput(val: string, isIncome: boolean) {
   if (!val) return '';
   const digits = val.replace(/[^\d]/g, '');
   if (!digits) return '';
-  return '$' + Number(digits).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const sign = isIncome ? '+' : '–';
+  return sign + '$' + Number(digits).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
-function CurrencyInput({ value, setValue, ...props }: { value: string, setValue: (val: string) => void } & React.ComponentProps<typeof Input>) {
+function CurrencyInput({ value, setValue, isIncome, ...props }: { value: string, setValue: (val: string) => void, isIncome: boolean } & React.ComponentProps<typeof Input>) {
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/[^\d]/g, '');
     setValue(raw);
   }
-  const displayValue = formatCurrencyInput(value);
+  const displayValue = formatCurrencyInput(value, isIncome);
   return (
     <Input
       {...props}
       value={displayValue}
       onChange={handleChange}
+      className={
+        (props.className || '') +
+        (isIncome ? ' text-green-600 dark:text-green-400' : ' text-red-600 dark:text-red-400')
+      }
     />
   );
 }
@@ -106,6 +111,7 @@ export function TransactionsPage() {
     owner: 'Both',
   });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
 
   useEffect(() => {
     fetchBills();
@@ -114,6 +120,13 @@ export function TransactionsPage() {
   useEffect(() => {
     filterAndSortBills();
   }, [bills, searchTerm, categoryFilter, ownerFilter, sortField, sortDirection]);
+
+  useEffect(() => {
+    // If editing or creating a paycheck, force type to income and disable toggle
+    if (formData.category === 'paycheck') {
+      setTransactionType('income');
+    }
+  }, [formData.category]);
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -195,12 +208,13 @@ export function TransactionsPage() {
 
   const handleCreateBill = async () => {
     try {
-      // Ensure amount is negative for expenses (except for income category)
+      // Ensure amount is negative for expenses, positive for income
       const adjustedFormData = { ...formData };
-      if (formData.category !== 'paycheck' && formData.amount > 0) {
-        adjustedFormData.amount = -formData.amount;
+      if (transactionType === 'expense') {
+        adjustedFormData.amount = -Math.abs(formData.amount);
+      } else {
+        adjustedFormData.amount = Math.abs(formData.amount);
       }
-      
       await createBill(adjustedFormData);
       await fetchBills();
       resetForm();
@@ -211,14 +225,14 @@ export function TransactionsPage() {
 
   const handleUpdateBill = async () => {
     if (!editingId) return;
-    
     try {
-      // Ensure amount is negative for expenses (except for income category)
+      // Ensure amount is negative for expenses, positive for income
       const adjustedFormData = { ...formData };
-      if (formData.category !== 'paycheck' && formData.amount > 0) {
-        adjustedFormData.amount = -formData.amount;
+      if (transactionType === 'expense') {
+        adjustedFormData.amount = -Math.abs(formData.amount);
+      } else {
+        adjustedFormData.amount = Math.abs(formData.amount);
       }
-      
       await updateBill(editingId, adjustedFormData);
       await fetchBills();
       resetForm();
@@ -252,6 +266,7 @@ export function TransactionsPage() {
       owner: bill.owner || 'Both',
       note: bill.note,
     });
+    setTransactionType(bill.amount >= 0 ? 'income' : 'expense');
   };
 
   const resetForm = () => {
@@ -317,11 +332,36 @@ export function TransactionsPage() {
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               />
               
+              {/* Type toggle for Income/Expense */}
+              <div className="flex flex-col">
+                <label className="text-sm font-medium mb-1">Type</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={`px-3 py-1 rounded border ${transactionType === 'income' ? 'bg-green-100 text-green-700 border-green-400' : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700'}`}
+                    onClick={() => formData.category !== 'paycheck' && setTransactionType('income')}
+                    disabled={formData.category === 'paycheck'}
+                  >
+                    Income
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-3 py-1 rounded border ${transactionType === 'expense' ? 'bg-red-100 text-red-700 border-red-400' : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700'}`}
+                    onClick={() => formData.category !== 'paycheck' && setTransactionType('expense')}
+                    disabled={formData.category === 'paycheck'}
+                  >
+                    Expense
+                  </button>
+                </div>
+              </div>
+              
+              {/* Amount field with dollar sign, sign, and color */}
               <CurrencyInput
                 label="Amount"
                 value={formData.amount === 0 ? '' : Math.abs(formData.amount).toString()}
                 setValue={val => setFormData({ ...formData, amount: val === '' ? 0 : Number(val) })}
-                helperText="Enter positive value. It will be converted to negative for expenses."
+                isIncome={transactionType === 'income'}
+                helperText="Enter the amount. Type determines if it is positive or negative."
               />
               
               <Select

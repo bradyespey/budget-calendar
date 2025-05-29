@@ -50,6 +50,42 @@ const OWNER_OPTIONS = [
   { value: 'Jenny', label: 'Jenny' },
 ];
 
+// Helper functions for frequency grammar
+function capitalize(str: string) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function pluralize(frequency: string) {
+  if (frequency === 'daily') return 'days';
+  if (frequency === 'weekly') return 'weeks';
+  if (frequency === 'monthly') return 'months';
+  if (frequency === 'yearly') return 'years';
+  return frequency;
+}
+
+// CurrencyInput component for dollar sign and formatting
+function formatCurrencyInput(val: string) {
+  if (!val) return '';
+  const digits = val.replace(/[^\d]/g, '');
+  if (!digits) return '';
+  return '$' + Number(digits).toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+function CurrencyInput({ value, setValue, ...props }: { value: string, setValue: (val: string) => void } & React.ComponentProps<typeof Input>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/[^\d]/g, '');
+    setValue(raw);
+  }
+  const displayValue = formatCurrencyInput(value);
+  return (
+    <Input
+      {...props}
+      value={displayValue}
+      onChange={handleChange}
+    />
+  );
+}
+
 export function TransactionsPage() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [filteredBills, setFilteredBills] = useState<Bill[]>([]);
@@ -281,12 +317,10 @@ export function TransactionsPage() {
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               />
               
-              <Input
+              <CurrencyInput
                 label="Amount"
-                type="number"
-                step="0.01"
-                value={formData.amount || ''}
-                onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                value={formData.amount === 0 ? '' : Math.abs(formData.amount).toString()}
+                setValue={val => setFormData({ ...formData, amount: val === '' ? 0 : Number(val) })}
                 helperText="Enter positive value. It will be converted to negative for expenses."
               />
               
@@ -315,13 +349,15 @@ export function TransactionsPage() {
                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
               />
               
-              <Input
-                label="End Date"
-                type="date"
-                value={formData.end_date || ''}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value || undefined })}
-                helperText="Optional, leave blank for ongoing"
-              />
+              {formData.frequency !== 'one-time' && (
+                <Input
+                  label="End Date"
+                  type="date"
+                  value={formData.end_date || ''}
+                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value || undefined })}
+                  helperText="Optional, leave blank for ongoing"
+                />
+              )}
               
               <Select
                 label="Owner"
@@ -480,9 +516,11 @@ export function TransactionsPage() {
                           {formatCurrency(bill.amount)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                          {bill.frequency === 'one-time' 
-                            ? 'One-time' 
-                            : `Every ${bill.repeats_every > 1 ? bill.repeats_every : ''} ${bill.frequency}`
+                          {bill.frequency === 'one-time'
+                            ? 'One-time'
+                            : bill.repeats_every === 1
+                              ? `${capitalize(bill.frequency)}`
+                              : `Every ${bill.repeats_every} ${pluralize(bill.frequency)}`
                           }
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">

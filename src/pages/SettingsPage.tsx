@@ -654,15 +654,15 @@ export function SettingsPage() {
                     
                     if (!bills) return;
                     
-                    const headers = ['Name', 'Category', 'Amount', 'Frequency', 'Repeats Every', 'Start Date', 'End Date', 'Owner', 'Note'];
+                    const headers = ['Name', 'Category', 'Amount', 'Repeats Every', 'Frequency', 'Start Date', 'End Date', 'Owner', 'Note'];
                     const csvContent = [
                       headers.join(','),
                       ...bills.map(bill => [
                         `"${bill.name}"`,
                         `"${bill.category}"`,
                         bill.amount < 0 ? `-$${Math.abs(bill.amount).toFixed(2)}` : `$${bill.amount.toFixed(2)}`,
-                        `"${bill.frequency}"`,
                         bill.repeats_every,
+                        `"${bill.frequency}"`,
                         `"${format(parseISO(bill.start_date), 'M/d/yyyy')}"`,
                         bill.end_date ? `"${format(parseISO(bill.end_date), 'M/d/yyyy')}"` : '',
                         bill.owner ? `"${bill.owner}"` : '',
@@ -686,11 +686,11 @@ export function SettingsPage() {
               </Button>
               <Button
                 onClick={() => {
-                  const headers = ['Name', 'Category', 'Amount', 'Frequency', 'Repeats Every', 'Start Date', 'End Date', 'Owner', 'Note'];
+                  const headers = ['Name', 'Category', 'Amount', 'Repeats Every', 'Frequency', 'Start Date', 'End Date', 'Owner', 'Note'];
                   const sampleData = [
-                    ['Rent', 'Housing', '-$2,000.00', 'monthly', '1', '1/1/2025', '', 'Both', 'Monthly rent payment'],
-                    ['Paycheck', 'Paycheck', '$5,000.00', 'weekly', '2', '1/15/2025', '', 'Brady', 'Biweekly salary (every 2 weeks)'],
-                    ['Netflix', 'Subscription', '-$15.99', 'monthly', '1', '1/1/2025', '', 'Both', 'Streaming service']
+                    ['Rent', 'Housing', '-$2,000.00', '1', 'monthly', '1/1/2025', '', 'Both', 'Monthly rent payment'],
+                    ['Paycheck', 'Paycheck', '$5,000.00', '2', 'weekly', '1/15/2025', '', 'Brady', 'Biweekly salary (every 2 weeks)'],
+                    ['Netflix', 'Subscription', '-$15.99', '1', 'monthly', '1/1/2025', '', 'Both', 'Streaming service']
                   ];
                   const csvContent = [
                     headers.join(','),

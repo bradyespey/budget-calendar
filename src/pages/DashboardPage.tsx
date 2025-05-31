@@ -51,7 +51,6 @@ export function DashboardPage() {
   const [sortField, setSortField] = useState<'category' | 'monthly' | 'yearly'>('category')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-  const { projectionDays } = useSettingsStore()
   const { balance: totalBalance, lastSync } = useBalance()
 
   // ── Fetch data ─────────────────────────────────────────────────────────
@@ -73,7 +72,7 @@ export function DashboardPage() {
       }
     }
     fetchData()
-  }, [projectionDays])
+  }, [])
 
   // ── Compute summaries ──────────────────────────────────────────────────
   function calculateAverages(bills: Bill[]) {

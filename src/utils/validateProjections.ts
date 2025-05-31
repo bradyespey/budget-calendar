@@ -1,3 +1,5 @@
+//src/utils/validateProjections.ts
+
 import { supabase } from '../lib/supabase'
 import { addDays, parseISO, startOfDay, format, isWeekend } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'

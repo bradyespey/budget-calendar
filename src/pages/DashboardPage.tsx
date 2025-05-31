@@ -14,7 +14,6 @@ import { getHighLowProjections } from '../api/projections'
 import { getBills } from '../api/bills'
 import { Bill, Projection } from '../types'
 import { format, parseISO } from 'date-fns'
-import { useSettingsStore } from '../../old/stores/settingsStore'
 import { useBalance } from '../context/BalanceContext'
 
 interface CategoryAverage {

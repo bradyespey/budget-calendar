@@ -1,6 +1,6 @@
 //supabase/functions/budget-projection/index.ts
 
-import { addDays, isWeekend, differenceInCalendarDays, differenceInCalendarMonths, parseISO, startOfDay } from "npm:date-fns@3.4.0";
+import { addDays, isWeekend, differenceInCalendarDays, differenceInCalendarMonths, parseISO, startOfDay, format } from "npm:date-fns@3.4.0";
 import { formatInTimeZone, zonedTimeToUtc } from "npm:date-fns-tz@3.0.0-beta.3";
 
 // Imports: Supabase client
@@ -120,7 +120,21 @@ Deno.serve(async (req: Request) => {
     );
   } catch (error) {
     console.error("Error in budget projection:", error);
-    
+    // Send error alert
+    try {
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-alert`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: Deno.env.get("ALERT_EMAIL"),
+          subject: 'Budget Calendar App - Budget Projection Error',
+          text: `The Budget Projection function failed with error: ${error.message || error}. Please review in [Budget Calendar](https://budget.theespeys.com/).`
+        })
+      });
+    } catch (e) { console.error('Failed to send error alert:', e); }
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -530,10 +544,42 @@ async function checkLowBalanceAlerts(threshold: number) {
   
   if (projections.length > 0) {
     const lowBalance = projections[0];
-    console.log(`Low balance alert: ${Math.round(lowBalance.projected_balance).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} on ${lowBalance.proj_date}`);
+    const formattedBalance = Math.round(lowBalance.projected_balance).toLocaleString('en-US', { 
+      style: 'currency', 
+      currency: 'USD', 
+      maximumFractionDigits: 0 
+    });
+    // Format date as 'Friday, June 9, 2025'
+    const formattedDate = format(new Date(lowBalance.proj_date), 'EEEE, MMMM d, yyyy');
+    const thresholdFormatted = `$${Math.round(threshold).toLocaleString('en-US')}`;
+    const appUrl = 'https://budget.theespeys.com/';
     
-    // In a real implementation, send an email alert here
-    // For now, we'll just log it
+    console.log(`Low balance alert: ${formattedBalance} on ${lowBalance.proj_date}`);
+    
+    // Send email alert
+    try {
+      const alertRes = await fetch(
+        `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-alert`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: Deno.env.get("ALERT_EMAIL"),
+            subject: 'Budget Calendar App - Low Balance',
+            text: `Your projected balance will drop to ${formattedBalance} on ${formattedDate}. This is below your configured threshold of ${thresholdFormatted}. Visit the Budget Calendar app at https://budget.theespeys.com to review.`,
+          })
+        }
+      );
+      
+      if (!alertRes.ok) {
+        throw new Error('Failed to send alert email');
+      }
+    } catch (err) {
+      console.error('Error sending low balance alert:', err);
+    }
   }
 }
 

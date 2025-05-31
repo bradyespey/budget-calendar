@@ -1,29 +1,68 @@
-name: Budget Calendar Nightly Automation
+name: Budget Nightly Automation
 
 on:
   schedule:
-    - cron: '30 12 * * *'   # 7:30 AM CT (12:30 UTC)
-  workflow_dispatch:
+    - cron: '30 12 * * *'  # 7:30 AM CT
+  workflow_dispatch:  # Allow manual trigger
 
 jobs:
-  nightly:
+  refresh-accounts:
     runs-on: ubuntu-latest
     steps:
       - name: Refresh Accounts
         run: |
-          curl -X POST "https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/refresh-accounts" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
-      - name: Wait for 90 seconds
+          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/refresh-accounts' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}'
+        continue-on-error: true
+
+  update-balance:
+    needs: refresh-accounts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Account Refresh
         run: sleep 90
-      - name: Update Chase Balance
+
+      - name: Update Balance
+        id: update-balance
         run: |
-          curl -X POST "https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/chase-balance" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
-      - name: Run Budget Projection
+          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/chase-balance' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}'
+        continue-on-error: true
+
+  run-projections:
+    needs: update-balance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Projections
+        id: run-projections
         run: |
-          curl -X POST "https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/budget-projection" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/budget-projection' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}'
+        continue-on-error: true
+
+  sync-calendar:
+    needs: run-projections
+    runs-on: ubuntu-latest
+    steps:
       - name: Sync Calendar
+        id: sync-calendar
         run: |
-          curl -X POST "https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/sync-calendar" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/sync-calendar' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}'
+        continue-on-error: true
+
+  notify-failure:
+    needs: [refresh-accounts, update-balance, run-projections, sync-calendar]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Failure Alert
+        run: |
+          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/send-alert' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
+          --header 'Content-Type: application/json' \
+          --data '{
+            "to": "${{ secrets.ALERT_EMAIL }}",
+            "subject": "Budget Calendar: Nightly Job Failed",
+            "text": "One or more steps in the nightly budget calendar job failed. Please check the GitHub Actions logs for details."
+          }'

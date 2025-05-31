@@ -168,6 +168,21 @@ serve(async (req) => {
     return new Response("Calendar sync complete", { status: 200, headers: corsHeaders });
   } catch (e) {
     console.error("Calendar sync error:", e);
+    // Send error alert
+    try {
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-alert`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: Deno.env.get("ALERT_EMAIL"),
+          subject: 'Budget Calendar App - Sync Calendar Error',
+          text: `The Sync Calendar function failed with error: ${e.message || e}. Please review in the Budget Calendar app at https://budget.theespeys.com.`,
+        })
+      });
+    } catch (err) { console.error('Failed to send error alert:', err); }
     return new Response("Calendar sync error: " + (e?.message || e), { status: 500, headers: corsHeaders });
   }
 });

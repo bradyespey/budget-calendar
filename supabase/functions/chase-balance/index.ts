@@ -81,6 +81,21 @@ serve(async (req: Request) => {
 
   } catch (err: any) {
     console.error("chase-balance error:", err);
+    // Send error alert
+    try {
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-alert`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: Deno.env.get("ALERT_EMAIL"),
+          subject: 'Budget Calendar App - Chase Balance Error',
+          text: `The Chase Balance function failed with error: ${err.message || err}. Please review in the Budget Calendar app at https://budget.theespeys.com.`,
+        })
+      });
+    } catch (e) { console.error('Failed to send error alert:', e); }
     return new Response(
       JSON.stringify({ error: err.message || "Unknown error" }),
       { status: 500, headers: { ...CORS, "Content-Type": "application/json" } }

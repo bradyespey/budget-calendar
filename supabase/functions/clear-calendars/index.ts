@@ -115,6 +115,21 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error("Clear calendars error:", e);
+    // Send error alert
+    try {
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-alert`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: Deno.env.get("ALERT_EMAIL"),
+          subject: 'Budget Calendar App - Clear Calendars Error',
+          text: `The Clear Calendars function failed with error: ${e.message || e}. Please review in the Budget Calendar app at https://budget.theespeys.com.`,
+        })
+      });
+    } catch (err) { console.error('Failed to send error alert:', err); }
     return new Response(
       JSON.stringify({ success: false, error: e.message || String(e) }),
       { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }

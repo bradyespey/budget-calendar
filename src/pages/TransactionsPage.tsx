@@ -63,29 +63,94 @@ function pluralize(frequency: string) {
   return frequency;
 }
 
-// CurrencyInput component for dollar sign and formatting, with sign and color
+// CurrencyInput component for dollar sign, commas, and decimals
 function formatCurrencyInput(val: string, isIncome: boolean) {
   if (!val) return '';
-  const digits = val.replace(/[^\d]/g, '');
-  if (!digits) return '';
-  const sign = isIncome ? '+' : '–';
-  return sign + '$' + Number(digits).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+  const sign = isIncome ? '' : '–';
+
+  // If user typed a decimal or has decimals, preserve them up to two places
+  if (val.includes('.')) {
+    const parts = val.split('.');
+    const rawInt = parts[0];
+    let rawDec = parts[1] || '';
+
+    // Limit decimal characters to two
+    if (rawDec.length > 2) {
+      rawDec = rawDec.slice(0, 2);
+    }
+
+    // Format integer part with commas
+    const intNum = parseInt(rawInt, 10) || 0;
+    const formattedInt = intNum.toLocaleString('en-US');
+
+    // If user ends with a trailing dot, show that
+    if (val.endsWith('.')) {
+      return `${sign}$${formattedInt}.`;
+    }
+
+    // Show formatted integer and decimal (up to two digits)
+    return `${sign}$${formattedInt}.${rawDec}`;
+  }
+
+  // No decimal typed: treat as whole number
+  const numeric = parseFloat(val);
+  if (isNaN(numeric)) {
+    return isIncome ? '$0.00' : '–$0.00';
+  }
+
+  const formattedIntOnly = numeric.toLocaleString('en-US', {
+    style: 'decimal',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+
+  return `${sign}$${formattedIntOnly}`;
 }
 
-function CurrencyInput({ value, setValue, isIncome, ...props }: { value: string, setValue: (val: string) => void, isIncome: boolean } & React.ComponentProps<typeof Input>) {
+function CurrencyInput({
+  value,
+  setValue,
+  isIncome,
+  ...props
+}: {
+  value: string;
+  setValue: (val: string) => void;
+  isIncome: boolean;
+} & React.ComponentProps<typeof Input>) {
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value.replace(/[^\d]/g, '');
+    let raw = e.target.value;
+
+    // Remove all characters except digits and period
+    raw = raw.replace(/[^\d.]/g, '');
+
+    // Prevent more than one period
+    const parts = raw.split('.');
+    if (parts.length > 2) {
+      raw = parts.slice(0, 2).join('.');
+    }
+
+    // Limit to two decimal places
+    if (parts[1]?.length > 2) {
+      raw = parts[0] + '.' + parts[1].slice(0, 2);
+    }
+
     setValue(raw);
   }
+
   const displayValue = formatCurrencyInput(value, isIncome);
+
   return (
     <Input
       {...props}
+      placeholder="$0.00"
       value={displayValue}
       onChange={handleChange}
       className={
         (props.className || '') +
-        (isIncome ? ' text-green-600 dark:text-green-400' : ' text-red-600 dark:text-red-400')
+        (isIncome
+          ? ' text-green-600 dark:text-green-400'
+          : ' text-red-600 dark:text-red-400')
       }
     />
   );
@@ -109,7 +174,9 @@ export function TransactionsPage() {
     repeats_every: 1,
     start_date: format(new Date(), 'yyyy-MM-dd'),
     owner: 'Both',
+    note: undefined,
   });
+  const [amountInput, setAmountInput] = useState(''); // raw string for CurrencyInput
   const [editingId, setEditingId] = useState<string | null>(null);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
 
@@ -208,13 +275,21 @@ export function TransactionsPage() {
 
   const handleCreateBill = async () => {
     try {
-      // Ensure amount is negative for expenses, positive for income
-      const adjustedFormData = { ...formData };
+      // Convert amountInput (string) to a numeric value
+      let numericAmount = parseFloat(amountInput || '0');
+      if (isNaN(numericAmount)) numericAmount = 0;
+
       if (transactionType === 'expense') {
-        adjustedFormData.amount = -Math.abs(formData.amount);
+        numericAmount = -Math.abs(numericAmount);
       } else {
-        adjustedFormData.amount = Math.abs(formData.amount);
+        numericAmount = Math.abs(numericAmount);
       }
+
+      const adjustedFormData = {
+        ...formData,
+        amount: numericAmount,
+      };
+
       await createBill(adjustedFormData);
       await fetchBills();
       resetForm();
@@ -226,13 +301,20 @@ export function TransactionsPage() {
   const handleUpdateBill = async () => {
     if (!editingId) return;
     try {
-      // Ensure amount is negative for expenses, positive for income
-      const adjustedFormData = { ...formData };
+      let numericAmount = parseFloat(amountInput || '0');
+      if (isNaN(numericAmount)) numericAmount = 0;
+
       if (transactionType === 'expense') {
-        adjustedFormData.amount = -Math.abs(formData.amount);
+        numericAmount = -Math.abs(numericAmount);
       } else {
-        adjustedFormData.amount = Math.abs(formData.amount);
+        numericAmount = Math.abs(numericAmount);
       }
+
+      const adjustedFormData = {
+        ...formData,
+        amount: numericAmount,
+      };
+
       await updateBill(editingId, adjustedFormData);
       await fetchBills();
       resetForm();
@@ -258,7 +340,7 @@ export function TransactionsPage() {
     setFormData({
       name: bill.name,
       category: bill.category,
-      amount: Math.abs(bill.amount), // Always display positive in form
+      amount: Math.abs(bill.amount),
       frequency: bill.frequency,
       repeats_every: bill.repeats_every,
       start_date: bill.start_date,
@@ -267,6 +349,9 @@ export function TransactionsPage() {
       note: bill.note,
     });
     setTransactionType(bill.amount >= 0 ? 'income' : 'expense');
+
+    // Initialize amountInput from existing bill amount
+    setAmountInput(Math.abs(bill.amount).toFixed(2));
   };
 
   const resetForm = () => {
@@ -280,15 +365,18 @@ export function TransactionsPage() {
       repeats_every: 1,
       start_date: format(new Date(), 'yyyy-MM-dd'),
       owner: 'Both',
+      note: undefined,
     });
+    setAmountInput('');
+    setTransactionType('expense');
   };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -358,8 +446,8 @@ export function TransactionsPage() {
               {/* Amount field with dollar sign, sign, and color */}
               <CurrencyInput
                 label="Amount"
-                value={formData.amount === 0 ? '' : Math.abs(formData.amount).toString()}
-                setValue={val => setFormData({ ...formData, amount: val === '' ? 0 : Number(val) })}
+                value={amountInput}
+                setValue={setAmountInput}
                 isIncome={transactionType === 'income'}
                 helperText="Enter the amount. Type determines if it is positive or negative."
               />
@@ -387,6 +475,7 @@ export function TransactionsPage() {
                 type="date"
                 value={formData.start_date}
                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                className="text-left"
               />
               
               {formData.frequency !== 'one-time' && (
@@ -396,6 +485,7 @@ export function TransactionsPage() {
                   value={formData.end_date || ''}
                   onChange={(e) => setFormData({ ...formData, end_date: e.target.value || undefined })}
                   helperText="Optional, leave blank for ongoing"
+                  className="text-left"
                 />
               )}
               

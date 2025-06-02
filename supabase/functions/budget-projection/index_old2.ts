@@ -312,17 +312,9 @@ async function computeProjections(settings: Settings) {
         }
 
         const intendedStr = formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd");
-        if (intendedStr === today) {
-          // Skip today in the future-dates loop
-          monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
-          continue;
-        }
-
         if (projectionDates.includes(intendedStr)) {
           if (!billsByDate[intendedStr]) billsByDate[intendedStr] = [];
-          if (!billsByDate[intendedStr].some(b => b.id === bill.id)) {
-            billsByDate[intendedStr].push(bill);
-          }
+          billsByDate[intendedStr].push(bill);
         }
 
         // Move to next month
@@ -415,17 +407,9 @@ async function computeProjections(settings: Settings) {
           }
 
           const intendedStr = formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd");
-          if (intendedStr === today) {
-            // Skip today in the future-dates loop
-            monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
-            continue;
-          }
-
           if (projectionDates.includes(intendedStr)) {
             if (!billsByDate[intendedStr]) billsByDate[intendedStr] = [];
-            if (!billsByDate[intendedStr].some(b => b.id === bill.id)) {
-              billsByDate[intendedStr].push(bill);
-            }
+            billsByDate[intendedStr].push(bill);
           }
 
           // Move to next month
@@ -485,9 +469,7 @@ async function computeProjections(settings: Settings) {
         // Only add if in projection window
         if (projectionDates.includes(adjustedStr)) {
           if (!billsByDate[adjustedStr]) billsByDate[adjustedStr] = [];
-          if (!billsByDate[adjustedStr].some(b => b.id === bill.id)) {
-            billsByDate[adjustedStr].push(bill);
-          }
+          billsByDate[adjustedStr].push(bill);
         }
         // Increment to next occurrence
         if (bill.frequency === 'daily') current = addDays(current, bill.repeats_every);
@@ -495,11 +477,6 @@ async function computeProjections(settings: Settings) {
         else if (bill.frequency === 'monthly') current.setMonth(current.getMonth() + bill.repeats_every);
         else if (bill.frequency === 'yearly') current.setFullYear(current.getFullYear() + bill.repeats_every);
         else break;
-
-        if (adjustedStr === today) {
-          // Don't add bills for today in the future-dates loop
-          continue;
-        }
       }
     }
     // Now, for each projection date, add the bills for that day

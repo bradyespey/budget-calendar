@@ -571,56 +571,68 @@ async function computeProjections(settings: Settings) {
 async function checkLowBalanceAlerts(threshold: number) {
   console.log("Checking for low balance alerts...");
   
-  // Get projections
-  const { data: projections, error } = await supabase
+  // First check if balance ever drops below threshold
+  const { data: belowThreshold, error: checkError } = await supabase
     .from('projections')
     .select('*')
     .lt('projected_balance', threshold)
-    .order('proj_date', { ascending: true })
     .limit(1);
   
-  if (error) {
-    console.error("Error checking for low balance:", error);
+  if (checkError) {
+    console.error("Error checking for balance below threshold:", checkError);
     return;
   }
-  
-  if (projections.length > 0) {
-    const lowBalance = projections[0];
-    const formattedBalance = Math.round(lowBalance.projected_balance).toLocaleString('en-US', { 
-      style: 'currency', 
-      currency: 'USD', 
-      maximumFractionDigits: 0 
-    });
-    // Format date as 'Friday, June 9, 2025'
-    const formattedDate = format(new Date(lowBalance.proj_date), 'EEEE, MMMM d, yyyy');
-    const thresholdFormatted = `$${Math.round(threshold).toLocaleString('en-US')}`;
-    const appUrl = 'https://budget.theespeys.com/';
+
+  // Only proceed if balance drops below threshold
+  if (belowThreshold?.length > 0) {
+    // Get lowest balance
+    const { data: lowestBalance, error: lowestError } = await supabase
+      .from('projections')
+      .select('*')
+      .order('projected_balance', { ascending: true })
+      .limit(1);
     
-    console.log(`Low balance alert: ${formattedBalance} on ${lowBalance.proj_date}`);
-    
-    // Send email alert
-    try {
-      const alertRes = await fetch(
-        `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-alert`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: Deno.env.get("ALERT_EMAIL"),
-            subject: 'Budget Calendar App - Low Balance',
-            text: `Your projected balance will drop to ${formattedBalance} on ${formattedDate}. This is below your configured threshold of ${thresholdFormatted}. Visit the Budget Calendar app at https://budget.theespeys.com to review.`,
-          })
-        }
-      );
+    if (lowestError) {
+      console.error("Error checking for lowest balance:", lowestError);
+      return;
+    }
+
+    if (lowestBalance?.length > 0) {
+      const lowest = lowestBalance[0];
+      const formattedBalance = Math.round(lowest.projected_balance).toLocaleString('en-US', { 
+        style: 'currency', 
+        currency: 'USD', 
+        maximumFractionDigits: 0 
+      });
+      const formattedDate = format(new Date(lowest.proj_date), 'EEEE, MMMM d, yyyy');
+      const thresholdFormatted = `$${Math.round(threshold).toLocaleString('en-US')}`;
       
-      if (!alertRes.ok) {
-        throw new Error('Failed to send alert email');
+      console.log(`Low balance alert: ${formattedBalance} on ${lowest.proj_date}`);
+      
+      // Send alert
+      try {
+        const alertRes = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-alert`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: Deno.env.get("ALERT_EMAIL"),
+              subject: 'Budget Calendar App - Low Balance Alert',
+              text: `Your projected balance will drop below ${thresholdFormatted} to ${formattedBalance} on ${formattedDate}. Visit the Budget Calendar app at https://budget.theespeys.com to review.`,
+            })
+          }
+        );
+        
+        if (!alertRes.ok) {
+          throw new Error('Failed to send alert email');
+        }
+      } catch (err) {
+        console.error('Error sending alert:', err);
       }
-    } catch (err) {
-      console.error('Error sending low balance alert:', err);
     }
   }
 }

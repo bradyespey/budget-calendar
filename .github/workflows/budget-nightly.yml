@@ -11,8 +11,10 @@ jobs:
     steps:
       - name: Refresh Accounts
         run: |
-          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/refresh-accounts' \
-          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}'
+          echo "Starting account refresh..."
+          RESPONSE=$(curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/refresh-accounts' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}')
+          echo "Response: $RESPONSE"
         continue-on-error: true
 
   update-balance:
@@ -20,13 +22,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for Account Refresh
-        run: sleep 90
+        run: |
+          echo "Waiting 90 seconds for refresh to complete..."
+          sleep 90
 
       - name: Update Balance
         id: update-balance
         run: |
-          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/chase-balance' \
-          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}'
+          echo "Updating balance..."
+          RESPONSE=$(curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/chase-balance' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}')
+          echo "Response: $RESPONSE"
         continue-on-error: true
 
   run-projections:
@@ -36,8 +42,10 @@ jobs:
       - name: Run Projections
         id: run-projections
         run: |
-          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/budget-projection' \
-          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}'
+          echo "Running projections..."
+          RESPONSE=$(curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/budget-projection' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}')
+          echo "Response: $RESPONSE"
         continue-on-error: true
 
   sync-calendar:
@@ -47,8 +55,10 @@ jobs:
       - name: Sync Calendar
         id: sync-calendar
         run: |
-          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/sync-calendar' \
-          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}'
+          echo "Syncing calendar..."
+          RESPONSE=$(curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/sync-calendar' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}')
+          echo "Response: $RESPONSE"
         continue-on-error: true
 
   notify-failure:
@@ -58,6 +68,7 @@ jobs:
     steps:
       - name: Send Failure Alert
         run: |
+          echo "Sending failure alert..."
           curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/send-alert' \
           --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
           --header 'Content-Type: application/json' \

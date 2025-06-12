@@ -1,0 +1,2 @@
+# Ignore GitHub Actions workflow warnings
+.github/workflows/budget-nightly.yml

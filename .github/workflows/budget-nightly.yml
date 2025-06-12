@@ -8,12 +8,21 @@ on:
 jobs:
   refresh-accounts:
     runs-on: ubuntu-latest
+    env:
+      API_AUTH: ${{ secrets.API_AUTH }}
     steps:
+      - name: Check Secrets
+        run: |
+          if [ -z "$API_AUTH" ]; then
+            echo "::error::API_AUTH secret is not set"
+            exit 1
+          fi
+
       - name: Refresh Accounts
         run: |
           echo "Starting account refresh..."
-          RESPONSE=$(curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/refresh-accounts' \
-          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}')
+          RESPONSE=$(curl -i --location --request GET 'https://api.theespeys.com/refresh_accounts' \
+          --header "Authorization: Basic $API_AUTH")
           echo "Response: $RESPONSE"
         continue-on-error: true
 

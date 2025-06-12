@@ -2,10 +2,6 @@
 // @ts-nocheck
 
 import { serve } from "https://deno.land/std@0.178.0/http/server.ts";
-import { init, wasm_data, totp } from "https://deno.land/x/totp_wasm/deno/mod.ts";
-
-// ── INIT TOTP WASM ─────────────────────────────────────────────────────────
-await init(wasm_data);
 
 // ── CORS HEADERS ────────────────────────────────────────────────────────────
 const CORS = {
@@ -22,38 +18,25 @@ serve(async (req: Request) => {
   try {
     // ── ENV & PARAMS ─────────────────────────────────────────────────---
     const env = Deno.env.toObject();
-    const email  = env.MONARCH_EMAIL!;
-    const pass   = env.MONARCH_PASSWORD!;
-    const secret = env.MONARCH_MFA_SECRET!;
-    const acctId = env.MONARCH_CHASE_CHECKING_ACCOUNT_ID!;
-    if (!email || !pass || !secret || !acctId) {
-      throw new Error("Missing one or more MONARCH_* env vars");
+    const apiAuth = env.API_AUTH!;
+    const apiRefreshUrl = env.API_REFRESH_URL!;
+
+    if (!apiAuth || !apiRefreshUrl) {
+      throw new Error("Missing API_AUTH or API_REFRESH_URL env vars");
     }
 
-    // ── GENERATE MFA TOKEN ─────────────────────────────────────────────
-    const timestamp = Math.floor(Date.now() / 1000);
-    const mfaToken  = totp(secret, timestamp, 6, 30);
-
-    // ── LOGIN TO MONARCH ─────────────────────────────────────────────--
-    const loginRes = await fetch("https://api.monarchmoney.com/auth/login/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: pass, mfa_token: mfaToken }),
+    // ── CALL FLASK ENDPOINT ─────────────────────────────────────────────
+    const response = await fetch(apiRefreshUrl, {
+      method: "GET",
+      headers: {
+        "Authorization": "Basic " + btoa(apiAuth),
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"
+      }
     });
-    const loginJson = await loginRes.json();
-    if (!loginRes.ok) {
-      throw new Error(`Login failed: ${JSON.stringify(loginJson)}`);
-    }
-    const token = (loginJson as any).token as string;
 
-    // ── REFRESH ACCOUNT ─────────────────────────────────────────────---
-    const refreshRes = await fetch(
-      `https://api.monarchmoney.com/accounts/${acctId}/refresh`,
-      { method: "POST", headers: { Authorization: `Token ${token}` } }
-    );
-    if (!refreshRes.ok) {
-      const errText = await refreshRes.text();
-      throw new Error(`Refresh failed: ${errText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask endpoint failed: ${errorText}`);
     }
 
     // ── SUCCESS RESPONSE ─────────────────────────────────────────────--
@@ -83,4 +66,4 @@ serve(async (req: Request) => {
       { status: 500, headers: { ...CORS, "Content-Type": "application/json" } }
     );
   }
-});
+}); 

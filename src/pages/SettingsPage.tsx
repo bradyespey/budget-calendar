@@ -29,6 +29,7 @@ import { supabase } from '../lib/supabase'
 import { useLocation } from 'react-router-dom'
 import { importBillsFromCSV } from '../utils/importBills'
 import { validateProjections } from '../utils/validateProjections'
+import { CategoryManagement } from '../components/CategoryManagement'
 import { format, parseISO } from 'date-fns'
 
 type CurrencyInputProps = React.ComponentProps<typeof Input> & {
@@ -414,6 +415,16 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto px-2 sm:px-4">
+      {/* Page Description */}
+      <div className="text-center space-y-2 py-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Settings
+        </h1>
+        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          Configure your budget settings, manage data, and run maintenance tasks. Update projection settings, refresh account data, and manage categories.
+        </p>
+      </div>
+      
       {busy && (
         <div className="flex items-center justify-center mb-4">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mr-2"></div>
@@ -422,7 +433,7 @@ export function SettingsPage() {
       )}
       {/* Page header with Save button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-2">
-        <h1 className="text-2xl font-bold">Settings</h1>
+        <h2 className="text-2xl font-bold">Configuration</h2>
         <Button
           onClick={handleSave}
           className="inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[0] w-auto"
@@ -552,41 +563,61 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent>
           {/* Main Actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-            <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRefreshAccounts} disabled={busy}>
-              {busy && activeAction === 'refresh' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="refresh">🔄</span>}
-              Refresh Accounts
-            </Button>
-            <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleUpdateBalance} disabled={busy}>
-              {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="balance">💰</span>}
-              Update Balance
-            </Button>
-            <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRecalculate} disabled={busy}>
-              {busy && activeAction === 'projection' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="projection">📊</span>}
-              Budget Projection
-            </Button>
-            <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleSyncCalendar} disabled={busy}>
-              {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="calendar">📅</span>}
-              Sync Calendar
-            </Button>
+          <div className="space-y-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRefreshAccounts} disabled={busy}>
+                  {busy && activeAction === 'refresh' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="refresh">🔄</span>}
+                  Refresh Accounts
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Forces an accounts refresh in Monarch so latest bank balances can be obtained</p>
+              </div>
+              <div className="space-y-1">
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleUpdateBalance} disabled={busy}>
+                  {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="balance">💰</span>}
+                  Update Balance
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Grabs the latest balance from Monarch</p>
+              </div>
+              <div className="space-y-1">
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRecalculate} disabled={busy}>
+                  {busy && activeAction === 'projection' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="projection">📊</span>}
+                  Budget Projection
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Projects future budget in the Upcoming tab based on Budget Projection Settings</p>
+              </div>
+              <div className="space-y-1">
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleSyncCalendar} disabled={busy}>
+                  {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="calendar">📅</span>}
+                  Sync Calendar
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Syncs the budget projection with your shared Google Calendar</p>
+              </div>
+            </div>
           </div>
           <div className="border-t border-gray-200 dark:border-gray-700 my-4" />
           {/* Maintenance Actions */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-200 mb-2">Maintenance</h4>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={handleValidateProjections} variant="outline" className="w-full sm:w-auto" disabled={busy}>
-                {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : '🧮'} Validate Projections
-              </Button>
-              <Button onClick={handleClearCalendars} variant="outline" className="w-full sm:w-auto" disabled={busy}>
-                {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : '🧹'} Clear Calendars
-              </Button>
+            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-200 mb-3">Maintenance</h4>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="space-y-1">
+                <Button onClick={handleValidateProjections} variant="outline" className="w-full sm:w-auto" disabled={busy}>
+                  {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : '💾'} Validate Projections
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Ensures all Transactions match up with what's expected for the Upcoming page and shows missing bills that need to be fixed</p>
+              </div>
+              <div className="space-y-1">
+                <Button onClick={handleClearCalendars} variant="outline" className="w-full sm:w-auto" disabled={busy}>
+                  {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : '🧹'} Clear Calendars
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes today and forward budget calendar events from your shared Google Calendar</p>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Top row: Calendar Mode (left), (right column can be empty or another card) */}
+      {/* Top row: Calendar Mode (left), Import/Export Bills (right) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="flex flex-col h-full w-full">
           <CardHeader>
@@ -630,7 +661,7 @@ export function SettingsPage() {
           <CardHeader>
             <CardTitle>Import/Export Bills</CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-200">
-              Import, export, or download a sample CSV of your bills.
+              📊 Upload bills from CSV or download your current data.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -719,6 +750,9 @@ export function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Category Management Card - spans full width */}
+        <CategoryManagement showNotification={showNotification} />
       </div>
     </div>
   )

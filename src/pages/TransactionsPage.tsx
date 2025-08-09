@@ -5,8 +5,10 @@ import { Plus, Edit2, Trash2, Check, X } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
+import { CategorySelect } from '../components/ui/CategorySelect';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { getBills, createBill, updateBill, deleteBill } from '../api/bills';
+import { getCategories, Category } from '../api/categories';
 import { Bill } from '../types';
 import { format, parseISO } from 'date-fns';
 
@@ -22,27 +24,7 @@ const FREQUENCY_OPTIONS = [
   { value: 'one-time', label: 'One-time' },
 ];
 
-const CATEGORY_OPTIONS = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'cloud storage', label: 'Cloud Storage' },
-  { value: 'counseling', label: 'Counseling' },
-  { value: 'credit card', label: 'Credit Card' },
-  { value: 'fitness', label: 'Fitness' },
-  { value: 'food & drinks', label: 'Food & Drinks' },
-  { value: 'games', label: 'Games' },
-  { value: 'golf', label: 'Golf' },
-  { value: 'health', label: 'Health' },
-  { value: 'house', label: 'House' },
-  { value: 'insurance', label: 'Insurance' },
-  { value: 'job search', label: 'Job Search' },
-  { value: 'mobile phone', label: 'Mobile Phone' },
-  { value: 'other', label: 'Other' },
-  { value: 'paycheck', label: 'Paycheck' },
-  { value: 'subscription', label: 'Subscription' },
-  { value: 'transfer', label: 'Transfer' },
-  { value: 'travel', label: 'Travel' },
-  { value: 'utilities', label: 'Utilities' },
-];
+// Removed hardcoded categories - now using dynamic categories from database
 
 const OWNER_OPTIONS = [
   { value: 'Both', label: 'Both' },
@@ -159,6 +141,7 @@ function CurrencyInput({
 export function TransactionsPage() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [filteredBills, setFilteredBills] = useState<Bill[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -182,6 +165,7 @@ export function TransactionsPage() {
 
   useEffect(() => {
     fetchBills();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -212,6 +196,37 @@ export function TransactionsPage() {
       console.error('Error fetching bills:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const data = await getCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      // Fallback to hardcoded categories if API fails
+      setCategories([
+        { id: '1', name: 'auto', created_at: '', transaction_count: 0 },
+        { id: '2', name: 'cloud storage', created_at: '', transaction_count: 0 },
+        { id: '3', name: 'counseling', created_at: '', transaction_count: 0 },
+        { id: '4', name: 'credit card', created_at: '', transaction_count: 0 },
+        { id: '5', name: 'fitness', created_at: '', transaction_count: 0 },
+        { id: '6', name: 'food & drinks', created_at: '', transaction_count: 0 },
+        { id: '7', name: 'games', created_at: '', transaction_count: 0 },
+        { id: '8', name: 'golf', created_at: '', transaction_count: 0 },
+        { id: '9', name: 'health', created_at: '', transaction_count: 0 },
+        { id: '10', name: 'house', created_at: '', transaction_count: 0 },
+        { id: '11', name: 'insurance', created_at: '', transaction_count: 0 },
+        { id: '12', name: 'job search', created_at: '', transaction_count: 0 },
+        { id: '13', name: 'mobile phone', created_at: '', transaction_count: 0 },
+        { id: '14', name: 'other', created_at: '', transaction_count: 0 },
+        { id: '15', name: 'paycheck', created_at: '', transaction_count: 0 },
+        { id: '16', name: 'subscription', created_at: '', transaction_count: 0 },
+        { id: '17', name: 'transfer', created_at: '', transaction_count: 0 },
+        { id: '18', name: 'travel', created_at: '', transaction_count: 0 },
+        { id: '19', name: 'utilities', created_at: '', transaction_count: 0 },
+      ]);
     }
   };
 
@@ -387,8 +402,21 @@ export function TransactionsPage() {
 
   return (
     <div className="space-y-8 px-4 max-w-5xl mx-auto">
+      {/* Page Description */}
+      <div className="text-center space-y-2 py-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Transactions
+        </h1>
+        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          Manage all your recurring bills and income sources. Add, edit, or delete transactions to keep your budget projections accurate.
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          💡 All transactions here automatically update your financial projections and sync with your calendar for upcoming payments.
+        </p>
+      </div>
+      
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transactions</h1>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Manage Transactions</h2>
         {mode === 'view' && (
           <Button
             onClick={() => setMode('create')}
@@ -413,11 +441,10 @@ export function TransactionsPage() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
               
-              <Select
+              <CategorySelect
                 label="Category"
                 value={formData.category}
-                options={CATEGORY_OPTIONS}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, category: value })}
               />
               
               {/* Type toggle for Income/Expense */}
@@ -537,7 +564,10 @@ export function TransactionsPage() {
               onChange={(e) => setCategoryFilter(e.target.value)}
               options={[
                 { value: '', label: 'All Categories' },
-                ...CATEGORY_OPTIONS
+                ...categories.map(cat => ({
+                  value: cat.name,
+                  label: cat.name.charAt(0).toUpperCase() + cat.name.slice(1)
+                }))
               ]}
             />
             <Select

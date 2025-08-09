@@ -19,6 +19,8 @@ const corsHeaders = {
 // Create Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+console.log("Supabase URL:", supabaseUrl);
+console.log("Service Role Key set:", supabaseKey ? "Yes" : "No");
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Define timezone at the top level since it's used in multiple functions
@@ -59,8 +61,33 @@ Deno.serve(async (req: Request) => {
       .limit(1)
       .maybeSingle();
 
-    if (error || !settings) {
-      throw new Error('Failed to fetch settings');
+    if (error) {
+      throw new Error('Failed to fetch settings: ' + error.message);
+    }
+    
+    // Create default settings if none exist
+    if (!settings) {
+      console.log("No settings found, creating default settings...");
+      const defaultSettings = {
+        id: 1,
+        projection_days: 30,
+        balance_threshold: 1000,
+        manual_balance_override: null,
+        last_projected_at: null
+      };
+      
+      const { data: newSettings, error: insertError } = await supabase
+        .from('settings')
+        .upsert([defaultSettings])
+        .select()
+        .single();
+        
+      if (insertError) {
+        throw new Error('Failed to create default settings: ' + insertError.message);
+      }
+      
+      console.log("Default settings created successfully");
+      settings = newSettings;
     }
 
     const userSettings: Settings = {
@@ -69,8 +96,15 @@ Deno.serve(async (req: Request) => {
       manual_balance_override: settings.manual_balance_override || null,
     };
     
+    console.log("Starting projection computation with settings:", userSettings);
     // Compute the projections
-    await computeProjections(userSettings);
+    try {
+      await computeProjections(userSettings);
+      console.log("Projection computation completed successfully");
+    } catch (err) {
+      console.error("ERROR in computeProjections:", err);
+      throw err; // Re-throw to trigger main catch block
+    }
     
     // Check for low balance alerts
     await checkLowBalanceAlerts(userSettings.balanceThreshold);
@@ -81,28 +115,7 @@ Deno.serve(async (req: Request) => {
       .update({ last_projected_at: new Date().toISOString() })
       .eq('id', 1);
     
-    // After all projections are inserted, mark highest/lowest (excluding today)
-    try {
-      const { data: allProjs, error } = await supabase
-        .from('projections')
-        .select('proj_date, projected_balance')
-        .order('proj_date', { ascending: true });
-      if (!error && allProjs && allProjs.length > 1) {
-        let highest = allProjs[1], lowest = allProjs[1];
-        for (let i = 1; i < allProjs.length; i++) {
-          if (allProjs[i].projected_balance > highest.projected_balance) highest = allProjs[i];
-          if (allProjs[i].projected_balance < lowest.projected_balance) lowest = allProjs[i];
-        }
-        // Clear all highest/lowest first
-        await supabase.from('projections').update({ highest: false, lowest: false }).gte('proj_date', allProjs[1].proj_date);
-        // Set highest
-        await supabase.from('projections').update({ highest: true }).eq('proj_date', highest.proj_date);
-        // Set lowest
-        await supabase.from('projections').update({ lowest: true }).eq('proj_date', lowest.proj_date);
-      }
-    } catch (err) {
-      console.error('Error updating highest/lowest projections:', err);
-    }
+    // Note: Highest/lowest marking is now handled within computeProjections function
     
     return new Response(
       JSON.stringify({ 
@@ -221,7 +234,11 @@ function adjustMonthlyDate(date: Date, targetDay: number): Date {
 // Projection logic
 // Function to compute projections
 async function computeProjections(settings: Settings) {
+  console.log("=== ENTERING computeProjections ===");
+  console.log("computeProjections called with settings:", JSON.stringify(settings));
   const today = formatInTimeZone(new Date(), TIMEZONE, "yyyy-MM-dd");
+  console.log("Today is:", today);
+  console.log("Projection days:", settings.projectionDays);
   const startDate = zonedTimeToUtc(`${today}T00:00:00`, TIMEZONE);
   const projectionDates: string[] = [];
   for (let i = 1; i < settings.projectionDays; i++) {
@@ -238,7 +255,39 @@ async function computeProjections(settings: Settings) {
   if (!bills || !Array.isArray(bills)) throw new Error('Failed to fetch bills');
   if (!holidays || !(holidays instanceof Set)) throw new Error('Failed to fetch holidays');
 
-  await supabase.from('projections').delete().gte('proj_date', today);
+  console.log(`Found ${accounts.length} accounts and ${bills.length} bills`);
+  
+  // Ensure we have at least one account
+  if (accounts.length === 0) {
+    console.log("No accounts found, creating dummy account...");
+    const { data: newAccount, error: accountError } = await supabase
+      .from('accounts')
+      .insert([{
+        name: 'Default Checking',
+        last_balance: 21369,
+        account_type: 'checking'
+      }])
+      .select()
+      .single();
+      
+    if (accountError) {
+      throw new Error('Failed to create default account: ' + accountError.message);
+    }
+    accounts.push(newAccount);
+    console.log("Default account created");
+  }
+
+  console.log("Deleting old projections from", today);
+  const deleteResult = await supabase.from('projections').delete().gte('proj_date', today);
+  console.log("Delete result:", deleteResult.error ? deleteResult.error : "Success");
+  
+  // Clear ALL highest/lowest flags to ensure old data doesn't interfere
+  console.log("Clearing all highest/lowest flags...");
+  const clearFlagsResult = await supabase
+    .from('projections')
+    .update({ highest: false, lowest: false })
+    .or('highest.eq.true,lowest.eq.true');
+  console.log("Clear flags result:", clearFlagsResult.error ? clearFlagsResult.error : "Success");
 
   const totalBalance = settings.manual_balance_override !== null && settings.manual_balance_override !== undefined
     ? settings.manual_balance_override
@@ -512,7 +561,7 @@ async function computeProjections(settings: Settings) {
       for (const bill of billsForDay) {
         runningBalance += bill.amount;
       }
-      // Insert this day's projection immediately
+      // Add to projections array (will be inserted in batch later)
       const projectionObj = {
         proj_date: dateStr,
         projected_balance: Math.round(runningBalance * 100) / 100,
@@ -520,13 +569,7 @@ async function computeProjections(settings: Settings) {
         highest: false,
         bills: billsForDay,
       };
-      try {
-        await supabase.from('projections').insert([projectionObj]);
-        await new Promise(res => setTimeout(res, 5)); // 5ms delay to avoid rate limits
-      } catch (err) {
-        console.error('Error inserting projection for date:', dateStr, err);
-        throw err;
-      }
+      projections.push(projectionObj);
       projectionCount++;
     }
 
@@ -544,11 +587,25 @@ async function computeProjections(settings: Settings) {
     }
 
     // Insert in batches
+    console.log("About to insert", projections.length, "projections");
+    if (projections.length > 0) {
+      console.log("First projection:", projections[0]);
+      console.log("Last projection:", projections[projections.length - 1]);
+    } else {
+      console.log("WARNING: No projections to insert!");
+      return; // Exit early if no projections
+    }
     const BATCH_SIZE = 10;
     for (let i = 0; i < projections.length; i += BATCH_SIZE) {
       const batch = projections.slice(i, i + BATCH_SIZE);
+      console.log(`Inserting batch ${i/BATCH_SIZE + 1}, size:`, batch.length);
       try {
-        await supabase.from('projections').insert(batch);
+        const insertResult = await supabase.from('projections').insert(batch);
+        if (insertResult.error) {
+          console.error("Insert error:", insertResult.error);
+        } else {
+          console.log("Batch inserted successfully");
+        }
         await new Promise(res => setTimeout(res, 100)); // 100ms delay
       } catch (err) {
         console.error('Error inserting projections batch:', err, {

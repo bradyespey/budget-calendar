@@ -108,10 +108,23 @@ export function UpcomingPage() {
 
   return (
     <div className="space-y-8 px-4 max-w-3xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-2 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white md:mr-8">
-          {upcomingDays.length}-Day Projection
+      {/* Page Description */}
+      <div className="text-center space-y-2 py-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Upcoming Bills
         </h1>
+        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          Preview your upcoming bills and projected account balance for the next 30 days. These events automatically sync with your shared Google Calendar.
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          📅 Each bill is added to your Google Calendar so you both can see when payments are due and plan accordingly.
+        </p>
+      </div>
+      
+      <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-2 mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white md:mr-8">
+          {upcomingDays.length}-Day Projection
+        </h2>
         {lastProjected && (
           <div className="text-sm text-gray-500 dark:text-gray-400">
             <strong>Last projected:</strong> {format(lastProjected, "MMMM d, yyyy, h:mm a")}

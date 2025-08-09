@@ -169,6 +169,19 @@ export function DashboardPage() {
   // ── UI ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8 px-4 max-w-5xl mx-auto">
+      {/* Page Description */}
+      <div className="text-center space-y-2 py-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Financial Dashboard
+        </h1>
+        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          Your financial overview at a glance. See your current account balance, projected future balances, and spending patterns across different categories.
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          💡 The projections are calculated based on your recurring bills and help you plan ahead for upcoming expenses.
+        </p>
+      </div>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Current Balance */}
         <Card>

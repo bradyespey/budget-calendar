@@ -457,6 +457,79 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/* Quick actions */}
+      <Card className="w-full">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-200">Manual triggers for account updates and calculations.</CardDescription>
+          </div>
+          <Button
+            onClick={handleAllActions}
+            className="ml-2 px-4 py-2 text-base font-semibold shadow whitespace-nowrap min-w-[120px]"
+            variant="primary"
+            title="Run All"
+            disabled={busy}
+          >
+            {busy && activeAction === 'all' ? <Loader className="animate-spin" size={18} /> : '🚀'} {busy && activeAction === 'all' && runAllStep ? 'Running...' : 'Run All'}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {/* Main Actions */}
+          <div className="space-y-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRefreshAccounts} disabled={busy}>
+                  {busy && activeAction === 'refresh' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="refresh">🔄</span>}
+                  Refresh Accounts
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Forces an accounts refresh in Monarch so latest bank balances can be obtained</p>
+              </div>
+              <div className="space-y-1">
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleUpdateBalance} disabled={busy}>
+                  {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="balance">💰</span>}
+                  Update Balance
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Grabs the latest balance from Monarch</p>
+              </div>
+              <div className="space-y-1">
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRecalculate} disabled={busy}>
+                  {busy && activeAction === 'projection' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="projection">📊</span>}
+                  Budget Projection
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Projects future budget in the Upcoming tab based on Budget Projection Settings</p>
+              </div>
+              <div className="space-y-1">
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleSyncCalendar} disabled={busy}>
+                  {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="calendar">📅</span>}
+                  Sync Calendar
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Syncs the budget projection with your shared Google Calendar</p>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-gray-200 dark:border-gray-700 my-4" />
+          {/* Maintenance Actions */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-200 mb-3">Maintenance</h4>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="space-y-1">
+                <Button onClick={handleValidateProjections} variant="outline" className="w-full sm:w-auto" disabled={busy}>
+                  {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : '💾'} Validate Projections
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Ensures all Transactions match up with what's expected for the Upcoming page and shows missing bills that need to be fixed</p>
+              </div>
+              <div className="space-y-1">
+                <Button onClick={handleClearCalendars} variant="outline" className="w-full sm:w-auto" disabled={busy}>
+                  {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : '🧹'} Clear Calendars
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes today and forward budget calendar events from your shared Google Calendar</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Budget Projection Settings */}
       <Card className="w-full">
         <CardHeader className="!border-b-0">
@@ -544,78 +617,8 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Quick actions */}
-      <Card className="w-full">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-200">Manual triggers for account updates and calculations.</CardDescription>
-          </div>
-          <Button
-            onClick={handleAllActions}
-            className="ml-2 px-4 py-2 text-base font-semibold shadow whitespace-nowrap min-w-[120px]"
-            variant="primary"
-            title="Run All"
-            disabled={busy}
-          >
-            {busy && activeAction === 'all' ? <Loader className="animate-spin" size={18} /> : '🚀'} {busy && activeAction === 'all' && runAllStep ? 'Running...' : 'Run All'}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {/* Main Actions */}
-          <div className="space-y-4 mb-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRefreshAccounts} disabled={busy}>
-                  {busy && activeAction === 'refresh' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="refresh">🔄</span>}
-                  Refresh Accounts
-                </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Forces an accounts refresh in Monarch so latest bank balances can be obtained</p>
-              </div>
-              <div className="space-y-1">
-                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleUpdateBalance} disabled={busy}>
-                  {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="balance">💰</span>}
-                  Update Balance
-                </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Grabs the latest balance from Monarch</p>
-              </div>
-              <div className="space-y-1">
-                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRecalculate} disabled={busy}>
-                  {busy && activeAction === 'projection' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="projection">📊</span>}
-                  Budget Projection
-                </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Projects future budget in the Upcoming tab based on Budget Projection Settings</p>
-              </div>
-              <div className="space-y-1">
-                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleSyncCalendar} disabled={busy}>
-                  {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="calendar">📅</span>}
-                  Sync Calendar
-                </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Syncs the budget projection with your shared Google Calendar</p>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-gray-200 dark:border-gray-700 my-4" />
-          {/* Maintenance Actions */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-200 mb-3">Maintenance</h4>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="space-y-1">
-                <Button onClick={handleValidateProjections} variant="outline" className="w-full sm:w-auto" disabled={busy}>
-                  {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : '💾'} Validate Projections
-                </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Ensures all Transactions match up with what's expected for the Upcoming page and shows missing bills that need to be fixed</p>
-              </div>
-              <div className="space-y-1">
-                <Button onClick={handleClearCalendars} variant="outline" className="w-full sm:w-auto" disabled={busy}>
-                  {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : '🧹'} Clear Calendars
-                </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes today and forward budget calendar events from your shared Google Calendar</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Category Management Card - spans full width */}
+      <CategoryManagement showNotification={showNotification} />
 
       {/* Top row: Calendar Mode (left), Import/Export Bills (right) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -750,9 +753,6 @@ export function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Category Management Card - spans full width */}
-        <CategoryManagement showNotification={showNotification} />
       </div>
     </div>
   )

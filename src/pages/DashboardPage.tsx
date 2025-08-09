@@ -175,10 +175,7 @@ export function DashboardPage() {
           Financial Dashboard
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-          Your financial overview at a glance. See your current account balance, projected future balances, and spending patterns across different categories.
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          💡 The projections are calculated based on your recurring bills and help you plan ahead for upcoming expenses.
+          Your financial overview at a glance with current account balance, projected future balances, spending patterns, and projections calculated from recurring bills.
         </p>
       </div>
       

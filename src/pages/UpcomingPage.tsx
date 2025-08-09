@@ -114,10 +114,7 @@ export function UpcomingPage() {
           Upcoming Bills
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-          Preview your upcoming bills and projected account balance for the next 30 days. These events automatically sync with your shared Google Calendar.
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          📅 Each bill is added to your Google Calendar so you both can see when payments are due and plan accordingly.
+          Preview your upcoming bills and projected account balance with automatic Google Calendar sync. Bills are moved to the next business day if they fall on weekends or holidays, while paychecks move to the previous business day.
         </p>
       </div>
       

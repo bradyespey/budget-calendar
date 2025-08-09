@@ -408,10 +408,7 @@ export function TransactionsPage() {
           Transactions
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-          Manage all your recurring bills and income sources. Add, edit, or delete transactions to keep your budget projections accurate.
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          💡 All transactions here automatically update your financial projections and sync with your calendar for upcoming payments.
+          Manage all your recurring bills and income sources with add, edit, and delete functionality that automatically updates financial projections.
         </p>
       </div>
       

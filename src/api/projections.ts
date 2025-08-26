@@ -139,7 +139,7 @@ export async function getHighLowProjections() {
 
 export async function triggerManualRecalculation() {
   try {
-    const budgetProjectionFunction = httpsCallable(functions, 'budgetProjectionV1');
+    const budgetProjectionFunction = httpsCallable(functions, 'budgetProjection');
     const result = await budgetProjectionFunction();
     return result.data;
   } catch (error) {

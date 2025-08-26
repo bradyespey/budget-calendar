@@ -41,7 +41,8 @@ jobs:
         id: update-balance
         run: |
           echo "Updating balance..."
-          RESPONSE=$(curl -i --location --request POST 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net/chaseBalance')
+          RESPONSE=$(curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/chase-balance' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}')
           echo "Response: $RESPONSE"
         continue-on-error: true
 
@@ -53,7 +54,8 @@ jobs:
         id: run-projections
         run: |
           echo "Running projections..."
-          RESPONSE=$(curl -i --location --request POST 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net/budgetProjection')
+          RESPONSE=$(curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/budget-projection' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}')
           echo "Response: $RESPONSE"
         continue-on-error: true
 
@@ -65,7 +67,8 @@ jobs:
         id: sync-calendar
         run: |
           echo "Syncing calendar..."
-          RESPONSE=$(curl -i --location --request POST 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net/syncCalendar')
+          RESPONSE=$(curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/sync-calendar' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}')
           echo "Response: $RESPONSE"
         continue-on-error: true
 
@@ -77,7 +80,8 @@ jobs:
       - name: Send Failure Alert
         run: |
           echo "Sending failure alert..."
-          curl -i --location --request POST 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net/sendAlert' \
+          curl -i --location --request POST 'https://qifbxpqtitmomvwfkvmx.supabase.co/functions/v1/send-alert' \
+          --header 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
           --header 'Content-Type: application/json' \
           --data '{
             "to": "${{ secrets.ALERT_EMAIL }}",

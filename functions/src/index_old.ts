@@ -25,43 +25,16 @@ const region = 'us-central1';
 export const budgetProjection = functions.region(region).https.onCall(
   async (data, context) => {
     try {
-      logger.info("Starting budget projection calculation");
-
-      // Get settings from Firestore (use same document as frontend)
-      const settingsDocRef = db.collection('settings').doc('config');
-      const settingsDoc = await settingsDocRef.get();
-      let settings;
-      
-      if (!settingsDoc.exists) {
-        // Create default settings
-        logger.info("No settings found, creating default settings...");
-        const defaultSettings = {
-          projectionDays: 7,
-          balanceThreshold: 1000,
-          manualBalanceOverride: null,
-          lastProjectedAt: null
-        };
-        
-        await settingsDocRef.set(defaultSettings);
-        settings = defaultSettings;
-      } else {
-        settings = settingsDoc.data();
-      }
-
-      logger.info("Computing projections with settings:", settings);
-      await computeProjections(settings);
-
-      // Update last projected time
-      await settingsDocRef.update({
-        lastProjectedAt: new Date()
-      });
-
-      logger.info("Budget projection completed successfully");
+      logger.info("Simple budget projection test");
+      logger.info("Auth context exists:", !!context.auth);
+      logger.info("User ID:", context.auth?.uid);
       
       return { 
         success: true, 
-        message: "Budget projection completed successfully",
-        timestamp: new Date().toISOString()
+        message: "Simple budget projection test completed",
+        timestamp: new Date().toISOString(),
+        hasAuth: !!context.auth,
+        userId: context.auth?.uid
       };
 
     } catch (error) {
@@ -71,9 +44,10 @@ export const budgetProjection = functions.region(region).https.onCall(
   });
 
 // Define timezone
-const TIMEZONE = 'America/Chicago';
+// const TIMEZONE = 'America/Chicago';
 
 // Helper function to fetch US holidays
+/*
 async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
   const holidays = new Set<string>();
   for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
@@ -118,8 +92,10 @@ function startOfDay(date: Date): Date {
   result.setHours(0, 0, 0, 0);
   return result;
 }
+*/
 
 // Helper function to parse ISO date with validation
+/*
 function parseISO(dateString: string): Date {
   if (!dateString || typeof dateString !== 'string') {
     throw new Error(`Invalid date string: ${dateString}`);
@@ -208,8 +184,10 @@ function addDays(date: Date, days: number): Date {
   result.setDate(result.getDate() + days);
   return result;
 }
+*/
 
 // Bill interface for TypeScript
+/*
 interface Bill {
   id: string;
   name?: string;
@@ -220,8 +198,11 @@ interface Bill {
   startDate?: string;
   endDate?: string;
 }
+*/
 
 // Main projection computation function
+// Temporarily commented out for testing
+/*
 async function computeProjections(settings: any) {
   logger.info("=== ENTERING computeProjections ===");
   
@@ -576,6 +557,7 @@ async function computeProjections(settings: any) {
 
   logger.info("Projections computation completed");
 }
+*/
 
 /**
  * 💰 Refresh Accounts Function

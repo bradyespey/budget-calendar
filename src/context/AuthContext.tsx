@@ -37,7 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<'admin' | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const allowedEmails = import.meta.env.VITE_ALLOWED_EMAILS?.split(',') || [];
+  // Fallback to hardcoded emails if env var is missing
+  const allowedEmails = import.meta.env.VITE_ALLOWED_EMAILS?.split(',') || [
+    'baespey@gmail.com',
+    'jennycespey@gmail.com', 
+    'bradyjennytx@gmail.com'
+  ];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -55,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserRole(null);
         if (user) {
           // User not authorized
-          alert('Access denied. You are not authorized to use this application.');
+          alert(`Access denied. Email ${user.email} is not authorized. Allowed: ${allowedEmails.join(', ')}`);
           await firebaseSignOut(auth);
         }
       }
@@ -63,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return unsubscribe;
-  }, []);
+  }, [allowedEmails]);
 
   const handleUserDocument = async (user: User) => {
     try {

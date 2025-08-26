@@ -67,6 +67,16 @@ export function DashboardPage() {
         calculateAverages(billsData)
       } catch (e) {
         console.error('Error fetching dashboard data:', e)
+        // Ensure cards render zeros rather than staying empty
+        setCategoryAverages({})
+        setBillsSummary({
+          oneTime: { bills: 0, income: 0 },
+          daily: { bills: 0, income: 0 },
+          weekly: { bills: 0, income: 0 },
+          monthly: { bills: 0, income: 0 },
+          yearly: { bills: 0, income: 0 },
+        })
+        setMonthlyTotals({ income: 0, bills: 0, leftover: 0 })
       } finally {
         setLoading(false)
       }
@@ -87,40 +97,54 @@ export function DashboardPage() {
     let totalMonthlyIncome = 0
     let totalMonthlyBills = 0
 
-    bills.forEach(bill => {
-      if (!categories[bill.category]) {
-        categories[bill.category] = { monthly: 0, yearly: 0 }
+    bills.forEach(raw => {
+      // Normalize bill fields defensively
+      const amount = Number(raw.amount) || 0
+      const frequency = (raw.frequency || 'monthly') as Bill['frequency']
+      const repeatsEvery = Number((raw as any).repeats_every ?? (raw as any).repeatsEvery ?? 1) || 1
+      const category = (raw.category || 'uncategorized').toLowerCase()
+
+      if (!categories[category]) {
+        categories[category] = { monthly: 0, yearly: 0 }
       }
+
       let monthlyAmount = 0
       let yearlyAmount = 0
-      switch (bill.frequency) {
+      switch (frequency) {
         case 'daily':
-          monthlyAmount = (bill.amount * 30.44) / bill.repeats_every
-          yearlyAmount = (bill.amount * 365.25) / bill.repeats_every
-          summary.daily[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          monthlyAmount = (amount * 30.44) / repeatsEvery
+          yearlyAmount = (amount * 365.25) / repeatsEvery
+          summary.daily[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
           break
         case 'weekly':
-          monthlyAmount = (bill.amount * 4.35) / bill.repeats_every
-          yearlyAmount = (bill.amount * 52.18) / bill.repeats_every
-          summary.weekly[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          monthlyAmount = (amount * 4.35) / repeatsEvery
+          yearlyAmount = (amount * 52.18) / repeatsEvery
+          summary.weekly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
           break
         case 'monthly':
-          monthlyAmount = bill.amount / bill.repeats_every
-          yearlyAmount = (bill.amount * 12) / bill.repeats_every
-          summary.monthly[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          monthlyAmount = amount / repeatsEvery
+          yearlyAmount = (amount * 12) / repeatsEvery
+          summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
           break
         case 'yearly':
-          monthlyAmount = bill.amount / (12 * bill.repeats_every)
-          yearlyAmount = bill.amount / bill.repeats_every
-          summary.yearly[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          monthlyAmount = amount / (12 * repeatsEvery)
+          yearlyAmount = amount / repeatsEvery
+          summary.yearly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
           break
         case 'one-time':
-          summary.oneTime[bill.amount >= 0 ? 'income' : 'bills'] += Math.abs(bill.amount)
+          summary.oneTime[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
           break
+        default:
+          // Treat unknown frequency as monthly
+          monthlyAmount = amount / repeatsEvery
+          yearlyAmount = (amount * 12) / repeatsEvery
+          summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
       }
-      categories[bill.category].monthly += monthlyAmount
-      categories[bill.category].yearly += yearlyAmount
-      if (bill.amount >= 0) {
+
+      categories[category].monthly += monthlyAmount
+      categories[category].yearly += yearlyAmount
+
+      if (amount >= 0) {
         totalMonthlyIncome += monthlyAmount
       } else {
         totalMonthlyBills += Math.abs(monthlyAmount)
@@ -142,7 +166,7 @@ export function DashboardPage() {
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount)
+    }).format(Math.round(amount))
 
   const handleSort = (field: 'category' | 'monthly' | 'yearly') => {
     if (field === sortField) {
@@ -218,7 +242,7 @@ export function DashboardPage() {
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {highLow.lowest
                     ? formatCurrency(highLow.lowest.projected_balance)
-                    : '-'}
+                    : formatCurrency(0)}
                 </h3>
                 {highLow.lowest && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -244,7 +268,7 @@ export function DashboardPage() {
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {highLow.highest
                     ? formatCurrency(highLow.highest.projected_balance)
-                    : '-'}
+                    : formatCurrency(0)}
                 </h3>
                 {highLow.highest && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">

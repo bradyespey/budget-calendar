@@ -1,90 +1,89 @@
 //src/api/accounts.ts
 
-import { supabase } from "../lib/supabase";
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  getDoc, 
+  query, 
+  orderBy 
+} from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../lib/firebaseConfig';
 import type { Account } from "../types";
 
-// ── Supabase & external API config ───────────────────────────────────────
-const FUNCTIONS_URL    = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL!;
-const ANON_KEY         = import.meta.env.VITE_SUPABASE_ANON_KEY!;
+// Helper function to convert Firestore timestamp to Date
+const timestampToDate = (timestamp: any): Date => {
+  if (timestamp?.toDate) {
+    return timestamp.toDate();
+  }
+  return new Date(timestamp);
+};
 
-// ── Supabase query functions ─────────────────────────────────────────────
+// ── Firebase query functions ─────────────────────────────────────────────
 export async function getAccounts(): Promise<Account[]> {
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("display_name", { ascending: true });
-  if (error) throw error;
-  return data as Account[];
+  const accountsRef = collection(db, 'accounts');
+  const q = query(accountsRef, orderBy('display_name'));
+  const snapshot = await getDocs(q);
+  
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    display_name: doc.data().displayName,
+    last_balance: doc.data().lastBalance,
+    last_synced: timestampToDate(doc.data().lastSynced).toISOString(),
+  }));
 }
 
 export async function getCheckingBalance(): Promise<number> {
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("last_balance")
-    .eq("id", "checking")
-    .single();
-  if (error) throw error;
-  return data.last_balance;
+  const accountRef = doc(db, 'accounts', 'checking');
+  const accountDoc = await getDoc(accountRef);
+  
+  if (!accountDoc.exists()) {
+    throw new Error('Checking account not found');
+  }
+  
+  return accountDoc.data().lastBalance;
 }
 
 export async function getLastSyncTime(): Promise<Date | null> {
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("last_synced")
-    .eq("id", "checking")
-    .single();
-  if (error) throw error;
-  return data && data.last_synced ? new Date(data.last_synced) : null;
+  const accountRef = doc(db, 'accounts', 'checking');
+  const accountDoc = await getDoc(accountRef);
+  
+  if (!accountDoc.exists() || !accountDoc.data().lastSynced) {
+    return null;
+  }
+  
+  return timestampToDate(accountDoc.data().lastSynced);
 }
 
-// ── Refresh accounts via Flask API ────────────────────────────────────────
+// ── Refresh accounts via Firebase Cloud Function ────────────────────────────────────────
 export async function refreshAccountsViaFlask(): Promise<void> {
-  const res = await fetch(import.meta.env.VITE_REFRESH_ACCOUNTS_API_URL!, {
-    method: "GET",
-    headers: {
-      Authorization: `Basic ${btoa(import.meta.env.VITE_REFRESH_ACCOUNTS_API_AUTH!)}`,
-    },
-  });
-  if (res.status !== 202) {
-    throw new Error(`Flask refresh failed (${res.status}): ${await res.text()}`);
+  const refreshAccountsFunction = httpsCallable(functions, 'refreshAccounts');
+  const result = await refreshAccountsFunction();
+  
+  const data = result.data as { success: boolean; message: string };
+  if (!data.success) {
+    throw new Error(data.message || 'Account refresh failed');
   }
 }
 
-// ── Supabase Edge Functions ──────────────────────────────────────────────
+// ── Firebase Cloud Functions ──────────────────────────────────────────────
 /**
- * 💰 Refresh Chase balance only (Supabase Edge Function)
- *    Now calls the function with proper headers and returns persisted balance.
+ * 💰 Refresh Chase balance only (Firebase Cloud Function)
+ *    Now calls the function and returns persisted balance.
  */
 export async function refreshChaseBalanceInDb(): Promise<number> {
-  const res = await fetch(`${FUNCTIONS_URL}/chase-balance`, {
-    method: "GET",
-    headers: {
-      apikey: ANON_KEY,
-      Authorization: `Bearer ${ANON_KEY}`,
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Chase balance function failed: ${err}`);
-  }
-  const { balance } = (await res.json()) as { balance: number };
-  return balance;
+  const chaseBalanceFunction = httpsCallable(functions, 'chaseBalance');
+  const result = await chaseBalanceFunction();
+  
+  const data = result.data as { balance: number };
+  return data.balance;
 }
 
 export async function getTransactionsReviewCount(): Promise<number> {
-  const res = await fetch(`${FUNCTIONS_URL}/transactions-review`, {
-    method: "GET",
-    headers: {
-      apikey: ANON_KEY,
-      Authorization: `Bearer ${ANON_KEY}`,
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Review count fetch failed: ${err}`);
-  }
-  const { transactions_to_review } = (await res.json()) as {
-    transactions_to_review: number;
-  };
-  return transactions_to_review;
+  const transactionsReviewFunction = httpsCallable(functions, 'transactionsReview');
+  const result = await transactionsReviewFunction();
+  
+  const data = result.data as { transactions_to_review: number };
+  return data.transactions_to_review;
 }

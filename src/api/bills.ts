@@ -1,80 +1,134 @@
 //src/api/bills.ts
 
-import { supabase } from '../lib/supabase';
+import { 
+  collection, 
+  doc, 
+  getDocs, 
+  getDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  orderBy,
+  writeBatch 
+} from 'firebase/firestore';
+import { db } from '../lib/firebaseConfig';
 import { Bill } from '../types';
 
 export async function getBills() {
-  const { data, error } = await supabase
-    .from('bills')
-    .select('*')
-    .order('start_date', { ascending: true });
+  try {
+    const billsRef = collection(db, 'bills');
+    const snapshot = await getDocs(billsRef);
     
-  if (error) {
+    return snapshot.docs.map(doc => {
+      const d: any = doc.data();
+      return {
+        id: doc.id,
+        name: d.name,
+        category: d.category,
+        amount: Number(d.amount ?? d.amount_cents ?? 0),
+        frequency: d.frequency,
+        repeats_every: d.repeatsEvery ?? d.repeats_every ?? 1,
+        start_date: d.startDate ?? d.start_date,
+        end_date: d.endDate ?? d.end_date,
+        owner: d.owner,
+        note: d.note,
+      } as Bill;
+    });
+  } catch (error) {
     console.error('Error fetching bills:', error);
     throw error;
   }
-  
-  return data as Bill[];
 }
 
 export async function getBill(id: string) {
-  const { data, error } = await supabase
-    .from('bills')
-    .select('*')
-    .eq('id', id)
-    .single();
+  try {
+    const billRef = doc(db, 'bills', id);
+    const billDoc = await getDoc(billRef);
     
-  if (error) {
+    if (!billDoc.exists()) {
+      throw new Error(`Bill with id ${id} not found`);
+    }
+    
+    const d: any = billDoc.data();
+    return {
+      id: billDoc.id,
+      name: d.name,
+      category: d.category,
+      amount: Number(d.amount ?? d.amount_cents ?? 0),
+      frequency: d.frequency,
+      repeats_every: d.repeatsEvery ?? d.repeats_every ?? 1,
+      start_date: d.startDate ?? d.start_date,
+      end_date: d.endDate ?? d.end_date,
+      owner: d.owner,
+      note: d.note,
+    } as Bill;
+  } catch (error) {
     console.error(`Error fetching bill ${id}:`, error);
     throw error;
   }
-  
-  return data as Bill;
 }
 
 export async function createBill(bill: Omit<Bill, 'id'>) {
-  const { data, error } = await supabase
-    .from('bills')
-    .insert(bill)
-    .select()
-    .single();
+  try {
+    const billsRef = collection(db, 'bills');
+    const payload: any = {
+      name: bill.name,
+      category: bill.category,
+      amount: bill.amount,
+      frequency: bill.frequency,
+      repeatsEvery: bill.repeats_every,
+      startDate: bill.start_date,
+    };
+    if (bill.end_date) payload.endDate = bill.end_date;
+    if (bill.owner) payload.owner = bill.owner;
+    if (bill.note) payload.note = bill.note;
+
+    const docRef = await addDoc(billsRef, payload);
     
-  if (error) {
+    return {
+      id: docRef.id,
+      ...bill
+    } as Bill;
+  } catch (error) {
     console.error('Error creating bill:', error);
     throw error;
   }
-  
-  return data as Bill;
 }
 
 export async function updateBill(id: string, updates: Partial<Omit<Bill, 'id'>>) {
-  const { data, error } = await supabase
-    .from('bills')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+  try {
+    const billRef = doc(db, 'bills', id);
     
-  if (error) {
+    const firestoreUpdates: any = {};
+    if (updates.name !== undefined) firestoreUpdates.name = updates.name;
+    if (updates.category !== undefined) firestoreUpdates.category = updates.category;
+    if (updates.amount !== undefined) firestoreUpdates.amount = updates.amount;
+    if (updates.frequency !== undefined) firestoreUpdates.frequency = updates.frequency;
+    if (updates.repeats_every !== undefined) firestoreUpdates.repeatsEvery = updates.repeats_every;
+    if (updates.start_date !== undefined) firestoreUpdates.startDate = updates.start_date;
+    if (updates.end_date !== undefined) firestoreUpdates.endDate = updates.end_date;
+    if (updates.owner !== undefined) firestoreUpdates.owner = updates.owner;
+    if (updates.note !== undefined) firestoreUpdates.note = updates.note;
+    
+    await updateDoc(billRef, firestoreUpdates);
+    
+    return getBill(id);
+  } catch (error) {
     console.error(`Error updating bill ${id}:`, error);
     throw error;
   }
-  
-  return data as Bill;
 }
 
 export async function deleteBill(id: string) {
-  const { error } = await supabase
-    .from('bills')
-    .delete()
-    .eq('id', id);
-    
-  if (error) {
+  try {
+    const billRef = doc(db, 'bills', id);
+    await deleteDoc(billRef);
+    return true;
+  } catch (error) {
     console.error(`Error deleting bill ${id}:`, error);
     throw error;
   }
-  
-  return true;
 }
 
 // Import bills from CSV data
@@ -89,14 +143,30 @@ export async function importBills(bills: Array<{
   owner?: string;
   note?: string;
 }>) {
-  const { error } = await supabase
-    .from('bills')
-    .insert(bills);
-
-  if (error) {
+  try {
+    const batch = writeBatch(db);
+    const billsRef = collection(db, 'bills');
+    
+    bills.forEach(bill => {
+      const newBillRef = doc(billsRef);
+      const payload: any = {
+        name: bill.name,
+        category: bill.category,
+        amount: bill.amount,
+        frequency: bill.frequency,
+        repeatsEvery: bill.repeats_every,
+        startDate: bill.start_date,
+      };
+      if (bill.end_date) payload.endDate = bill.end_date;
+      if (bill.owner) payload.owner = bill.owner;
+      if (bill.note) payload.note = bill.note;
+      batch.set(newBillRef, payload);
+    });
+    
+    await batch.commit();
+    return true;
+  } catch (error) {
     console.error('Error importing bills:', error);
     throw error;
   }
-
-  return true;
 }

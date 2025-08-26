@@ -1,6 +1,6 @@
 //src/utils/validateProjections.ts
 
-import { supabase } from '../lib/supabase'
+import { getSettings, getBills, getProjections } from '../api/firebase'
 import { addDays, parseISO, startOfDay, format, isWeekend } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 
@@ -75,8 +75,8 @@ interface ValidationResult {
 }
 
 function shouldBillOccurOnDate(bill: any, date: Date): boolean {
-  const billStart = parseISO(bill.start_date)
-  const billEnd = bill.end_date ? parseISO(bill.end_date) : null
+  const billStart = parseISO(bill.startDate)
+  const billEnd = bill.endDate ? parseISO(bill.endDate) : null
 
   // Check if date is within bill's active period
   if (date < billStart || (billEnd && date > billEnd)) {
@@ -91,27 +91,27 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   // For daily bills
   if (bill.frequency === 'daily') {
     const daysSinceStart = Math.floor((date.getTime() - billStart.getTime()) / (1000 * 60 * 60 * 24))
-    return daysSinceStart % bill.repeats_every === 0
+    return daysSinceStart % bill.repeatsEvery === 0
   }
 
   // For weekly bills
   if (bill.frequency === 'weekly') {
     const daysSinceStart = Math.floor((date.getTime() - billStart.getTime()) / (1000 * 60 * 60 * 24))
-    return daysSinceStart % (7 * bill.repeats_every) === 0
+    return daysSinceStart % (7 * bill.repeatsEvery) === 0
   }
 
   // For monthly bills
   if (bill.frequency === 'monthly') {
     const monthsSinceStart = (date.getFullYear() - billStart.getFullYear()) * 12 + 
                             (date.getMonth() - billStart.getMonth())
-    return monthsSinceStart % bill.repeats_every === 0 && 
+    return monthsSinceStart % bill.repeatsEvery === 0 && 
            date.getDate() === billStart.getDate()
   }
 
   // For yearly bills
   if (bill.frequency === 'yearly') {
     const yearsSinceStart = date.getFullYear() - billStart.getFullYear()
-    return yearsSinceStart % bill.repeats_every === 0 && 
+    return yearsSinceStart % bill.repeatsEvery === 0 && 
            date.getMonth() === billStart.getMonth() && 
            date.getDate() === billStart.getDate()
   }
@@ -121,37 +121,31 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
 
 export async function validateProjections(): Promise<ValidationResult> {
   // Get settings to know projection days
-  const { data: settings } = await supabase
-    .from('settings')
-    .select('projection_days')
-    .limit(1)
-    .maybeSingle()
+  const settings = await getSettings()
 
   if (!settings) {
     throw new Error('Failed to fetch settings')
   }
 
-  const projectionDays = settings.projection_days || 30
+  const projectionDays = settings.projectionDays || 30
   const today = formatInTimeZone(new Date(), TIMEZONE, 'yyyy-MM-dd')
   const endDate = formatInTimeZone(addDays(new Date(), projectionDays), TIMEZONE, 'yyyy-MM-dd')
 
   // Get all bills
-  const { data: bills } = await supabase
-    .from('bills')
-    .select('*')
-    .order('start_date', { ascending: true })
+  const bills = await getBills()
 
   if (!bills) {
     throw new Error('Failed to fetch bills')
   }
 
   // Get all projections
-  const { data: projections } = await supabase
-    .from('projections')
-    .select('*')
-    .gte('proj_date', today)
-    .lte('proj_date', endDate)
-    .order('proj_date', { ascending: true })
+  const allProjections = await getProjections()
+  
+  // Filter projections to the date range
+  const projections = allProjections.filter(proj => {
+    const projDate = proj.projDate
+    return projDate >= today && projDate <= endDate
+  }).sort((a, b) => a.projDate.localeCompare(b.projDate))
 
   if (!projections) {
     throw new Error('Failed to fetch projections')
@@ -171,18 +165,18 @@ export async function validateProjections(): Promise<ValidationResult> {
   for (const proj of projections) {
     if (!proj.bills) continue
 
-    if (!actualBills.has(proj.proj_date)) {
-      actualBills.set(proj.proj_date, new Set())
+    if (!actualBills.has(proj.projDate)) {
+      actualBills.set(proj.projDate, new Set())
     }
 
     for (const bill of proj.bills) {
-      actualBills.get(proj.proj_date)!.add(billKey(bill))
+      actualBills.get(proj.projDate)!.add(billKey(bill))
     }
   }
 
   // For each projection date, check which bills should occur (with adjustment)
   for (const proj of projections) {
-    const projDate = parseISO(proj.proj_date)
+    const projDate = parseISO(proj.projDate)
     // Check each bill to see if it should occur on this date
     for (const bill of bills) {
       // Determine intended date
@@ -224,7 +218,7 @@ export async function validateProjections(): Promise<ValidationResult> {
               name: bill.name,
               amount: bill.amount,
               frequency: bill.frequency,
-              start_date: bill.start_date,
+              start_date: bill.startDate,
               category: bill.category
             },
             expectedDate: date

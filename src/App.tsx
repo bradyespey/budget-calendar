@@ -11,6 +11,7 @@ import { TransactionsPage } from './pages/TransactionsPage'
 import { UpcomingPage } from './pages/UpcomingPage'
 import { SettingsPage } from './pages/SettingsPage'
 
+
 function App() {
   return (
     <BrowserRouter>
@@ -19,6 +20,7 @@ function App() {
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+
 
           {/* Protected */}
           <Route

@@ -8,12 +8,17 @@
     "build": "vite build",
     "lint": "eslint --ext .ts,.tsx . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "migrate": "tsx scripts/migrateData.ts",
+    "migrate:dry-run": "tsx scripts/migrateData.ts --dry-run",
+    "import:firebase": "tsx scripts/importDataToFirebase.ts",
+    "cleanup:supabase": "tsx scripts/cleanupSupabase.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8",
     "date-fns": "^3.4.0",
     "date-fns-tz": "^3.2.0",
+    "firebase": "^12.1.0",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -28,12 +33,15 @@
     "@typescript-eslint/parser": "^7.1.1",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.18",
+    "dotenv": "^17.2.1",
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "firebase-tools": "^14.12.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.20.3",
     "typescript": "^5.2.2",
     "vite": "^5.1.6"
   }

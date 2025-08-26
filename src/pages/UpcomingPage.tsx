@@ -6,7 +6,7 @@ import { format, parseISO } from 'date-fns';
 import { getProjections } from '../api/projections';
 import { Projection } from '../types';
 import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { getSettings } from '../api/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { useLocation } from 'react-router-dom';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -33,13 +33,13 @@ export function UpcomingPage() {
   useEffect(() => {
     fetchUpcomingData();
     async function fetchLastProjected() {
-      const { data } = await supabase
-        .from('settings')
-        .select('last_projected_at')
-        .eq('id', 1)
-        .maybeSingle();
-      if (data?.last_projected_at) {
-        setLastProjected(new Date(data.last_projected_at));
+      try {
+        const settings = await getSettings();
+        if (settings?.lastProjectedAt) {
+          setLastProjected(settings.lastProjectedAt);
+        }
+      } catch (error) {
+        console.error('Error fetching last projected time:', error);
       }
     }
     fetchLastProjected();

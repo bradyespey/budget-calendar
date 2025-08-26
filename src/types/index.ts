@@ -26,6 +26,7 @@ export interface Projection {
   projected_balance: number
   lowest: boolean
   highest: boolean
+  bills?: any[] // Array of bill data for the projection
 }
 
 export interface User {

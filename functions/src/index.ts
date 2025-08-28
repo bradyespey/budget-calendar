@@ -748,10 +748,13 @@ export const syncCalendar = functions.region(region).https.onCall(
     try {
       logger.info("Starting calendar sync");
 
+      // Check if this is a large sync operation and warn about potential timeouts
+      const env = data?.env || "dev"; // Default to dev for testing
+      logger.info(`Calendar sync environment: ${env}`);
+
       // Get Firebase config for Google credentials and calendar IDs
       const config = functions.config();
       const googleServiceAccountJson = config.google?.service_account_json;
-      const env = data?.env || "dev"; // Default to dev for testing
       
       const balanceCalId = env === "dev" 
         ? config.google?.dev_balance_calendar_id
@@ -874,12 +877,402 @@ export const syncCalendar = functions.region(region).https.onCall(
         throw lastError;
       }
 
-      // Process each projection
-      for (const [index, projection] of projections.entries()) {
+      // First, run budget projection to ensure we have fresh data with current settings
+      logger.info("Running budget projection first to ensure fresh data...");
+      
+      try {
+        // Get current settings to determine projection days
+        const settingsDocRef = db.collection('settings').doc('config');
+        const settingsDoc = await settingsDocRef.get();
+        let settings;
+        
+        if (!settingsDoc.exists) {
+          logger.info("No settings found, creating default settings...");
+          const defaultSettings = {
+            projectionDays: 7,
+            balanceThreshold: 1000,
+            manualBalanceOverride: null,
+            lastProjectedAt: null
+          };
+          
+          await settingsDocRef.set(defaultSettings);
+          settings = defaultSettings;
+        } else {
+          settings = settingsDoc.data();
+        }
+        
+        logger.info(`Found settings with projectionDays: ${settings?.projectionDays || 7}`);
+        
+        // Call computeProjections to generate fresh projections
+        await computeProjections(settings);
+        
+        // Update last projected time
+        await settingsDocRef.update({
+          lastProjectedAt: new Date()
+        });
+        
+        logger.info("Budget projection completed, now fetching fresh projections for calendar sync");
+        
+        // Re-fetch projections after computation
+        const freshProjectionsSnapshot = await db.collection('projections')
+          .where('projDate', '>=', today)
+          .orderBy('projDate', 'asc')
+          .get();
+          
+        if (freshProjectionsSnapshot.empty) {
+          logger.info("No fresh projections found for calendar sync");
+          return { 
+            success: true, 
+            message: "No projections to sync",
+            timestamp: new Date().toISOString()
+          };
+        }
+        
+        // Update projections with fresh data
+        const freshProjections = freshProjectionsSnapshot.docs.map(doc => doc.data());
+        logger.info(`Fresh projections count: ${freshProjections.length}`);
+        
+        // Replace the original projections with fresh ones
+        projections.splice(0, projections.length, ...freshProjections);
+        
+      } catch (projectionError) {
+        logger.error("Error running budget projection:", projectionError);
+        throw new https.HttpsError('internal', `Failed to generate fresh projections: ${projectionError instanceof Error ? projectionError.message : 'Unknown error'}`);
+      }
+
+      // Process all projections with optimized logic to prevent duplicates and timeouts
+      logger.info(`Processing ${projections.length} projections with optimization`);
+      
+      let processedCount = 0;
+      let updatedCount = 0;
+      let createdCount = 0;
+      let skippedCount = 0;
+
+      // Process in smaller batches for large syncs to avoid timeouts
+      const BATCH_SIZE = 50;
+      const totalBatches = Math.ceil(projections.length / BATCH_SIZE);
+      
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const batchStart = batchIndex * BATCH_SIZE;
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, projections.length);
+        const batch = projections.slice(batchStart, batchEnd);
+        
+        logger.info(`Processing batch ${batchIndex + 1}/${totalBatches} (${batch.length} projections)`);
+
+        for (const [index, projection] of batch.entries()) {
+          const globalIndex = batchStart + index;
         const dateStr = projection.projDate;
         
         // === BALANCE EVENTS ===
-        const expectedBalanceSummary = index === 0
+          const expectedBalanceSummary = globalIndex === 0
+            ? `Balance: ${formatCurrency(projection.projectedBalance)}`
+            : `Projected Balance: ${formatCurrency(projection.projectedBalance)}`;
+          
+          // Find existing balance events for this date
+          const existingBalanceEvents = balanceEvents.filter(event => event.start?.date === dateStr);
+          const correctBalanceEvent = existingBalanceEvents.find(event => event.summary === expectedBalanceSummary);
+          
+          if (correctBalanceEvent) {
+            // Event already exists with correct data - skip
+            skippedCount++;
+          } else if (existingBalanceEvents.length > 0) {
+            // Update the first existing event and remove any duplicates
+            const eventToUpdate = existingBalanceEvents[0];
+            await withRetry(() => 
+              calendar.events.patch({
+                calendarId: balanceCalId,
+                eventId: eventToUpdate.id!,
+                requestBody: { summary: expectedBalanceSummary }
+              })
+            );
+            updatedCount++;
+            
+            // Remove any duplicate balance events on this date
+            for (let i = 1; i < existingBalanceEvents.length; i++) {
+              await withRetry(() =>
+                calendar.events.delete({
+                  calendarId: balanceCalId,
+                  eventId: existingBalanceEvents[i].id!
+                })
+              );
+              logger.info(`Removed duplicate balance event for ${dateStr}`);
+            }
+          } else {
+            // Create new balance event
+            await withRetry(() =>
+              calendar.events.insert({
+                calendarId: balanceCalId,
+                requestBody: {
+                  summary: expectedBalanceSummary,
+                  start: { date: dateStr },
+                  end: { date: dateStr }
+                }
+              })
+            );
+            createdCount++;
+          }
+
+          // === BILLS EVENTS ===
+          if (projection.bills && projection.bills.length > 0) {
+            // Get all existing bill events for this date
+            const existingBillsForDate = billsEvents.filter(event => event.start?.date === dateStr);
+            
+            // Create a map of expected bills for easy comparison
+            const expectedBills = new Map();
+            for (const bill of projection.bills) {
+              const expectedSummary = `${bill.name} ${formatCurrency(bill.amount)}`;
+              expectedBills.set(expectedSummary, bill);
+            }
+            
+            // Check which expected bills already exist
+            const existingBillSummaries = new Set();
+            for (const existingEvent of existingBillsForDate) {
+              if (existingEvent.summary && expectedBills.has(existingEvent.summary)) {
+                existingBillSummaries.add(existingEvent.summary);
+                skippedCount++;
+              }
+            }
+            
+            // Remove any bills that no longer exist in projections
+            for (const existingEvent of existingBillsForDate) {
+              if (existingEvent.summary && !expectedBills.has(existingEvent.summary)) {
+                await withRetry(() =>
+                  calendar.events.delete({
+                    calendarId: billsCalId,
+                    eventId: existingEvent.id!
+                  })
+                );
+                logger.info(`Removed outdated bill event: ${existingEvent.summary} for ${dateStr}`);
+              }
+            }
+            
+            // Create missing bill events
+            for (const [expectedSummary, bill] of expectedBills) {
+              if (!existingBillSummaries.has(expectedSummary)) {
+                await withRetry(() =>
+                  calendar.events.insert({
+                    calendarId: billsCalId,
+                    requestBody: {
+                      summary: expectedSummary,
+                      description: `Amount: ${formatCurrency(bill.amount)}`,
+                      start: { date: dateStr },
+                      end: { date: dateStr }
+                    }
+                  })
+                );
+                createdCount++;
+              }
+            }
+          } else {
+            // No bills expected for this date - remove any existing ones
+            const existingBillsForDate = billsEvents.filter(event => event.start?.date === dateStr);
+            for (const existingEvent of existingBillsForDate) {
+              await withRetry(() =>
+                calendar.events.delete({
+                  calendarId: billsCalId,
+                  eventId: existingEvent.id!
+                })
+              );
+              logger.info(`Removed bill event (no bills expected): ${existingEvent.summary} for ${dateStr}`);
+            }
+          }
+            
+          processedCount++;
+        }
+        
+        // Add a small delay between batches for large syncs to prevent rate limiting
+        if (batchIndex < totalBatches - 1 && projections.length > 50) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      logger.info(`Calendar sync completed - processed: ${processedCount}, created: ${createdCount}, updated: ${updatedCount}, skipped: ${skippedCount}`);
+        
+        return {
+          success: true,
+          message: "Calendar sync completed successfully",
+          projectionsCount: projections.length,
+          processedCount,
+          chunksProcessed: 1,
+          environment: env,
+          timestamp: new Date().toISOString(),
+        };
+
+    } catch (error) {
+      logger.error("Calendar sync error:", error);
+      
+      // You could add error alerting here later when you migrate the sendAlert function
+      // For now, just throw the error
+      
+      if (error instanceof https.HttpsError) {
+        throw error;
+      }
+      throw new https.HttpsError('internal', error instanceof Error ? error.message : "Unknown error");
+    }
+  });
+
+/**
+ * 📅 Continue Calendar Sync Function
+ * Continues large calendar syncs from a specific offset
+ */
+export const continueCalendarSync = functions.region(region).https.onCall(
+  async (data, context) => {
+    try {
+      logger.info("Starting continued calendar sync");
+
+      const { env = "dev", offset = 0, limit = 10 } = data;
+      logger.info(`Continuing sync from offset ${offset} with limit ${limit}`);
+
+      // Get Firebase config for Google credentials and calendar IDs
+      const config = functions.config();
+      const googleServiceAccountJson = config.google?.service_account_json;
+      
+      const balanceCalId = env === "dev" 
+        ? config.google?.dev_balance_calendar_id
+        : config.google?.prod_balance_calendar_id;
+      const billsCalId = env === "dev"
+        ? config.google?.dev_bills_calendar_id
+        : config.google?.prod_bills_calendar_id;
+
+      if (!googleServiceAccountJson) {
+        throw new https.HttpsError('failed-precondition', 'Missing google.service_account_json in Firebase config');
+      }
+      if (!balanceCalId || !billsCalId) {
+        throw new https.HttpsError('failed-precondition', `Missing calendar IDs for ${env} environment`);
+      }
+
+      // Parse service account key
+      let serviceAccountKey: any;
+      try {
+        serviceAccountKey = typeof googleServiceAccountJson === 'string'
+          ? JSON.parse(googleServiceAccountJson)
+          : googleServiceAccountJson;
+      } catch (error) {
+        logger.error("Failed to parse service account JSON:", error);
+        throw new https.HttpsError('failed-precondition', 'Invalid service account JSON');
+      }
+
+      if (!serviceAccountKey?.client_email || !serviceAccountKey?.private_key) {
+        logger.error('Service account JSON missing required fields');
+        throw new https.HttpsError('failed-precondition', 'Invalid service account JSON');
+      }
+
+      // Set up Google Calendar API auth
+      const auth = new google.auth.JWT({
+        email: serviceAccountKey.client_email,
+        key: serviceAccountKey.private_key,
+        scopes: ["https://www.googleapis.com/auth/calendar"]
+      });
+      
+      await auth.authorize();
+      const calendar = google.calendar({ version: "v3", auth });
+
+      // Get projections from Firestore (from today forward)
+      const today = new Date().toISOString().split('T')[0];
+      
+      const projectionsSnapshot = await db.collection('projections')
+        .where('projDate', '>=', today)
+        .orderBy('projDate', 'asc')
+        .get();
+
+      if (projectionsSnapshot.empty) {
+        logger.info("No projections found for continued sync");
+        return { 
+          success: true, 
+          message: "No projections to sync",
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      const allProjections = projectionsSnapshot.docs.map(doc => doc.data());
+      const totalProjections = allProjections.length;
+      
+      if (offset >= totalProjections) {
+        return {
+          success: true,
+          message: "Sync already completed",
+          projectionsCount: totalProjections,
+          processedCount: 0,
+          hasMore: false,
+          environment: env,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      // Get the slice of projections to process
+      const projections = allProjections.slice(offset, offset + limit);
+      logger.info(`Processing ${projections.length} projections from offset ${offset} (${offset + 1}-${offset + projections.length} of ${totalProjections})`);
+
+      // Calculate event window for this batch
+      const startDate = new Date(projections[0].projDate);
+      const endDate = new Date(projections[projections.length - 1].projDate);
+      const maxDate = new Date(endDate.getTime() + 24 * 60 * 60 * 1000);
+
+      // Helper function to fetch events for this batch
+      async function fetchBatchEvents(calendarId: string): Promise<any[]> {
+        let allEvents: any[] = [];
+        let pageToken: string | undefined = undefined;
+        
+        do {
+          const response: any = await calendar.events.list({
+            calendarId,
+            timeMin: startDate.toISOString(),
+            timeMax: maxDate.toISOString(),
+            singleEvents: true,
+            maxResults: 100,
+            pageToken,
+          });
+          
+          allEvents = allEvents.concat(response.data.items || []);
+          pageToken = response.data.nextPageToken;
+        } while (pageToken);
+        
+        return allEvents;
+      }
+
+      // Get existing events for this batch
+      const [balanceEvents, billsEvents] = await Promise.all([
+        fetchBatchEvents(balanceCalId),
+        fetchBatchEvents(billsCalId)
+      ]);
+
+      logger.info(`Found ${balanceEvents.length} existing balance events, ${billsEvents.length} existing bills events for this batch`);
+
+      // Helper function to format currency
+      function formatCurrency(amount: number): string {
+        return amount.toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        });
+      }
+
+      // Helper function for retry logic
+      async function withRetry(fn: () => Promise<any>, maxRetries = 3, delayMs = 250): Promise<any> {
+        let lastError;
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            return await fn();
+          } catch (error) {
+            lastError = error;
+            if (i < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+          }
+        }
+        throw lastError;
+      }
+
+      let processedCount = 0;
+
+      // Process each projection in this batch
+      for (const [index, projection] of projections.entries()) {
+        const globalIndex = offset + index;
+        const dateStr = projection.projDate;
+        
+        // === BALANCE EVENTS ===
+        const expectedBalanceSummary = globalIndex === 0
           ? `Balance: ${formatCurrency(projection.projectedBalance)}`
           : `Projected Balance: ${formatCurrency(projection.projectedBalance)}`;
         
@@ -963,23 +1356,29 @@ export const syncCalendar = functions.region(region).https.onCall(
             }
           }
         }
+        
+        processedCount++;
       }
 
-      logger.info("Calendar sync completed successfully");
-      
+      const nextOffset = offset + limit;
+      const hasMore = nextOffset < totalProjections;
+
+      logger.info(`Completed batch - processed ${processedCount} projections. Next offset: ${nextOffset}, hasMore: ${hasMore}`);
+
       return {
         success: true,
-        message: "Calendar sync completed successfully",
-        projectionsCount: projections.length,
+        message: hasMore ? `Batch completed - ${nextOffset} of ${totalProjections} processed` : "Sync completed",
+        projectionsCount: totalProjections,
+        processedCount,
+        currentOffset: offset,
+        nextOffset,
+        hasMore,
         environment: env,
         timestamp: new Date().toISOString(),
       };
 
     } catch (error) {
-      logger.error("Calendar sync error:", error);
-      
-      // You could add error alerting here later when you migrate the sendAlert function
-      // For now, just throw the error
+      logger.error("Continue calendar sync error:", error);
       
       if (error instanceof https.HttpsError) {
         throw error;

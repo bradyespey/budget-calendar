@@ -172,13 +172,17 @@ export function SettingsPage() {
     try {
       await saveSettings();
       
-      // Call Firebase Cloud Function
+      // Call Firebase Cloud Function (it will recalculate projections internally)
       const result = await syncCalendar(calendarMode);
       
       const email = calendarMode === 'dev'
         ? 'baespey@gmail.com'
         : 'bradyjennytx@gmail.com';
-      showNotification(`Calendar sync completed for ${email}. Synced ${result.projectionsCount || 0} projections.`, 'success');
+      if (result.success) {
+        showNotification(`Calendar sync completed for ${email}. Synced ${result.processedCount || 0} days.`, 'success');
+      } else {
+        showNotification(`Calendar sync failed: ${result.message}`, 'error');
+      }
     } catch (e: any) {
       showNotification(`Error syncing calendar: ${e.message}`, 'error');
     } finally {
@@ -473,7 +477,7 @@ export function SettingsPage() {
                   {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="calendar">📅</span>}
                   Sync Calendar
                 </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Syncs the budget projection with your shared Google Calendar</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Syncs the budget projection with Google Calendar</p>
               </div>
             </div>
           </div>
@@ -481,18 +485,18 @@ export function SettingsPage() {
           {/* Maintenance Actions */}
           <div>
             <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-200 mb-3">Maintenance</h4>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="space-y-1">
-                <Button onClick={handleValidateProjections} variant="outline" className="w-full sm:w-auto" disabled={busy}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+              <div className="space-y-2">
+                <Button onClick={handleValidateProjections} variant="outline" className="w-full" disabled={busy}>
                   {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : '💾'} Validate Projections
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Ensures all Transactions match up with what's expected for the Upcoming page and shows missing bills that need to be fixed</p>
               </div>
-              <div className="space-y-1">
-                <Button onClick={handleClearCalendars} variant="outline" className="w-full sm:w-auto" disabled={busy}>
+              <div className="space-y-2">
+                <Button onClick={handleClearCalendars} variant="outline" className="w-full" disabled={busy}>
                   {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : '🧹'} Clear Calendars
                 </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes today and forward budget calendar events from your shared Google Calendar</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes all budget calendar events from Google Calendar</p>
               </div>
             </div>
           </div>

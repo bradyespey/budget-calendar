@@ -25,7 +25,7 @@ export interface Category {
 
 export async function getCategories(): Promise<Category[]> {
   try {
-    console.log('Fetching categories...');
+
     
     const categoriesRef = collection(db, 'categories');
     const q = query(categoriesRef, orderBy('name'));
@@ -55,7 +55,7 @@ export async function getCategories(): Promise<Category[]> {
       })
     );
     
-    console.log('Returning categories:', counted);
+
     return counted;
   } catch (error) {
     console.error('Error fetching categories:', error);
@@ -67,7 +67,7 @@ export async function createCategory(name: string): Promise<Category> {
   try {
     // Clean and validate the category name
     const cleanName = name.trim().toLowerCase();
-    console.log('Creating category with name:', cleanName);
+
     
     if (!cleanName) {
       throw new Error('Category name cannot be empty');
@@ -95,7 +95,7 @@ export async function createCategory(name: string): Promise<Category> {
       transaction_count: 0,
     };
     
-    console.log('Category created successfully:', newCategory);
+
     return newCategory;
   } catch (error) {
     console.error('Error creating category:', error);
@@ -149,7 +149,7 @@ export async function updateCategory(id: string, name: string): Promise<Category
 
 export async function deleteCategory(id: string): Promise<void> {
   try {
-    console.log('Attempting to delete category by ID:', id);
+
     
     // First, get the category
     const categoryRef = doc(db, 'categories', id);
@@ -160,14 +160,14 @@ export async function deleteCategory(id: string): Promise<void> {
     }
     
     const categoryName = categoryDoc.data().name;
-    console.log('Found category to delete:', categoryName);
+
     
     // Check if any bills are using this category
     const billsRef = collection(db, 'bills');
     const billsQuery = query(billsRef, where('category', '==', categoryName));
     const billsSnapshot = await getDocs(billsQuery);
     
-    console.log('Bills using category:', billsSnapshot.size);
+
     
     if (!billsSnapshot.empty) {
       const billNames = billsSnapshot.docs
@@ -177,11 +177,11 @@ export async function deleteCategory(id: string): Promise<void> {
       throw new Error(`Cannot delete category: it is being used by ${billsSnapshot.size} transaction(s) including: ${billNames}`);
     }
     
-    console.log('No bills using category, proceeding with delete...');
+
     
     // Delete the category
     await deleteDoc(categoryRef);
-    console.log('Category deleted successfully');
+
   } catch (error) {
     console.error('Error deleting category:', error);
     throw error;
@@ -190,7 +190,7 @@ export async function deleteCategory(id: string): Promise<void> {
 
 export async function deleteCategoryWithBillsCheck(categoryName: string): Promise<void> {
   try {
-    console.log('Attempting to delete category:', categoryName);
+
     
     // Find category by name
     const categoriesRef = collection(db, 'categories');
@@ -208,7 +208,7 @@ export async function deleteCategoryWithBillsCheck(categoryName: string): Promis
     const billsQuery = query(billsRef, where('category', '==', categoryName));
     const billsSnapshot = await getDocs(billsQuery);
     
-    console.log('Bills using category:', billsSnapshot.size);
+
     
     if (!billsSnapshot.empty) {
       const billNames = billsSnapshot.docs
@@ -218,11 +218,11 @@ export async function deleteCategoryWithBillsCheck(categoryName: string): Promis
       throw new Error(`Cannot delete category: it is being used by ${billsSnapshot.size} transaction(s) including: ${billNames}`);
     }
     
-    console.log('No bills using category, proceeding with delete...');
+
     
     // Delete the category
     await deleteDoc(categoryDoc.ref);
-    console.log('Category deleted successfully');
+
   } catch (error) {
     console.error('Error deleting category:', error);
     throw error;

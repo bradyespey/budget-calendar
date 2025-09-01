@@ -37,13 +37,13 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      console.log('CategoryManagement: Fetching categories...');
+
       const data = await getCategories();
-      console.log('CategoryManagement: Received categories:', data);
+
       setCategories(data);
     } catch (error) {
       console.error('CategoryManagement: Error fetching categories:', error);
-      console.log('CategoryManagement: Using fallback hardcoded categories');
+
       // Fallback to hardcoded categories if API fails
       setCategories([
         { id: '1', name: 'auto', created_at: '', transaction_count: 0 },
@@ -105,13 +105,13 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
   };
 
   const handleDelete = async (category: Category) => {
-    console.log('CategoryManagement: Attempting to delete category:', category);
+
     if (!window.confirm(`Are you sure you want to delete the category "${category.name}"? This action cannot be undone.`)) {
       return;
     }
 
     try {
-      console.log('CategoryManagement: Calling deleteCategory with ID:', category.id);
+
       await deleteCategory(category.id);
       await fetchCategories();
       showNotification('Category deleted successfully', 'success');

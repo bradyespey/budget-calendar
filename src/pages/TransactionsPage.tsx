@@ -145,6 +145,7 @@ export function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [frequencyFilter, setFrequencyFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -170,7 +171,7 @@ export function TransactionsPage() {
 
   useEffect(() => {
     filterAndSortBills();
-  }, [bills, searchTerm, categoryFilter, ownerFilter, sortField, sortDirection]);
+  }, [bills, searchTerm, categoryFilter, frequencyFilter, ownerFilter, sortField, sortDirection]);
 
   useEffect(() => {
     // If editing or creating a paycheck, force type to income and disable toggle
@@ -182,6 +183,7 @@ export function TransactionsPage() {
   const resetFilters = () => {
     setSearchTerm('');
     setCategoryFilter('');
+    setFrequencyFilter('');
     setOwnerFilter('');
     setSortField('name');
     setSortDirection('asc');
@@ -244,6 +246,10 @@ export function TransactionsPage() {
     
     if (categoryFilter) {
       filtered = filtered.filter(bill => bill.category === categoryFilter);
+    }
+    
+    if (frequencyFilter) {
+      filtered = filtered.filter(bill => bill.frequency === frequencyFilter);
     }
     
     if (ownerFilter) {
@@ -427,6 +433,18 @@ export function TransactionsPage() {
     return sortDirection === 'asc' ? '↑' : '↓';
   };
 
+  const handleCategoryClick = (category: string) => {
+    setCategoryFilter(category);
+  };
+
+  const handleFrequencyClick = (frequency: string) => {
+    setFrequencyFilter(frequency);
+  };
+
+  const handleOwnerClick = (owner: string) => {
+    setOwnerFilter(owner);
+  };
+
   return (
     <div className="space-y-8 px-4 max-w-5xl mx-auto">
       {/* Page Description */}
@@ -584,7 +602,7 @@ export function TransactionsPage() {
       {/* Filters */}
       {mode === 'view' && (
         <div className="flex justify-center">
-          <div className="flex flex-col sm:flex-row items-center space-x-2">
+          <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
             <Input
               className="w-full sm:w-80"
               placeholder="Search name, note, or amount..."
@@ -601,6 +619,15 @@ export function TransactionsPage() {
                   value: cat.name,
                   label: cat.name.charAt(0).toUpperCase() + cat.name.slice(1)
                 }))
+              ]}
+            />
+            <Select
+              className="w-full sm:w-40"
+              value={frequencyFilter}
+              onChange={(e) => setFrequencyFilter(e.target.value)}
+              options={[
+                { value: '', label: 'All Frequencies' },
+                ...FREQUENCY_OPTIONS
               ]}
             />
             <Select
@@ -697,7 +724,11 @@ export function TransactionsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                          <span className="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-700">
+                          <span 
+                            className="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-700 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                            onClick={() => handleCategoryClick(bill.category)}
+                            title={`Filter by ${bill.category}`}
+                          >
                             {bill.category}
                           </span>
                         </td>
@@ -709,12 +740,18 @@ export function TransactionsPage() {
                           {formatCurrency(bill.amount)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                          {bill.frequency === 'one-time'
-                            ? 'One-time'
-                            : bill.repeats_every === 1
-                              ? `${capitalize(bill.frequency)}`
-                              : `Every ${bill.repeats_every} ${pluralize(bill.frequency)}`
-                          }
+                          <span 
+                            className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 px-2 py-1 rounded transition-colors"
+                            onClick={() => handleFrequencyClick(bill.frequency)}
+                            title={`Filter by ${bill.frequency}`}
+                          >
+                            {bill.frequency === 'one-time'
+                              ? 'One-time'
+                              : bill.repeats_every === 1
+                                ? `${capitalize(bill.frequency)}`
+                                : `Every ${bill.repeats_every} ${pluralize(bill.frequency)}`
+                            }
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                           {format(parseISO(bill.start_date), 'MMM d, yyyy')}
@@ -725,7 +762,13 @@ export function TransactionsPage() {
                             : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                          {bill.owner || 'Both'}
+                          <span 
+                            className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 px-2 py-1 rounded transition-colors"
+                            onClick={() => handleOwnerClick(bill.owner || 'Both')}
+                            title={`Filter by ${bill.owner || 'Both'}`}
+                          >
+                            {bill.owner || 'Both'}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <div className="flex space-x-2">

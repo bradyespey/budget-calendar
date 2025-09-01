@@ -19,7 +19,7 @@
   },
   "include": ["src", "old/stores"],
   "exclude": [
-    "supabase/functions",
+    "old/supabase/functions",
     "dist",
     "node_modules"
   ]

@@ -12,6 +12,8 @@ export interface Bill {
   end_date?: string
   owner?: 'Both' | 'Brady' | 'Jenny'
   note?: string
+  iconUrl?: string
+  iconType?: 'brand' | 'generated' | 'category' | 'custom'
 }
 
 export interface Account {

@@ -1,7 +1,7 @@
 //src/pages/TransactionsPage.tsx
 
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, Check, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, X, Copy } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -236,7 +236,9 @@ export function TransactionsPage() {
     if (searchTerm) {
       filtered = filtered.filter(bill => 
         bill.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bill.note?.toLowerCase().includes(searchTerm.toLowerCase())
+        bill.note?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        Math.abs(bill.amount).toString().includes(searchTerm) ||
+        formatCurrency(bill.amount).includes(searchTerm)
       );
     }
     
@@ -335,6 +337,31 @@ export function TransactionsPage() {
       resetForm();
     } catch (error) {
       console.error('Error updating bill:', error);
+    }
+  };
+
+  const handleDuplicateBill = async () => {
+    try {
+      let numericAmount = parseFloat(amountInput || '0');
+      if (isNaN(numericAmount)) numericAmount = 0;
+
+      if (transactionType === 'expense') {
+        numericAmount = -Math.abs(numericAmount);
+      } else {
+        numericAmount = Math.abs(numericAmount);
+      }
+
+      const duplicateData = {
+        ...formData,
+        name: `${formData.name} Copy`,
+        amount: numericAmount,
+      };
+
+      await createBill(duplicateData);
+      await fetchBills();
+      resetForm();
+    } catch (error) {
+      console.error('Error duplicating bill:', error);
     }
   };
 
@@ -534,6 +561,15 @@ export function TransactionsPage() {
               <Button variant="outline" onClick={resetForm} leftIcon={<X size={16} />}>
                 Cancel
               </Button>
+              {mode === 'edit' && (
+                <Button 
+                  variant="outline"
+                  onClick={handleDuplicateBill}
+                  leftIcon={<Copy size={16} />}
+                >
+                  Duplicate
+                </Button>
+              )}
               <Button 
                 onClick={mode === 'create' ? handleCreateBill : handleUpdateBill}
                 leftIcon={<Check size={16} />}
@@ -547,16 +583,16 @@ export function TransactionsPage() {
       
       {/* Filters */}
       {mode === 'view' && (
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex justify-center">
+          <div className="flex flex-col sm:flex-row items-center space-x-2">
             <Input
-              className="w-48"
-              placeholder="Search..."
+              className="w-full sm:w-80"
+              placeholder="Search name, note, or amount..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             <Select
-              className="w-40"
+              className="w-full sm:w-40"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               options={[
@@ -568,7 +604,7 @@ export function TransactionsPage() {
               ]}
             />
             <Select
-              className="w-40"
+              className="w-full sm:w-40"
               value={ownerFilter}
               onChange={(e) => setOwnerFilter(e.target.value)}
               options={[

@@ -1,6 +1,8 @@
 //src/pages/TransactionsPage.tsx
 
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Layout } from '../components/Layout/Layout';
 import { Plus, Edit2, Trash2, Check, X, Copy, ImageIcon, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -141,6 +143,7 @@ function CurrencyInput({
 }
 
 export function TransactionsPage() {
+  const location = useLocation();
   const [bills, setBills] = useState<Bill[]>([]);
   const [filteredBills, setFilteredBills] = useState<Bill[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -175,6 +178,13 @@ export function TransactionsPage() {
     fetchCategories();
   }, []);
 
+  // Handle navbar Transactions click
+  const handleNavbarTransactionsClick = () => {
+    if (mode === 'edit' || mode === 'create') {
+      resetForm();
+    }
+  };
+
   useEffect(() => {
     filterAndSortBills();
   }, [bills, searchTerm, categoryFilter, frequencyFilter, ownerFilter, sortField, sortDirection]);
@@ -208,11 +218,8 @@ export function TransactionsPage() {
         setTimeout(() => {
           let newScrollPosition = scrollPosition;
           
-          // If we deleted an item, use a smaller adjustment or no adjustment
+          // Clear deleted item flag but don't change scroll behavior
           if (deletedItemId !== null) {
-            // Use a smaller adjustment since the full row height was too much
-            const smallAdjustment = 20;
-            newScrollPosition = Math.max(0, scrollPosition - smallAdjustment);
             setDeletedItemId(null);
           }
           
@@ -398,10 +405,13 @@ export function TransactionsPage() {
     if (!window.confirm('Are you sure you want to delete this bill?')) return;
     
     try {
-      setScrollPosition(window.scrollY);
-      setDeletedItemId(id); // Store the ID of the item being deleted
+      const currentScrollPosition = window.scrollY;
       await deleteBill(id);
-      await fetchBills(true);
+      await fetchBills();
+      // Restore scroll position immediately after fetch, like icon operations
+      setTimeout(() => {
+        window.scrollTo(0, currentScrollPosition);
+      }, 100);
     } catch (error) {
       console.error('Error deleting bill:', error);
     }
@@ -514,7 +524,8 @@ export function TransactionsPage() {
   };
 
   return (
-    <div className="space-y-8 px-4 max-w-5xl mx-auto">
+    <Layout onTransactionsClick={handleNavbarTransactionsClick}>
+      <div className="space-y-8 px-4 max-w-5xl mx-auto">
       {/* Page Description */}
       <div className="text-center space-y-2 py-6">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -884,7 +895,12 @@ export function TransactionsPage() {
                </div>
              )}
                             <div>
-                              <div className="font-medium">{bill.name}</div>
+                              <div 
+                                className="font-medium cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                onClick={() => startEdit(bill)}
+                              >
+                                {bill.name}
+                              </div>
                               {bill.note && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{bill.note}</p>
                               )}
@@ -967,6 +983,7 @@ export function TransactionsPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </Layout>
   );
 }

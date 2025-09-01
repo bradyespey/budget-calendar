@@ -11,9 +11,10 @@ import { useState } from 'react';
 interface NavbarProps {
   toggleTheme: () => void;
   isDarkMode: boolean;
+  onTransactionsClick?: () => void;
 }
 
-export function Navbar({ toggleTheme, isDarkMode }: NavbarProps) {
+export function Navbar({ toggleTheme, isDarkMode, onTransactionsClick }: NavbarProps) {
   const { balance, lastSync } = useBalance();
   const { signOut } = useAuth();
   const { pathname } = useLocation();
@@ -56,7 +57,12 @@ export function Navbar({ toggleTheme, isDarkMode }: NavbarProps) {
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                   }`}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (path === '/transactions' && onTransactionsClick) {
+                      onTransactionsClick();
+                    }
+                  }}
                 >
                   {label}
                 </Link>
@@ -108,7 +114,12 @@ export function Navbar({ toggleTheme, isDarkMode }: NavbarProps) {
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                   }`}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (path === '/transactions' && onTransactionsClick) {
+                      onTransactionsClick();
+                    }
+                  }}
                 >
                   {label}
                 </Link>

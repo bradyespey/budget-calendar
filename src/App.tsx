@@ -35,7 +35,7 @@ function App() {
             path="/transactions"
             element={
               <RequireAuth>
-                <Layout><TransactionsPage /></Layout>
+                <TransactionsPage />
               </RequireAuth>
             }
           />

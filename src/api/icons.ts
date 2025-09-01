@@ -60,8 +60,8 @@ export async function updateTransactionIcon(
 export async function resetTransactionIcon(billId: string): Promise<void> {
   const { updateBill } = await import('./bills');
   await updateBill(billId, {
-    iconUrl: undefined,
-    iconType: undefined
+    iconUrl: null,
+    iconType: null
   });
 }
 

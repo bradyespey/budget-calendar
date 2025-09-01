@@ -168,6 +168,7 @@ export function TransactionsPage() {
   const [iconEditingId, setIconEditingId] = useState<string | null>(null);
   const [customIconUrl, setCustomIconUrl] = useState('');
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [deletedItemId, setDeletedItemId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBills();
@@ -196,9 +197,6 @@ export function TransactionsPage() {
 
   const fetchBills = async (preserveScroll = false) => {
     try {
-      if (preserveScroll) {
-        setScrollPosition(window.scrollY);
-      }
       setLoading(true);
       const data = await getBills();
       setBills(data);
@@ -208,7 +206,17 @@ export function TransactionsPage() {
       setLoading(false);
       if (preserveScroll && scrollPosition > 0) {
         setTimeout(() => {
-          window.scrollTo(0, scrollPosition);
+          let newScrollPosition = scrollPosition;
+          
+          // If we deleted an item, use a smaller adjustment or no adjustment
+          if (deletedItemId !== null) {
+            // Use a smaller adjustment since the full row height was too much
+            const smallAdjustment = 20;
+            newScrollPosition = Math.max(0, scrollPosition - smallAdjustment);
+            setDeletedItemId(null);
+          }
+          
+          window.scrollTo(0, newScrollPosition);
         }, 100);
       }
     }
@@ -390,6 +398,8 @@ export function TransactionsPage() {
     if (!window.confirm('Are you sure you want to delete this bill?')) return;
     
     try {
+      setScrollPosition(window.scrollY);
+      setDeletedItemId(id); // Store the ID of the item being deleted
       await deleteBill(id);
       await fetchBills(true);
     } catch (error) {

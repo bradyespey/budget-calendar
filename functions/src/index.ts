@@ -1736,3 +1736,450 @@ export const nightlyBudgetUpdate = functions.region(region).https.onCall(
       throw new https.HttpsError('internal', error instanceof Error ? error.message : "Unknown error");
     }
   });
+
+
+/**
+ * 🎨 Generate Transaction Icons Function
+ * Generates icons for transactions using AI and brand mapping
+ */
+export const generateTransactionIcons = functions.region(region).https.onCall(
+  async (data: { transactionIds?: string[]; forceRegenerate?: boolean }, context) => {
+    try {
+      logger.info("Starting transaction icon generation");
+      
+      const { transactionIds, forceRegenerate = false } = data;
+      
+      // Get OpenAI API key from Firebase config
+      const openaiApiKey = functions.config().openai?.api_key;
+      
+      if (!openaiApiKey) {
+        logger.warn("OpenAI API key not configured, using fallback icons only");
+      }
+
+      // Get bills from Firestore
+      let billsSnapshot;
+      
+      if (transactionIds && transactionIds.length > 0) {
+        // Generate icons for specific transactions
+        billsSnapshot = await db.collection('bills').where('__name__', 'in', transactionIds).get();
+      } else {
+        billsSnapshot = await db.collection('bills').get();
+      }
+      
+      const bills = billsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      
+      logger.info(`Found ${bills.length} bills to process for icons`);
+      
+      let processedCount = 0;
+      let updatedCount = 0;
+      let skippedCount = 0;
+      let errorCount = 0;
+      
+      // Process each bill
+      for (const bill of bills) {
+        try {
+          // Skip if icon already exists and not forcing regeneration
+          if (!forceRegenerate && bill.iconUrl && bill.iconType) {
+            skippedCount++;
+            continue;
+          }
+          
+          // Try to find an icon using our mapping system
+          const iconResult = await findTransactionIconForFunction(bill.name, bill.category, openaiApiKey);
+          
+          if (iconResult) {
+            // Update the bill with the new icon
+            await db.collection('bills').doc(bill.id).update({
+              iconUrl: iconResult.iconUrl,
+              iconType: iconResult.iconType
+            });
+            
+            updatedCount++;
+            logger.info(`Updated icon for "${bill.name}": ${iconResult.iconType}`);
+          } else {
+            logger.warn(`No icon found for "${bill.name}"`);
+          }
+          
+          processedCount++;
+          
+        } catch (error) {
+          logger.error(`Error processing bill "${bill.name}":`, error);
+          errorCount++;
+        }
+      }
+      
+      logger.info(`Icon generation completed - processed: ${processedCount}, updated: ${updatedCount}, skipped: ${skippedCount}, errors: ${errorCount}`);
+      
+      return {
+        success: true,
+        message: "Transaction icon generation completed",
+        processedCount,
+        updatedCount,
+        skippedCount,
+        errorCount,
+        timestamp: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      logger.error("Error in generate transaction icons:", error);
+      throw new https.HttpsError('internal', error instanceof Error ? error.message : "Unknown error");
+    }
+  });
+
+// Helper function to find transaction icon using mapping and AI fallback
+async function findTransactionIconForFunction(transactionName: string, category: string, openaiApiKey?: string): Promise<{ iconUrl: string; iconType: 'brand' | 'generated' | 'category' } | null> {
+  const normalizedName = transactionName.toLowerCase().trim();
+  
+  // Brand icon mapping (same as frontend)
+  const brandIcons: Record<string, { iconUrl: string; iconType: 'brand' }> = {
+    'netflix': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/netflix.svg', iconType: 'brand' },
+    'disney plus': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/disneyplus.svg', iconType: 'brand' },
+    'hulu': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/hulu.svg', iconType: 'brand' },
+    'amazon prime': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonprime.svg', iconType: 'brand' },
+    'spotify': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/spotify.svg', iconType: 'brand' },
+    'apple music': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/applemusic.svg', iconType: 'brand' },
+    '1password': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/1password.svg', iconType: 'brand' },
+    'github': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/github.svg', iconType: 'brand' },
+    'google': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/google.svg', iconType: 'brand' },
+    'microsoft': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/microsoft.svg', iconType: 'brand' },
+    'adobe': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/adobe.svg', iconType: 'brand' },
+    'openai': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/openai.svg', iconType: 'brand' },
+    'dropbox': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/dropbox.svg', iconType: 'brand' },
+    'icloud': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/icloud.svg', iconType: 'brand' },
+    'google drive': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/googledrive.svg', iconType: 'brand' },
+    'clash of clans': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/clashofclans.svg', iconType: 'brand' },
+    'steam': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/steam.svg', iconType: 'brand' },
+    'nintendo': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/nintendo.svg', iconType: 'brand' },
+    'playstation': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/playstation.svg', iconType: 'brand' },
+    'xbox': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/xbox.svg', iconType: 'brand' },
+    'amazon': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazon.svg', iconType: 'brand' },
+    'target': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/target.svg', iconType: 'brand' },
+    'walmart': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/walmart.svg', iconType: 'brand' },
+    'costco': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/costco.svg', iconType: 'brand' },
+    'att': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/att.svg', iconType: 'brand' },
+    'verizon': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/verizon.svg', iconType: 'brand' },
+    'tmobile': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/tmobile.svg', iconType: 'brand' },
+    'chase': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/chase.svg', iconType: 'brand' },
+    'american express': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/americanexpress.svg', iconType: 'brand' },
+    'paypal': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/paypal.svg', iconType: 'brand' },
+    'venmo': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/venmo.svg', iconType: 'brand' },
+    'doordash': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/doordash.svg', iconType: 'brand' },
+    'uber eats': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/ubereats.svg', iconType: 'brand' },
+    'grubhub': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/grubhub.svg', iconType: 'brand' },
+    'starbucks': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/starbucks.svg', iconType: 'brand' },
+    'mcdonalds': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/mcdonalds.svg', iconType: 'brand' },
+    'peloton': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/peloton.svg', iconType: 'brand' },
+    'fitbit': { iconUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/fitbit.svg', iconType: 'brand' }
+  };
+  
+  // Category icon mapping
+  const categoryIcons: Record<string, { iconUrl: string; iconType: 'category' }> = {
+    'auto': { iconUrl: '/icons/car.svg', iconType: 'category' },
+    'food & drinks': { iconUrl: '/icons/utensils.svg', iconType: 'category' },
+    'utilities': { iconUrl: '/icons/zap.svg', iconType: 'category' },
+    'subscription': { iconUrl: '/icons/repeat.svg', iconType: 'category' },
+    'house': { iconUrl: '/icons/home.svg', iconType: 'category' },
+    'health': { iconUrl: '/icons/heart.svg', iconType: 'category' },
+    'insurance': { iconUrl: '/icons/shield.svg', iconType: 'category' },
+    'mobile phone': { iconUrl: '/icons/smartphone.svg', iconType: 'category' },
+    'travel': { iconUrl: '/icons/plane.svg', iconType: 'category' },
+    'fitness': { iconUrl: '/icons/dumbbell.svg', iconType: 'category' },
+    'games': { iconUrl: '/icons/gamepad-2.svg', iconType: 'category' },
+    'credit card': { iconUrl: '/icons/credit-card.svg', iconType: 'category' },
+    'transfer': { iconUrl: '/icons/arrow-right-left.svg', iconType: 'category' },
+    'paycheck': { iconUrl: '/icons/banknote.svg', iconType: 'category' },
+    'counseling': { iconUrl: '/icons/brain.svg', iconType: 'category' },
+    'cloud storage': { iconUrl: '/icons/cloud.svg', iconType: 'category' },
+    'golf': { iconUrl: '/icons/trophy.svg', iconType: 'category' },
+    'job search': { iconUrl: '/icons/briefcase.svg', iconType: 'category' },
+    'other': { iconUrl: '/icons/circle.svg', iconType: 'category' }
+  };
+  
+  // First, try exact brand match
+  if (brandIcons[normalizedName]) {
+    return brandIcons[normalizedName];
+  }
+  
+  // Try partial brand match
+  for (const [brandName, iconData] of Object.entries(brandIcons)) {
+    if (normalizedName.includes(brandName)) {
+      return iconData;
+    }
+  }
+  
+  // Try AI generation if API key is available
+  if (openaiApiKey) {
+    try {
+      const aiIcon = await generateAIIconForFunction(transactionName, openaiApiKey);
+      if (aiIcon) {
+        return aiIcon;
+      }
+    } catch (error) {
+      logger.warn(`AI icon generation failed for "${transactionName}":`, error);
+    }
+  }
+  
+  // Fall back to category icon
+  if (categoryIcons[category]) {
+    return categoryIcons[category];
+  }
+  
+  // Default fallback
+  return categoryIcons['other'];
+}
+
+// Helper function to generate AI icon using OpenAI DALL-E
+async function generateAIIconForFunction(transactionName: string, openaiApiKey: string): Promise<{ iconUrl: string; iconType: 'generated' } | null> {
+  try {
+    // Create a simple, clean prompt for icon generation
+    const prompt = `Create a simple, minimalist icon for "${transactionName}". The icon should be clean, recognizable, and suitable for a financial app. Use a simple style with clear lines and minimal colors.`;
+    
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'dall-e-3',
+        prompt: prompt,
+        n: 1,
+        size: '256x256',
+        quality: 'standard',
+        style: 'natural'
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      logger.error('OpenAI API error:', errorData);
+      return null;
+    }
+    
+    const result = await response.json();
+    const imageUrl = result.data?.[0]?.url;
+    
+    if (imageUrl) {
+      logger.info(`Generated AI icon for "${transactionName}"`);
+      return {
+        iconUrl: imageUrl,
+        iconType: 'generated'
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    logger.error('Error generating AI icon:', error);
+    return null;
+  }
+}
+
+/**
+ * 🔄 Reset All Transaction Icons Function
+ * Removes all custom icons and resets to default behavior
+ */
+export const resetAllTransactionIcons = functions.region(region).https.onCall(
+  async (data: { preserveCustom?: boolean }, context) => {
+    try {
+      logger.info("Starting reset all transaction icons");
+      
+      const { preserveCustom = false } = data;
+      
+      // Get all bills from Firestore
+      const billsSnapshot = await db.collection('bills').get();
+      const bills = billsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      
+      logger.info(`Found ${bills.length} bills to reset icons for`);
+      
+      let resetCount = 0;
+      let skippedCount = 0;
+      let errorCount = 0;
+      
+      // Process each bill
+      for (const bill of bills) {
+        try {
+          // Skip if preserving custom icons and this is a custom icon
+          if (preserveCustom && bill.iconType === 'custom') {
+            skippedCount++;
+            continue;
+          }
+          
+          // Only reset if there's an icon to reset
+          if (bill.iconUrl || bill.iconType) {
+            await db.collection('bills').doc(bill.id).update({
+              iconUrl: null,
+              iconType: null
+            });
+            resetCount++;
+            logger.info(`Reset icon for "${bill.name}"`);
+          } else {
+            skippedCount++;
+          }
+          
+        } catch (error) {
+          logger.error(`Error resetting icon for bill "${bill.name}":`, error);
+          errorCount++;
+        }
+      }
+      
+      logger.info(`Reset icons completed - reset: ${resetCount}, skipped: ${skippedCount}, errors: ${errorCount}`);
+      
+      return {
+        success: true,
+        message: "Transaction icons reset completed",
+        resetCount,
+        skippedCount,
+        errorCount,
+        timestamp: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      logger.error("Error in reset all transaction icons:", error);
+      throw new https.HttpsError('internal', error instanceof Error ? error.message : "Unknown error");
+    }
+  });
+
+/**
+ * 💾 Backup Transaction Icons Function
+ * Saves all transaction icons to Firebase storage
+ */
+export const backupTransactionIcons = functions.region(region).https.onCall(
+  async (data: {}, context) => {
+    try {
+      logger.info("Starting backup transaction icons");
+      
+      // Get all bills with icons
+      const billsSnapshot = await db.collection('bills').get();
+      const bills = billsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      
+      const iconBackup: { [transactionId: string]: { iconUrl: string; iconType: string; name: string } } = {};
+      
+      bills.forEach((bill) => {
+        if (bill.iconUrl && bill.iconType) {
+          iconBackup[bill.id] = {
+            iconUrl: bill.iconUrl,
+            iconType: bill.iconType,
+            name: bill.name
+          };
+        }
+      });
+      
+      // Save backup to Firebase
+      const backupData = {
+        backup: iconBackup,
+        backupCount: Object.keys(iconBackup).length,
+        timestamp: new Date().toISOString(),
+        userId: context.auth?.uid
+      };
+      
+      await db.collection('iconBackups').doc('latest').set(backupData);
+      
+      logger.info(`Backed up ${Object.keys(iconBackup).length} transaction icons to Firebase`);
+      
+      return {
+        success: true,
+        message: `Backed up ${Object.keys(iconBackup).length} transaction icons`,
+        backupCount: Object.keys(iconBackup).length,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      logger.error("Error backing up transaction icons:", error);
+      throw new https.HttpsError('internal', error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+);
+
+/**
+ * 📥 Restore Transaction Icons Function
+ * Restores transaction icons from Firebase backup
+ */
+export const restoreTransactionIcons = functions.region(region).https.onCall(
+  async (data: {}, context) => {
+    try {
+      logger.info("Starting restore transaction icons");
+      
+      // Get the latest backup from Firebase
+      const backupDoc = await db.collection('iconBackups').doc('latest').get();
+      
+      if (!backupDoc.exists) {
+        throw new https.HttpsError('not-found', 'No backup found. Please backup icons first.');
+      }
+      
+      const backupData = backupDoc.data();
+      const backup = backupData?.backup;
+      
+      if (!backup || typeof backup !== 'object') {
+        throw new https.HttpsError('invalid-argument', 'Invalid backup data found');
+      }
+      
+      let restoredCount = 0;
+      let errorCount = 0;
+      
+      // Restore each icon from backup
+      for (const [transactionId, iconData] of Object.entries(backup)) {
+        try {
+          const icon = iconData as { iconUrl: string; iconType: string; name: string };
+          if (icon.iconUrl && icon.iconType) {
+            await db.collection('bills').doc(transactionId).update({
+              iconUrl: icon.iconUrl,
+              iconType: icon.iconType
+            });
+            restoredCount++;
+          }
+        } catch (error) {
+          logger.error(`Error restoring icon for transaction ${transactionId}:`, error);
+          errorCount++;
+        }
+      }
+      
+      logger.info(`Restored ${restoredCount} transaction icons, errors: ${errorCount}`);
+      
+      return {
+        success: true,
+        message: `Restored ${restoredCount} transaction icons`,
+        restoredCount,
+        errorCount,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      logger.error("Error restoring transaction icons:", error);
+      throw new https.HttpsError('internal', error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+);
+
+/**
+ * 📋 Get Icon Backup Info Function
+ * Returns information about the latest backup
+ */
+export const getIconBackupInfo = functions.region(region).https.onCall(
+  async (data: {}, context) => {
+    try {
+      logger.info("Getting icon backup info");
+      
+      // Get the latest backup from Firebase
+      const backupDoc = await db.collection('iconBackups').doc('latest').get();
+      
+      if (!backupDoc.exists) {
+        return {
+          success: true,
+          hasBackup: false,
+          message: 'No backup found'
+        };
+      }
+      
+      const backupData = backupDoc.data();
+      
+      return {
+        success: true,
+        hasBackup: true,
+        backupCount: backupData?.backupCount || 0,
+        timestamp: backupData?.timestamp || null,
+        message: `Last backup: ${backupData?.backupCount || 0} icons`
+      };
+    } catch (error) {
+      logger.error("Error getting backup info:", error);
+      throw new https.HttpsError('internal', error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+);

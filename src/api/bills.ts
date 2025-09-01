@@ -33,6 +33,8 @@ export async function getBills() {
         end_date: d.endDate ?? d.end_date,
         owner: d.owner,
         note: d.note,
+        iconUrl: d.iconUrl,
+        iconType: d.iconType,
       } as Bill;
     });
   } catch (error) {
@@ -62,6 +64,8 @@ export async function getBill(id: string) {
       end_date: d.endDate ?? d.end_date,
       owner: d.owner,
       note: d.note,
+      iconUrl: d.iconUrl,
+      iconType: d.iconType,
     } as Bill;
   } catch (error) {
     console.error(`Error fetching bill ${id}:`, error);
@@ -83,6 +87,8 @@ export async function createBill(bill: Omit<Bill, 'id'>) {
     if (bill.end_date) payload.endDate = bill.end_date;
     if (bill.owner) payload.owner = bill.owner;
     if (bill.note) payload.note = bill.note;
+    if (bill.iconUrl) payload.iconUrl = bill.iconUrl;
+    if (bill.iconType) payload.iconType = bill.iconType;
 
     const docRef = await addDoc(billsRef, payload);
     
@@ -110,6 +116,8 @@ export async function updateBill(id: string, updates: Partial<Omit<Bill, 'id'>>)
     if (updates.end_date !== undefined) firestoreUpdates.endDate = updates.end_date;
     if (updates.owner !== undefined) firestoreUpdates.owner = updates.owner;
     if (updates.note !== undefined) firestoreUpdates.note = updates.note;
+    if (updates.iconUrl !== undefined) firestoreUpdates.iconUrl = updates.iconUrl;
+    if (updates.iconType !== undefined) firestoreUpdates.iconType = updates.iconType;
     
     await updateDoc(billRef, firestoreUpdates);
     

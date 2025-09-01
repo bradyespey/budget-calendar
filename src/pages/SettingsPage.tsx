@@ -33,6 +33,7 @@ import { validateProjections } from '../utils/validateProjections'
 import { CategoryManagement } from '../components/CategoryManagement'
 import { format, parseISO } from 'date-fns'
 import { getBills } from '../api/bills'
+import { generateTransactionIcons, resetAllTransactionIcons, backupTransactionIcons, restoreTransactionIcons, getIconBackupInfo } from '../api/icons'
 
 type CurrencyInputProps = React.ComponentProps<typeof Input> & {
   value: string;
@@ -65,6 +66,7 @@ export function CurrencyInput({ value, setValue, ...props }: CurrencyInputProps)
 
 export function SettingsPage() {
   const [busy, setBusy] = useState(false)
+  const [backupInfo, setBackupInfo] = useState<{ hasBackup: boolean; backupCount?: number; timestamp?: string; message: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { setBalance, setLastSync } = useBalance()
   const [localProjectionDays, setLocalProjectionDays] = useState<number | null>(null)
@@ -303,6 +305,124 @@ export function SettingsPage() {
     }
   }
 
+  async function handleGenerateIcons() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+    setBusy(true);
+    setActiveAction('icons');
+    try {
+      await saveSettings();
+      const result = await generateTransactionIcons();
+      
+      let message = `Icon generation completed: ${result.updatedCount} updated, ${result.skippedCount} skipped`;
+      if (result.errorCount > 0) {
+        message += `, ${result.errorCount} errors`;
+      }
+      
+      showNotification(message, 'success');
+    } catch (e: any) {
+      showNotification(`Error generating icons: ${e.message}`, 'error');
+    } finally {
+      setBusy(false);
+      setActiveAction(null);
+    }
+  }
+
+  async function handleResetAllIcons() {
+    if (!confirm('Reset all transaction icons? This will remove all generated and custom icons. Brand icons will still be detected automatically.')) {
+      return;
+    }
+    
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+    setBusy(true);
+    setActiveAction('reset-icons');
+    try {
+      await saveSettings();
+      const result = await resetAllTransactionIcons({ preserveCustom: false });
+      
+      let message = `Icon reset completed: ${result.resetCount} reset, ${result.skippedCount} skipped`;
+      if (result.errorCount > 0) {
+        message += `, ${result.errorCount} errors`;
+      }
+      
+      showNotification(message, 'success');
+    } catch (e: any) {
+      showNotification(`Error resetting icons: ${e.message}`, 'error');
+    } finally {
+      setBusy(false);
+      setActiveAction(null);
+    }
+  }
+
+  async function handleBackupIcons() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+    setBusy(true);
+    setActiveAction('backup-icons');
+    try {
+      await saveSettings();
+      const result = await backupTransactionIcons();
+      
+      // Update backup info
+      setBackupInfo({
+        hasBackup: true,
+        backupCount: result.backupCount,
+        timestamp: result.timestamp,
+        message: `Last backup: ${result.backupCount} icons`
+      });
+      
+      showNotification(`Backed up ${result.backupCount} icons to Firebase`, 'success');
+    } catch (e: any) {
+      showNotification(`Error backing up icons: ${e.message}`, 'error');
+    } finally {
+      setBusy(false);
+      setActiveAction(null);
+    }
+  }
+
+  async function handleRestoreIcons() {
+    if (!backupInfo?.hasBackup) {
+      showNotification('No backup available. Please backup icons first.', 'error');
+      return;
+    }
+
+    if (!confirm(`Restore ${backupInfo.backupCount || 0} transaction icons from backup?`)) {
+      return;
+    }
+
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+    setBusy(true);
+    setActiveAction('restore-icons');
+    try {
+      await saveSettings();
+      const result = await restoreTransactionIcons();
+      
+      let message = `Icon restore completed: ${result.restoredCount} restored`;
+      if (result.errorCount > 0) {
+        message += `, ${result.errorCount} errors`;
+      }
+      
+      showNotification(message, 'success');
+    } catch (e: any) {
+      showNotification(`Error restoring icons: ${e.message}`, 'error');
+    } finally {
+      setBusy(false);
+      setActiveAction(null);
+    }
+  }
+
+  // Load backup info on component mount
+  useEffect(() => {
+    const loadBackupInfo = async () => {
+      try {
+        const info = await getIconBackupInfo();
+        setBackupInfo(info);
+      } catch (error) {
+        console.error('Error loading backup info:', error);
+      }
+    };
+    
+    loadBackupInfo();
+  }, []);
+
   async function handleAllActions() {
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
@@ -382,6 +502,10 @@ export function SettingsPage() {
     if (activeAction === 'clear') return 'Clearing Calendars...';
     if (activeAction === 'import') return 'Importing Bills from CSV...';
     if (activeAction === 'save') return 'Saving Settings...';
+    if (activeAction === 'icons') return 'Generating Transaction Icons...';
+    if (activeAction === 'reset-icons') return 'Resetting Transaction Icons...';
+    if (activeAction === 'backup-icons') return 'Backing up Transaction Icons...';
+    if (activeAction === 'restore-icons') return 'Restoring Transaction Icons...';
     if (runAllStep) return runAllStep;
     return 'Working...';
   }
@@ -485,7 +609,7 @@ export function SettingsPage() {
           {/* Maintenance Actions */}
           <div>
             <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-200 mb-3">Maintenance</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
               <div className="space-y-2">
                 <Button onClick={handleValidateProjections} variant="outline" className="w-full" disabled={busy}>
                   {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : '💾'} Validate Projections
@@ -497,6 +621,35 @@ export function SettingsPage() {
                   {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : '🧹'} Clear Calendars
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes all budget calendar events from Google Calendar</p>
+              </div>
+              <div className="space-y-2">
+                <Button onClick={handleGenerateIcons} variant="outline" className="w-full" disabled={busy}>
+                  {busy && activeAction === 'icons' ? <Loader className="animate-spin" size={18} /> : '🎨'} Generate Icons
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Generates icons for transactions using AI and brand mapping</p>
+              </div>
+              <div className="space-y-2">
+                <Button onClick={handleResetAllIcons} variant="outline" className="w-full" disabled={busy}>
+                  {busy && activeAction === 'reset-icons' ? <Loader className="animate-spin" size={18} /> : '🔄'} Reset All Icons
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes all generated and custom icons, keeps brand icons</p>
+              </div>
+              <div className="space-y-2">
+                <Button onClick={handleBackupIcons} variant="outline" className="w-full" disabled={busy}>
+                  {busy && activeAction === 'backup-icons' ? <Loader className="animate-spin" size={18} /> : '💾'} Backup Icons
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Saves all custom icons to Firebase storage</p>
+              </div>
+              <div className="space-y-2">
+                <Button onClick={handleRestoreIcons} variant="outline" className="w-full" disabled={busy || !backupInfo?.hasBackup}>
+                  {busy && activeAction === 'restore-icons' ? <Loader className="animate-spin" size={18} /> : '📥'} Restore Icons
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">
+                  {backupInfo?.hasBackup 
+                    ? `Restores ${backupInfo.backupCount} icons from ${backupInfo.timestamp ? new Date(backupInfo.timestamp).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'backup'}`
+                    : 'No backup available (backup first)'
+                  }
+                </p>
               </div>
             </div>
           </div>

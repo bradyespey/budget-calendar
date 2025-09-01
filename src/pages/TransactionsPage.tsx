@@ -1,12 +1,14 @@
 //src/pages/TransactionsPage.tsx
 
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, Check, X, Copy } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, X, Copy, ImageIcon, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { CategorySelect } from '../components/ui/CategorySelect';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { TransactionIcon } from '../components/TransactionIcon';
+import { updateTransactionIcon, resetTransactionIcon } from '../api/icons';
 import { getBills, createBill, updateBill, deleteBill } from '../api/bills';
 import { getCategories, Category } from '../api/categories';
 import { Bill } from '../types';
@@ -163,6 +165,9 @@ export function TransactionsPage() {
   const [amountInput, setAmountInput] = useState(''); // raw string for CurrencyInput
   const [editingId, setEditingId] = useState<string | null>(null);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
+  const [iconEditingId, setIconEditingId] = useState<string | null>(null);
+  const [customIconUrl, setCustomIconUrl] = useState('');
+  const [scrollPosition, setScrollPosition] = useState(0);
 
   useEffect(() => {
     fetchBills();
@@ -189,8 +194,11 @@ export function TransactionsPage() {
     setSortDirection('asc');
   };
 
-  const fetchBills = async () => {
+  const fetchBills = async (preserveScroll = false) => {
     try {
+      if (preserveScroll) {
+        setScrollPosition(window.scrollY);
+      }
       setLoading(true);
       const data = await getBills();
       setBills(data);
@@ -198,6 +206,11 @@ export function TransactionsPage() {
       console.error('Error fetching bills:', error);
     } finally {
       setLoading(false);
+      if (preserveScroll && scrollPosition > 0) {
+        setTimeout(() => {
+          window.scrollTo(0, scrollPosition);
+        }, 100);
+      }
     }
   };
 
@@ -314,7 +327,7 @@ export function TransactionsPage() {
       };
 
       await createBill(adjustedFormData);
-      await fetchBills();
+      await fetchBills(true);
       resetForm();
     } catch (error) {
       console.error('Error creating bill:', error);
@@ -339,7 +352,7 @@ export function TransactionsPage() {
       };
 
       await updateBill(editingId, adjustedFormData);
-      await fetchBills();
+      await fetchBills(true);
       resetForm();
     } catch (error) {
       console.error('Error updating bill:', error);
@@ -361,10 +374,12 @@ export function TransactionsPage() {
         ...formData,
         name: `${formData.name} Copy`,
         amount: numericAmount,
+        iconUrl: formData.iconUrl,
+        iconType: formData.iconType,
       };
 
       await createBill(duplicateData);
-      await fetchBills();
+      await fetchBills(true);
       resetForm();
     } catch (error) {
       console.error('Error duplicating bill:', error);
@@ -376,7 +391,7 @@ export function TransactionsPage() {
     
     try {
       await deleteBill(id);
-      await fetchBills();
+      await fetchBills(true);
     } catch (error) {
       console.error('Error deleting bill:', error);
     }
@@ -395,6 +410,8 @@ export function TransactionsPage() {
       end_date: bill.end_date,
       owner: bill.owner || 'Both',
       note: bill.note,
+      iconUrl: bill.iconUrl,
+      iconType: bill.iconType,
     });
     setTransactionType(bill.amount >= 0 ? 'income' : 'expense');
 
@@ -414,6 +431,8 @@ export function TransactionsPage() {
       start_date: format(new Date(), 'yyyy-MM-dd'),
       owner: 'Both',
       note: undefined,
+      iconUrl: undefined,
+      iconType: undefined,
     });
     setAmountInput('');
     setTransactionType('expense');
@@ -443,6 +462,45 @@ export function TransactionsPage() {
 
   const handleOwnerClick = (owner: string) => {
     setOwnerFilter(owner);
+  };
+
+  const handleUpdateIcon = async (billId: string, iconUrl: string) => {
+    try {
+      // Basic URL validation
+      if (!iconUrl.trim()) {
+        alert('Please enter a valid icon URL');
+        return;
+      }
+      
+      // Check if URL looks like an image
+      const isValidImageUrl = /\.(jpg|jpeg|png|gif|svg|webp|ico)(\?.*)?$/i.test(iconUrl) || 
+                             iconUrl.includes('data:image/') ||
+                             iconUrl.includes('githubusercontent.com') ||
+                             iconUrl.includes('cdn.jsdelivr.net') ||
+                             iconUrl.includes('wikimedia.org');
+      
+      if (!isValidImageUrl) {
+        const proceed = confirm('This URL doesn\'t look like an image. Continue anyway?');
+        if (!proceed) return;
+      }
+      
+      await updateTransactionIcon(billId, iconUrl, 'custom');
+      await fetchBills(true);
+      setIconEditingId(null);
+      setCustomIconUrl('');
+    } catch (error) {
+      console.error('Error updating icon:', error);
+      alert('Failed to update icon. Please check the URL and try again.');
+    }
+  };
+
+  const handleResetIcon = async (billId: string) => {
+    try {
+      await resetTransactionIcon(billId);
+      await fetchBills(true);
+    } catch (error) {
+      console.error('Error resetting icon:', error);
+    }
   };
 
   return (
@@ -572,6 +630,29 @@ export function TransactionsPage() {
                   onChange={(e) => setFormData({ ...formData, note: e.target.value || undefined })}
                   helperText="Optional details about this transaction"
                 />
+              </div>
+              
+              <div className="md:col-span-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0">
+                    <TransactionIcon
+                      transactionName={formData.name || 'Transaction'}
+                      category={formData.category}
+                      iconUrl={formData.iconUrl}
+                      iconType={formData.iconType}
+                      className="w-10 h-10"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Input
+                      label="Icon URL"
+                      value={formData.iconUrl || ''}
+                      onChange={(e) => setFormData({ ...formData, iconUrl: e.target.value || undefined, iconType: e.target.value ? 'custom' : undefined })}
+                      helperText="Optional custom icon URL"
+                      placeholder="https://example.com/icon.svg"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -718,10 +799,87 @@ export function TransactionsPage() {
                         className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
                       >
                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                          {bill.name}
-                          {bill.note && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{bill.note}</p>
-                          )}
+                          <div className="flex items-center gap-3">
+                                         <div 
+               className="cursor-pointer"
+               onClick={() => {
+                 setScrollPosition(window.scrollY);
+                 setIconEditingId(bill.id);
+                 setCustomIconUrl(bill.iconUrl || '');
+               }}
+             >
+               <TransactionIcon
+                 transactionName={bill.name}
+                 category={bill.category}
+                 iconUrl={bill.iconUrl}
+                 iconType={bill.iconType}
+                 className="w-8 h-8 flex-shrink-0"
+               />
+             </div>
+             {iconEditingId === bill.id && (
+               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-lg w-full max-w-md">
+                   <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Edit Icon</h3>
+                   <div className="space-y-3">
+                     <Input
+                       placeholder="Enter icon URL"
+                       value={customIconUrl}
+                       onChange={(e) => setCustomIconUrl(e.target.value)}
+                       className="w-full"
+                     />
+                     <div className="flex gap-2 justify-end">
+                       <Button
+                         variant="outline"
+                         onClick={() => {
+                           setIconEditingId(null);
+                           setCustomIconUrl('');
+                           setTimeout(() => {
+                             window.scrollTo(0, scrollPosition);
+                           }, 100);
+                         }}
+                       >
+                         Cancel
+                       </Button>
+                       {bill.iconUrl && (
+                         <Button
+                           variant="outline"
+                           onClick={() => {
+                             handleResetIcon(bill.id);
+                             setIconEditingId(null);
+                             setCustomIconUrl('');
+                             setTimeout(() => {
+                               window.scrollTo(0, scrollPosition);
+                             }, 100);
+                           }}
+                         >
+                           Reset
+                         </Button>
+                       )}
+                       <Button
+                         onClick={() => {
+                           handleUpdateIcon(bill.id, customIconUrl);
+                           setIconEditingId(null);
+                           setCustomIconUrl('');
+                           setTimeout(() => {
+                             window.scrollTo(0, scrollPosition);
+                           }, 100);
+                         }}
+                         disabled={!customIconUrl.trim()}
+                       >
+                         Save
+                       </Button>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             )}
+                            <div>
+                              <div className="font-medium">{bill.name}</div>
+                              {bill.note && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{bill.note}</p>
+                              )}
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                           <span 

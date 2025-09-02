@@ -603,11 +603,7 @@ export const refreshAccounts = functions.region(region).https.onCall(
           "User-Agent": "Mozilla/5.0 (compatible; Budget-Calendar/1.0)",
         };
 
-        // Add debug mode header if requested
-        if (data?.debugMode) {
-          headers["X-Debug-Mode"] = "true";
-          logger.info("Debug mode enabled - Chrome will be visible on backend");
-        }
+        // Debug mode is now controlled by .env HEADLESS_MODE on the Flask server
 
         logger.info(`Calling Flask API: ${apiRefreshUrl}`);
         logger.info(`Headers: ${JSON.stringify(headers, null, 2)}`);

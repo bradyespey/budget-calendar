@@ -612,7 +612,7 @@ export const refreshAccounts = functions.region(region).https.onCall(
         logger.info(`Calling Flask API: ${apiRefreshUrl}`);
         logger.info(`Headers: ${JSON.stringify(headers, null, 2)}`);
 
-        const flaskResponse = await fetch(apiRefreshUrl, {
+        const flaskResponse = await fetch(`${apiRefreshUrl}?sync=1`, {
           method: "GET", 
           headers,
         });
@@ -626,6 +626,12 @@ export const refreshAccounts = functions.region(region).https.onCall(
           throw new https.HttpsError('internal', `Flask refresh failed: ${flaskResponse.status} - ${responseText}`);
         }
 
+        // For sync mode, expect 200 status for successful completion
+        if (flaskResponse.status !== 200) {
+          logger.error(`Flask refresh did not complete successfully: ${flaskResponse.status} - ${responseText}`);
+          throw new https.HttpsError('internal', `Flask refresh did not complete successfully: ${flaskResponse.status} - ${responseText}`);
+        }
+
         // Parse response to check if job was actually started
         let responseData;
         try {
@@ -636,7 +642,7 @@ export const refreshAccounts = functions.region(region).https.onCall(
         }
 
         logger.info(`Flask API response: ${JSON.stringify(responseData)}`);
-        logger.info("Account refresh triggered successfully via Flask API");
+        logger.info("Account refresh completed successfully via Flask API");
       } catch (error) {
         logger.error("Error calling Flask API:", error);
         if (error instanceof https.HttpsError) {
@@ -647,7 +653,7 @@ export const refreshAccounts = functions.region(region).https.onCall(
 
       return { 
         success: true,
-        message: "Account refresh triggered successfully",
+        message: "Account refresh completed successfully",
         timestamp: new Date().toISOString(),
       };
 

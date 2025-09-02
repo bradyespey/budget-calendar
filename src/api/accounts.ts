@@ -59,7 +59,11 @@ export async function getLastSyncTime(): Promise<Date | null> {
 // ── Refresh accounts via Firebase Cloud Function ────────────────────────────────────────
 export async function refreshAccountsViaFlask(): Promise<void> {
   const refreshAccountsFunction = httpsCallable(functions, 'refreshAccounts');
-  const result = await refreshAccountsFunction();
+  
+  // Get debug mode from environment variable
+  const debugMode = import.meta.env.VITE_DEBUG_MODE === 'true';
+  
+  const result = await refreshAccountsFunction({ debugMode });
   
   const data = result.data as { success: boolean; message: string };
   if (!data.success) {

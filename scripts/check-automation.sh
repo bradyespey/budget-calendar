@@ -20,7 +20,7 @@ if command -v firebase &> /dev/null; then
     echo "  📊 Function Execution Times:"
     
     # Check each function's last execution
-    functions=("nightlyBudgetUpdate" "chaseBalance" "budgetProjection" "syncCalendar" "refreshAccounts")
+           functions=("runAll" "chaseBalance" "budgetProjection" "syncCalendar" "refreshAccounts")
     
     for func in "${functions[@]}"; do
         echo -n "    ${func}: "
@@ -35,9 +35,9 @@ if command -v firebase &> /dev/null; then
         fi
     done
     
-    echo ""
-    echo "  📝 Recent nightlyBudgetUpdate logs:"
-    firebase functions:log --only nightlyBudgetUpdate | head -10 | grep -E "(Starting|completed|Error|Failed|Step|Function execution)" | tail -5
+           echo ""
+           echo "  📝 Recent runAll logs:"
+           firebase functions:log --only runAll | head -10 | grep -E "(Starting|completed|Error|Failed|Step|Function execution)" | tail -5
 else
     echo "  ❌ Firebase CLI not installed (install with: npm install -g firebase-tools)"
 fi
@@ -45,7 +45,7 @@ fi
 echo ""
 echo "💡 Quick Commands:"
 echo "  • Check GitHub Actions: gh run list --workflow=\"budget-nightly.yml\""
-echo "  • View Firebase logs: firebase functions:log --only chaseBalance"
+echo "  • View Firebase logs: firebase functions:log --only runAll"
 echo "  • Manual trigger (GitHub): gh workflow run budget-nightly.yml"
 echo "  • Manual trigger (Local): npm run trigger:nightly"
 echo "  • Individual function test: npm run dev → Settings → Run All Actions"

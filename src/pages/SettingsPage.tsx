@@ -8,6 +8,7 @@ import {
   Upload,
   Download,
   Loader,
+  Settings,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import {
@@ -84,6 +85,89 @@ export function SettingsPage() {
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [runAllStep, setRunAllStep] = useState<string | null>(null);
 
+  // State for function last run timestamps
+  const [functionTimestamps, setFunctionTimestamps] = useState<{
+    refreshAccounts?: Date;
+    updateBalance?: Date;
+    budgetProjection?: Date;
+    syncCalendar?: Date;
+    clearCalendars?: Date;
+    generateTransactionIcons?: Date;
+    resetAllTransactionIcons?: Date;
+    backupTransactionIcons?: Date;
+    runAll?: Date;
+  }>({});
+
+  // State for showing/hiding technical timestamps
+  const [showTimestamps, setShowTimestamps] = useState<boolean>(false);
+
+  // Function to load timestamps from localStorage
+  function loadFunctionTimestamps() {
+    const stored = localStorage.getItem('budgetFunctionTimestamps');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        const timestamps: typeof functionTimestamps = {};
+        
+        Object.keys(parsed).forEach(key => {
+          if (parsed[key]) {
+            timestamps[key as keyof typeof functionTimestamps] = new Date(parsed[key]);
+          }
+        });
+        
+        setFunctionTimestamps(timestamps);
+      } catch (e) {
+        console.error('Error loading function timestamps:', e);
+      }
+    }
+  }
+
+  // Function to save timestamp for a specific function
+  function saveFunctionTimestamp(functionName: keyof typeof functionTimestamps) {
+    const now = new Date();
+    const newTimestamps = { ...functionTimestamps, [functionName]: now };
+    setFunctionTimestamps(newTimestamps);
+    
+    // Save to localStorage
+    const toStore: { [key: string]: string } = {};
+    Object.entries(newTimestamps).forEach(([key, value]) => {
+      if (value) {
+        toStore[key] = value.toISOString();
+      }
+    });
+    localStorage.setItem('budgetFunctionTimestamps', JSON.stringify(toStore));
+  }
+
+  // Function to format timestamp for display
+  function formatTimestamp(date?: Date): string {
+    if (!date) return 'Never run';
+    
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  // Function to toggle timestamp visibility
+  function toggleTimestamps() {
+    const newState = !showTimestamps;
+    setShowTimestamps(newState);
+    localStorage.setItem('budgetShowTimestamps', JSON.stringify(newState));
+  }
+
   useEffect(() => {
     async function fetchSettings() {
       try {
@@ -123,6 +207,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       await refreshAccountsViaFlask();
+      saveFunctionTimestamp('refreshAccounts');
       showNotification('Accounts refreshed.', 'success');
     } catch (e: any) {
       showNotification(`Error refreshing accounts: ${e.message}`, 'error');
@@ -142,6 +227,7 @@ export function SettingsPage() {
       const freshSync = await getLastSyncTime();
       if (freshSync) setLastSync(freshSync);
       await setBalance(bal);
+      saveFunctionTimestamp('updateBalance');
       showNotification(`Chase balance updated: $${bal.toLocaleString()}`, 'success');
     } catch (e: any) {
       showNotification(`Error updating balance: ${e.message}`, 'error');
@@ -158,6 +244,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       await triggerManualRecalculation();
+      saveFunctionTimestamp('budgetProjection');
       showNotification('Budget projections recalculated.', 'success');
     } catch (e: any) {
       showNotification('Error recalculating projections.', 'error');
@@ -176,6 +263,8 @@ export function SettingsPage() {
       
       // Call Firebase Cloud Function (it will recalculate projections internally)
       const result = await syncCalendar(calendarMode);
+      
+      saveFunctionTimestamp('syncCalendar');
       
       const email = calendarMode === 'dev'
         ? 'baespey@gmail.com'
@@ -262,6 +351,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await clearCalendars();
+      saveFunctionTimestamp('clearCalendars');
       const email = calendarMode === 'dev'
         ? 'baespey@gmail.com'
         : 'bradyjennytx@gmail.com';
@@ -312,6 +402,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await generateTransactionIcons();
+      saveFunctionTimestamp('generateTransactionIcons');
       
       let message = `Icon generation completed: ${result.updatedCount} updated, ${result.skippedCount} skipped`;
       if (result.errorCount > 0) {
@@ -338,6 +429,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await resetAllTransactionIcons({ preserveCustom: false });
+      saveFunctionTimestamp('resetAllTransactionIcons');
       
       let message = `Icon reset completed: ${result.resetCount} reset, ${result.skippedCount} skipped`;
       if (result.errorCount > 0) {
@@ -360,6 +452,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await backupTransactionIcons();
+      saveFunctionTimestamp('backupTransactionIcons');
       
       // Update backup info
       setBackupInfo({
@@ -421,6 +514,13 @@ export function SettingsPage() {
     };
     
     loadBackupInfo();
+    loadFunctionTimestamps();
+    
+    // Load timestamp toggle state
+    const stored = localStorage.getItem('budgetShowTimestamps');
+    if (stored) {
+      setShowTimestamps(JSON.parse(stored));
+    }
   }, []);
 
   async function handleAllActions() {
@@ -433,6 +533,7 @@ export function SettingsPage() {
       try {
         await saveSettings();
         await refreshAccountsViaFlask();
+        saveFunctionTimestamp('refreshAccounts');
       } catch (e) {
         // ignore error
       }
@@ -447,6 +548,7 @@ export function SettingsPage() {
         const freshSync = await getLastSyncTime();
         if (freshSync) setLastSync(freshSync);
         await setBalance(bal);
+        saveFunctionTimestamp('updateBalance');
       } catch (e) {
         // ignore error
       }
@@ -455,6 +557,7 @@ export function SettingsPage() {
       try {
         await saveSettings();
         await triggerManualRecalculation();
+        saveFunctionTimestamp('budgetProjection');
       } catch (e: any) {
         showNotification('Error running Budget Projection: ' + (e.message || e), 'error');
         setBusy(false);
@@ -469,6 +572,7 @@ export function SettingsPage() {
         
         // Call Firebase Cloud Function
         await syncCalendar(calendarMode);
+        saveFunctionTimestamp('syncCalendar');
       } catch (e: any) {
         showNotification('Error syncing calendar: ' + (e.message || e), 'error');
         setBusy(false);
@@ -476,6 +580,7 @@ export function SettingsPage() {
         setRunAllStep(null);
         return;
       }
+      saveFunctionTimestamp('runAll');
       showNotification('All actions completed successfully.', 'success');
     } catch (e: any) {
       showNotification('Error running all actions: ' + (e.message || e), 'error');
@@ -561,15 +666,31 @@ export function SettingsPage() {
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-200">Manual triggers for account updates and calculations.</CardDescription>
           </div>
-          <Button
-            onClick={handleAllActions}
-            className="ml-2 px-4 py-2 text-base font-semibold shadow whitespace-nowrap min-w-[120px]"
-            variant="primary"
-            title="Run All"
-            disabled={busy}
-          >
-            {busy && activeAction === 'all' ? <Loader className="animate-spin" size={18} /> : '🚀'} {busy && activeAction === 'all' && runAllStep ? 'Running...' : 'Run All'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={toggleTimestamps}
+              className="px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg shadow-sm"
+              variant="outline"
+              title={showTimestamps ? "Hide technical info" : "Show technical info"}
+              disabled={busy}
+            >
+              <Settings size={16} className={showTimestamps ? "text-blue-600 dark:text-blue-400" : ""} />
+            </Button>
+            <div className="flex flex-col items-end">
+              <Button
+                onClick={handleAllActions}
+                className="ml-2 px-4 py-2 text-base font-semibold shadow whitespace-nowrap min-w-[120px]"
+                variant="primary"
+                title="Run All"
+                disabled={busy}
+              >
+                {busy && activeAction === 'all' ? <Loader className="animate-spin" size={18} /> : '🚀'} {busy && activeAction === 'all' && runAllStep ? 'Running...' : 'Run All'}
+              </Button>
+              {showTimestamps && (
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2 mt-1">Last run: {formatTimestamp(functionTimestamps.runAll)}</p>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {/* Main Actions */}
@@ -581,6 +702,9 @@ export function SettingsPage() {
                   Refresh Accounts
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Forces an accounts refresh in Monarch so latest bank balances can be obtained</p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.refreshAccounts)}</p>
+                )}
               </div>
               <div className="space-y-1">
                 <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleUpdateBalance} disabled={busy}>
@@ -588,6 +712,9 @@ export function SettingsPage() {
                   Update Balance
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Grabs the latest balance from Monarch</p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.updateBalance)}</p>
+                )}
               </div>
               <div className="space-y-1">
                 <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleRecalculate} disabled={busy}>
@@ -595,6 +722,9 @@ export function SettingsPage() {
                   Budget Projection
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Projects future budget in the Upcoming tab based on Budget Projection Settings</p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.budgetProjection)}</p>
+                )}
               </div>
               <div className="space-y-1">
                 <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={handleSyncCalendar} disabled={busy}>
@@ -602,6 +732,9 @@ export function SettingsPage() {
                   Sync Calendar
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Syncs the budget projection with Google Calendar</p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.syncCalendar)}</p>
+                )}
               </div>
             </div>
           </div>
@@ -621,24 +754,36 @@ export function SettingsPage() {
                   {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : '🧹'} Clear Calendars
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes all budget calendar events from Google Calendar</p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.clearCalendars)}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Button onClick={handleGenerateIcons} variant="outline" className="w-full" disabled={busy}>
                   {busy && activeAction === 'icons' ? <Loader className="animate-spin" size={18} /> : '🎨'} Generate Icons
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Generates icons for transactions using AI and brand mapping</p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.generateTransactionIcons)}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Button onClick={handleResetAllIcons} variant="outline" className="w-full" disabled={busy}>
                   {busy && activeAction === 'reset-icons' ? <Loader className="animate-spin" size={18} /> : '🔄'} Reset All Icons
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes all generated and custom icons, keeps brand icons</p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.resetAllTransactionIcons)}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Button onClick={handleBackupIcons} variant="outline" className="w-full" disabled={busy}>
                   {busy && activeAction === 'backup-icons' ? <Loader className="animate-spin" size={18} /> : '💾'} Backup Icons
                 </Button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Saves all custom icons to Firebase storage</p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.backupTransactionIcons)}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Button onClick={handleRestoreIcons} variant="outline" className="w-full" disabled={busy || !backupInfo?.hasBackup}>

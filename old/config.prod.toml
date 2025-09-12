@@ -1,0 +1,12 @@
+# old/config.prod.toml
+
+[auth]
+enabled = true
+site_url = "https://budgetcalendar.netlify.app"
+additional_redirect_urls = [
+  "https://budgetcalendar.netlify.app/auth/v1/callback",
+  "https://budgetcalendar.netlify.app/auth/callback"
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10

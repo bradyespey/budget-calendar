@@ -9,6 +9,7 @@ import { initializeApp } from "firebase-admin/app";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
 import { google } from "googleapis";
+// Use built-in fetch (available in Node.js 18+)
 
 // Initialize Firebase Admin
 initializeApp();
@@ -81,7 +82,7 @@ async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
       const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/US`);
       if (res.ok) {
         const data = await res.json();
-        data.forEach((h: { date: string }) => holidays.add(h.date));
+        (data as any[]).forEach((h: { date: string }) => holidays.add(h.date));
       }
     } catch (error) {
       logger.warn(`Failed to fetch holidays for ${year}:`, error);
@@ -705,7 +706,7 @@ export const chaseBalance = functions.region(region).https.onCall(
       }
 
       const result = await response.json();
-      const { accountTypeSummaries } = result.data;
+      const { accountTypeSummaries } = (result as any).data;
       
       const checking = (accountTypeSummaries as any[])
         .flatMap(s => s.accounts)
@@ -1609,7 +1610,7 @@ export const sendAlert = functions.region(region).https.onCall(
       return { 
         success: true, 
         message: "Alert sent successfully",
-        messageId: result.id,
+        messageId: (result as any).id,
         timestamp: new Date().toISOString()
       };
 
@@ -1668,10 +1669,26 @@ export const nightlyBudgetUpdate = functions.region(region).https.onCall(
     try {
       logger.info("Starting nightly budget update workflow");
       
-      // Step 1: Refresh accounts
+      // Step 1: Refresh accounts (Flask API)
       logger.info("Step 1: Refreshing accounts...");
       try {
-        // This would call the Flask API endpoint
+        // Call Flask API for account refresh
+        const apiAuth = functions.config().api?.auth;
+        if (!apiAuth) {
+          throw new Error('API_AUTH not configured in Firebase functions config');
+        }
+        
+        const refreshResponse = await fetch('https://api.theespeys.com/refresh_accounts', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(apiAuth).toString('base64')}`
+          }
+        });
+        
+        if (!refreshResponse.ok) {
+          throw new Error(`Account refresh failed: ${refreshResponse.status}`);
+        }
+        
         logger.info("Account refresh completed (Flask API)");
       } catch (error) {
         logger.error("Account refresh failed:", error);
@@ -1681,8 +1698,19 @@ export const nightlyBudgetUpdate = functions.region(region).https.onCall(
       // Step 2: Update balance
       logger.info("Step 2: Updating balance...");
       try {
-        // This would call chaseBalance function
-        logger.info("Balance update completed");
+        // Call chaseBalance function via HTTP
+        const balanceResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/chaseBalance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        
+        if (!balanceResponse.ok) {
+          throw new Error(`Balance update failed: ${balanceResponse.status}`);
+        }
+        
+        const balanceResult = await balanceResponse.json();
+        logger.info("Balance update completed:", balanceResult);
       } catch (error) {
         logger.error("Balance update failed:", error);
         throw error;
@@ -1691,8 +1719,19 @@ export const nightlyBudgetUpdate = functions.region(region).https.onCall(
       // Step 3: Run projections
       logger.info("Step 3: Running projections...");
       try {
-        // This would call budgetProjection function
-        logger.info("Projections completed");
+        // Call budgetProjection function via HTTP
+        const projectionResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/budgetProjection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        
+        if (!projectionResponse.ok) {
+          throw new Error(`Projections failed: ${projectionResponse.status}`);
+        }
+        
+        const projectionResult = await projectionResponse.json();
+        logger.info("Projections completed:", projectionResult);
       } catch (error) {
         logger.error("Projections failed:", error);
         throw error;
@@ -1701,8 +1740,19 @@ export const nightlyBudgetUpdate = functions.region(region).https.onCall(
       // Step 4: Sync calendar
       logger.info("Step 4: Syncing calendar...");
       try {
-        // This would call syncCalendar function
-        logger.info("Calendar sync completed");
+        // Call syncCalendar function via HTTP
+        const calendarResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/syncCalendar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        
+        if (!calendarResponse.ok) {
+          throw new Error(`Calendar sync failed: ${calendarResponse.status}`);
+        }
+        
+        const calendarResult = await calendarResponse.json();
+        logger.info("Calendar sync completed:", calendarResult);
       } catch (error) {
         logger.error("Calendar sync failed:", error);
         throw error;
@@ -1710,13 +1760,26 @@ export const nightlyBudgetUpdate = functions.region(region).https.onCall(
       
       logger.info("Nightly budget update workflow completed successfully");
       
-      // Log completion alert data instead of calling sendAlert directly
-      const alertData = {
-        to: 'baespey@gmail.com',
-        subject: 'Budget Calendar: Nightly Update Completed',
-        text: 'Nightly budget update workflow completed successfully at ' + new Date().toISOString()
-      };
-      logger.info('Would send completion alert:', alertData);
+      // Send completion alert
+      try {
+        const alertResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/sendAlert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: 'baespey@gmail.com',
+            subject: 'Budget Calendar: Nightly Update Completed',
+            text: 'Nightly budget update workflow completed successfully at ' + new Date().toISOString()
+          })
+        });
+        
+        if (alertResponse.ok) {
+          logger.info("Completion alert sent");
+        } else {
+          logger.warn("Failed to send completion alert:", alertResponse.status);
+        }
+      } catch (alertError) {
+        logger.warn("Failed to send completion alert:", alertError);
+      }
       
       return { 
         success: true, 
@@ -1727,13 +1790,26 @@ export const nightlyBudgetUpdate = functions.region(region).https.onCall(
     } catch (error) {
       logger.error("Error in nightly budget update:", error);
       
-      // Log error alert data instead of calling sendAlert directly
-      const alertData = {
-        to: 'baespey@gmail.com',
-        subject: 'Budget Calendar: Nightly Update Failed',
-        text: `Nightly budget update workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-      logger.info('Would send error alert:', alertData);
+      // Send error alert
+      try {
+        const alertResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/sendAlert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: 'baespey@gmail.com',
+            subject: 'Budget Calendar: Nightly Update Failed',
+            text: `Nightly budget update workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          })
+        });
+        
+        if (alertResponse.ok) {
+          logger.info("Error alert sent");
+        } else {
+          logger.warn("Failed to send error alert:", alertResponse.status);
+        }
+      } catch (alertError) {
+        logger.warn("Failed to send error alert:", alertError);
+      }
       
       throw new https.HttpsError('internal', error instanceof Error ? error.message : "Unknown error");
     }
@@ -1959,7 +2035,7 @@ async function generateAIIconForFunction(transactionName: string, openaiApiKey: 
     }
     
     const result = await response.json();
-    const imageUrl = result.data?.[0]?.url;
+    const imageUrl = (result as any).data?.[0]?.url;
     
     if (imageUrl) {
       logger.info(`Generated AI icon for "${transactionName}"`);

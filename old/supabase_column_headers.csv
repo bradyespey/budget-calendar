@@ -1,0 +1,29 @@
+table_name,column_name,data_type,is_nullable,column_default,ordinal_position
+accounts,id,text,NO,null,1
+accounts,display_name,text,NO,null,2
+accounts,last_balance,numeric,NO,null,3
+accounts,last_synced,timestamp with time zone,NO,null,4
+bills,id,uuid,NO,gen_random_uuid(),1
+bills,name,text,NO,null,2
+bills,category,text,NO,null,3
+bills,amount,numeric,NO,null,4
+bills,frequency,text,NO,null,5
+bills,repeats_every,integer,NO,1,6
+bills,start_date,date,NO,null,7
+bills,end_date,date,YES,null,8
+bills,owner,text,YES,null,9
+bills,note,text,YES,null,10
+categories,id,uuid,NO,gen_random_uuid(),1
+categories,name,text,NO,null,2
+categories,created_at,timestamp with time zone,YES,now(),3
+projections,lowest,boolean,YES,false,3
+projections,highest,boolean,YES,false,4
+projections,proj_date,date,YES,null,5
+projections,projected_balance,numeric,YES,null,6
+projections,bills,jsonb,YES,null,7
+settings,id,integer,NO,nextval('settings_id_seq'::regclass),1
+settings,projection_days,integer,YES,7,2
+settings,balance_threshold,integer,YES,1000,3
+settings,calendar_mode,text,YES,'prod'::text,4
+settings,manual_balance_override,numeric,YES,null,5
+settings,last_projected_at,timestamp with time zone,YES,null,6

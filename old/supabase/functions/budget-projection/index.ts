@@ -1,0 +1,730 @@
+//supabase/functions/budget-projection/index.ts
+
+import { addDays, isWeekend, differenceInCalendarDays, differenceInCalendarMonths, parseISO, startOfDay, format } from "npm:date-fns@3.4.0";
+import { formatInTimeZone, zonedTimeToUtc } from "npm:date-fns-tz@3.0.0-beta.3";
+
+// Imports: Supabase client
+import { createClient } from "npm:@supabase/supabase-js@2.39.8";
+
+// Constants
+// Cors headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-client-info, apikey",
+  "Access-Control-Allow-Credentials": "true",
+};
+
+// Supabase client setup
+// Create Supabase client
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+console.log("Supabase URL:", supabaseUrl);
+console.log("Service Role Key set:", supabaseKey ? "Yes" : "No");
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Define timezone at the top level since it's used in multiple functions
+const TIMEZONE = 'America/Chicago';
+
+// Main HTTP handler
+// Main function to handle the request
+Deno.serve(async (req: Request) => {
+  // Handle CORS preflight request
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
+  }
+  
+  try {
+    // Get JWT from request
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { 
+          status: 401, 
+          headers: { 
+            "Content-Type": "application/json",
+            ...corsHeaders 
+          } 
+        }
+      );
+    }
+    // No need to decode the token unless you want to check claims
+
+    // Fetch settings from DB
+    const { data: settings, error } = await supabase
+      .from('settings')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error('Failed to fetch settings: ' + error.message);
+    }
+    
+    // Create default settings if none exist
+    if (!settings) {
+      console.log("No settings found, creating default settings...");
+      const defaultSettings = {
+        id: 1,
+        projection_days: 30,
+        balance_threshold: 1000,
+        manual_balance_override: null,
+        last_projected_at: null
+      };
+      
+      const { data: newSettings, error: insertError } = await supabase
+        .from('settings')
+        .upsert([defaultSettings])
+        .select()
+        .single();
+        
+      if (insertError) {
+        throw new Error('Failed to create default settings: ' + insertError.message);
+      }
+      
+      console.log("Default settings created successfully");
+      settings = newSettings;
+    }
+
+    const userSettings: Settings = {
+      projectionDays: settings.projection_days || 7,
+      balanceThreshold: settings.balance_threshold || 1000,
+      manual_balance_override: settings.manual_balance_override || null,
+    };
+    
+    console.log("Starting projection computation with settings:", userSettings);
+    // Compute the projections
+    try {
+      await computeProjections(userSettings);
+      console.log("Projection computation completed successfully");
+    } catch (err) {
+      console.error("ERROR in computeProjections:", err);
+      throw err; // Re-throw to trigger main catch block
+    }
+    
+    // Check for low balance alerts
+    await checkLowBalanceAlerts(userSettings.balanceThreshold);
+    
+    // After projections are inserted, add:
+    await supabase
+      .from('settings')
+      .update({ last_projected_at: new Date().toISOString() })
+      .eq('id', 1);
+    
+    // Note: Highest/lowest marking is now handled within computeProjections function
+    
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: "Budget projection completed successfully",
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        status: 200, 
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders 
+        } 
+      }
+    );
+  } catch (error) {
+    console.error("Error in budget projection:", error);
+    // Send error alert
+    try {
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-alert`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: Deno.env.get("ALERT_EMAIL"),
+          subject: 'Budget Calendar App - Budget Projection Error',
+          text: `The Budget Projection function failed with error: ${error.message || error}. Please review in [Budget Calendar](https://budget.theespeys.com/).`
+        })
+      });
+    } catch (e) { console.error('Failed to send error alert:', e); }
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message || "Unknown error occurred" 
+      }),
+      { 
+        status: 500, 
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders 
+        } 
+      }
+    );
+  }
+});
+
+// Helper functions
+// Helper function to fetch US holidays
+async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
+  const holidays = new Set<string>();
+  for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/US`);
+    if (res.ok) {
+      const data = await res.json();
+      data.forEach((h: { date: string }) => holidays.add(h.date));
+    }
+  }
+  return holidays;
+}
+
+// Helper function to adjust transaction date based on weekends and holidays
+function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<string>, label: string = ""): Date {
+  let d = new Date(date);
+  const dateStr = (d: Date) => formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
+  let original = dateStr(d);
+  // Repeat until not weekend/holiday
+  while (true) {
+    if (isPaycheck) {
+      if (isWeekend(d)) {
+        d.setDate(d.getDate() - 1);
+        continue;
+      }
+      if (holidays.has(dateStr(d))) {
+        d.setDate(d.getDate() - 1);
+        continue;
+      }
+    } else {
+      if (isWeekend(d)) {
+        // Move forward to Monday
+        d.setDate(d.getDate() + (8 - d.getDay()) % 7);
+        continue;
+      }
+      if (holidays.has(dateStr(d))) {
+        d.setDate(d.getDate() + 1);
+        continue;
+      }
+    }
+    break;
+  }
+  return d;
+}
+
+
+// Helper function to get last day of month
+function getLastDayOfMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+// Helper function to adjust monthly date
+function adjustMonthlyDate(date: Date, targetDay: number): Date {
+  const lastDay = getLastDayOfMonth(date);
+  const adjustedDate = new Date(date);
+  
+  // If target day is greater than last day of month, use last day
+  if (targetDay > lastDay) {
+    adjustedDate.setDate(lastDay);
+  } else {
+    adjustedDate.setDate(targetDay);
+  }
+  
+  return adjustedDate;
+}
+
+// Projection logic
+// Function to compute projections
+async function computeProjections(settings: Settings) {
+  console.log("=== ENTERING computeProjections ===");
+  console.log("computeProjections called with settings:", JSON.stringify(settings));
+  const today = formatInTimeZone(new Date(), TIMEZONE, "yyyy-MM-dd");
+  console.log("Today is:", today);
+  console.log("Projection days:", settings.projectionDays);
+  const startDate = zonedTimeToUtc(`${today}T00:00:00`, TIMEZONE);
+  const projectionDates: string[] = [];
+  for (let i = 1; i < settings.projectionDays; i++) {
+    projectionDates.push(formatInTimeZone(addDays(startDate, i), TIMEZONE, "yyyy-MM-dd"));
+  }
+  const lastDate = addDays(startDate, settings.projectionDays);
+
+  const [{ data: accounts }, { data: bills }, holidays] = await Promise.all([
+    supabase.from('accounts').select('*'),
+    supabase.from('bills').select('*'),
+    fetchUSHolidays(startDate, addDays(startDate, settings.projectionDays + 7)),
+  ]);
+  if (!accounts || !Array.isArray(accounts)) throw new Error('Failed to fetch accounts');
+  if (!bills || !Array.isArray(bills)) throw new Error('Failed to fetch bills');
+  if (!holidays || !(holidays instanceof Set)) throw new Error('Failed to fetch holidays');
+
+  console.log(`Found ${accounts.length} accounts and ${bills.length} bills`);
+  
+  // Ensure we have at least one account
+  if (accounts.length === 0) {
+    console.log("No accounts found, creating dummy account...");
+    const { data: newAccount, error: accountError } = await supabase
+      .from('accounts')
+      .insert([{
+        name: 'Default Checking',
+        last_balance: 21369,
+        account_type: 'checking'
+      }])
+      .select()
+      .single();
+      
+    if (accountError) {
+      throw new Error('Failed to create default account: ' + accountError.message);
+    }
+    accounts.push(newAccount);
+    console.log("Default account created");
+  }
+
+  console.log("Deleting old projections from", today);
+  const deleteResult = await supabase.from('projections').delete().gte('proj_date', today);
+  console.log("Delete result:", deleteResult.error ? deleteResult.error : "Success");
+  
+  // Clear ALL highest/lowest flags to ensure old data doesn't interfere
+  console.log("Clearing all highest/lowest flags...");
+  const clearFlagsResult = await supabase
+    .from('projections')
+    .update({ highest: false, lowest: false })
+    .or('highest.eq.true,lowest.eq.true');
+  console.log("Clear flags result:", clearFlagsResult.error ? clearFlagsResult.error : "Success");
+
+  const totalBalance = settings.manual_balance_override !== null && settings.manual_balance_override !== undefined
+    ? settings.manual_balance_override
+    : accounts.reduce((sum, a) => sum + a.last_balance, 0);
+  let runningBalance = totalBalance;
+  const projections: Projection[] = [];
+
+  // Declare billsByDate ONCE here
+  const billsByDate: Record<string, Bill[]> = {};
+
+  // First, add today's balance and transactions
+  const todayBills: Bill[] = [];
+  for (const bill of bills) {
+    const billStart = zonedTimeToUtc(`${bill.start_date}T00:00:00`, TIMEZONE);
+    const billEnd = bill.end_date ? zonedTimeToUtc(`${bill.end_date}T00:00:00`, TIMEZONE) : null;
+    const isPaycheck = bill.category.toLowerCase() === 'paycheck';
+    
+    // Skip dates before start for non-paychecks
+    if (!isPaycheck && today < formatInTimeZone(billStart, TIMEZONE, "yyyy-MM-dd")) continue;
+    if (billEnd && today > formatInTimeZone(billEnd, TIMEZONE, "yyyy-MM-dd")) continue;
+
+    let intendedDate: Date | null = null;
+    let occurs = false;
+
+    // --- Frequency logic ---
+    if (bill.frequency === 'one-time') {
+      intendedDate = billStart;
+    } else if (bill.frequency === 'daily') {
+      const daysDiff = Math.floor((startDate.getTime() - billStart.getTime()) / 86400000);
+      if (daysDiff % bill.repeats_every === 0 && daysDiff >= 0) intendedDate = startDate;
+    } else if (bill.frequency === 'weekly') {
+      const isPaycheck = bill.category.toLowerCase() === 'paycheck';
+      const intervalDays = 7 * bill.repeats_every;
+      // compute diff between local dates
+      const daysDiff = differenceInCalendarDays(
+        startOfDay(new Date(today)),
+        startOfDay(parseISO(bill.start_date))
+      );
+      if (daysDiff >= 0 && daysDiff % intervalDays === 0) {
+        intendedDate = startDate;
+      }
+    } else if (bill.frequency === 'monthly') {
+      // For each month in the projection window, generate the intended date
+      let monthCursor = new Date(billStart); // Start from bill's start date
+      monthCursor.setDate(1); // Start at first of month
+
+      while (monthCursor <= addDays(startDate, settings.projectionDays)) {
+        const targetDay = parseISO(bill.start_date).getDate();
+        const lastDay = getLastDayOfMonth(monthCursor);
+        let intended = new Date(monthCursor);
+        intended.setDate(targetDay > lastDay ? lastDay : targetDay);
+
+        // Skip if before projection window
+        if (intended < startDate) {
+          monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
+          continue;
+        }
+
+        // Stop if after end date
+        if (billEnd && intended > billEnd) break;
+
+        // Adjust for business day (back for paychecks, forward for others)
+        if (isPaycheck) {
+          while (isWeekend(intended) || holidays.has(formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd"))) {
+            intended.setDate(intended.getDate() - 1);
+          }
+        } else {
+          while (isWeekend(intended) || holidays.has(formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd"))) {
+            intended.setDate(intended.getDate() + 1);
+          }
+        }
+
+        const intendedStr = formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd");
+        if (intendedStr === today) {
+          // Skip today in the future-dates loop
+          monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
+          continue;
+        }
+
+        if (projectionDates.includes(intendedStr)) {
+          if (!billsByDate[intendedStr]) billsByDate[intendedStr] = [];
+          if (!billsByDate[intendedStr].some(b => b.id === bill.id)) {
+            billsByDate[intendedStr].push(bill);
+          }
+        }
+
+        // Move to next month
+        monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
+      }
+      continue; // Skip the rest of the loop for monthly bills
+    } else if (bill.frequency === 'yearly') {
+      // Get the target month/day from the bill's start date
+      const targetMonth = new Date(bill.start_date + 'T00:00:00').getMonth();
+      const targetDay = new Date(bill.start_date + 'T00:00:00').getDate();
+      // Clamp to last day of month for the current projection year/month
+      const clampedDay = Math.min(targetDay, getLastDayOfMonth(new Date()));
+      if (
+        new Date().getMonth() === targetMonth &&
+        new Date().getDate() === clampedDay
+      ) {
+        intendedDate = adjustMonthlyDate(new Date(), targetDay);
+      }
+    }
+
+    if (intendedDate) {
+      const skipAdjust = bill.frequency === 'daily';
+      let adjustedDate = new Date(intendedDate);
+      if (!skipAdjust) {
+        const isPaycheck = bill.category.toLowerCase() === 'paycheck';
+        adjustedDate = adjustTransactionDate(adjustedDate, isPaycheck, holidays, bill.name);
+      }
+      const dateStrFn = (d: Date) => formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
+      if (dateStrFn(adjustedDate) === today) {
+        occurs = true;
+      }
+    }
+
+    if (occurs) {
+      todayBills.push(bill);
+    }
+  }
+
+  // Add today's entry with current balance and today's bills
+  projections.push({
+    proj_date: today,
+    projected_balance: totalBalance,
+    lowest: false,
+    highest: false,
+    bills: todayBills,
+  });
+
+  // Cap the number of projections per run
+  const MAX_PROJECTIONS = 1000;
+  let projectionCount = 0;
+
+  try {
+    // Now process future dates
+    // --- NEW LOGIC: For each bill, generate all intended dates in the window, adjust, and add to correct day ---
+    // Build a map of dateStr -> bills for that day
+    for (const bill of bills) {
+      const billStart = zonedTimeToUtc(`${bill.start_date}T00:00:00`, TIMEZONE);
+      const billEnd = bill.end_date ? zonedTimeToUtc(`${bill.end_date}T00:00:00`, TIMEZONE) : null;
+      const isPaycheck = bill.category.toLowerCase() === 'paycheck';
+
+      if (bill.frequency === 'monthly') {
+        // For each month in the projection window, generate the intended date
+        let monthCursor = new Date(billStart); // Start from bill's start date
+        monthCursor.setDate(1); // Start at first of month
+
+        while (monthCursor <= addDays(startDate, settings.projectionDays)) {
+          const targetDay = parseISO(bill.start_date).getDate();
+          const lastDay = getLastDayOfMonth(monthCursor);
+          let intended = new Date(monthCursor);
+          intended.setDate(targetDay > lastDay ? lastDay : targetDay);
+
+          // Skip if before projection window
+          if (intended < startDate) {
+            monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
+            continue;
+          }
+
+          // Stop if after end date
+          if (billEnd && intended > billEnd) break;
+
+          // Adjust for business day (back for paychecks, forward for others)
+          if (isPaycheck) {
+            while (isWeekend(intended) || holidays.has(formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd"))) {
+              intended.setDate(intended.getDate() - 1);
+            }
+          } else {
+            while (isWeekend(intended) || holidays.has(formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd"))) {
+              intended.setDate(intended.getDate() + 1);
+            }
+          }
+
+          const intendedStr = formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd");
+          if (intendedStr === today) {
+            // Skip today in the future-dates loop
+            monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
+            continue;
+          }
+
+          if (projectionDates.includes(intendedStr)) {
+            if (!billsByDate[intendedStr]) billsByDate[intendedStr] = [];
+            if (!billsByDate[intendedStr].some(b => b.id === bill.id)) {
+              billsByDate[intendedStr].push(bill);
+            }
+          }
+
+          // Move to next month
+          monthCursor.setMonth(monthCursor.getMonth() + bill.repeats_every);
+        }
+        continue; // Skip the rest of the loop for monthly bills
+      }
+
+      // Handle non-monthly bills
+      let current = new Date(billStart);
+      while (current <= addDays(startDate, settings.projectionDays)) {
+        // Skip if before projection window
+        if (current < startDate) {
+          // Increment to next occurrence
+          if (bill.frequency === 'daily') current = addDays(current, bill.repeats_every);
+          else if (bill.frequency === 'weekly') current = addDays(current, 7 * bill.repeats_every);
+          else if (bill.frequency === 'monthly') {
+            current.setMonth(current.getMonth() + bill.repeats_every);
+          } else if (bill.frequency === 'yearly') {
+            current.setFullYear(current.getFullYear() + bill.repeats_every);
+          } else break;
+          continue;
+        }
+        // Stop if after end date
+        if (billEnd && current > billEnd) break;
+        
+        let intended = new Date(current);
+        if (bill.frequency === 'monthly') {
+          const targetDay = new Date(bill.start_date + 'T00:00:00').getDate();
+          const lastDay = getLastDayOfMonth(current);
+          // If the bill's target day is greater than this month's last day, use the last day
+          if (targetDay > lastDay) {
+            intended.setDate(lastDay);
+          } else {
+            intended.setDate(targetDay);
+          }
+          // Now adjust for business day if needed (for all monthly bills)
+          while (isWeekend(intended) || holidays.has(formatInTimeZone(intended, TIMEZONE, "yyyy-MM-dd"))) {
+            intended.setDate(intended.getDate() - 1);
+          }
+        } else if (bill.frequency === 'yearly') {
+          const targetMonth = new Date(bill.start_date + 'T00:00:00').getMonth();
+          const targetDay = new Date(bill.start_date + 'T00:00:00').getDate();
+          if (intended.getMonth() !== targetMonth) {
+            // Increment to next year
+            current.setFullYear(current.getFullYear() + bill.repeats_every);
+            continue;
+          }
+          intended.setDate(Math.min(targetDay, getLastDayOfMonth(intended)));
+        }
+        // Adjust for holidays/weekends (skip for daily)
+        let adjusted = new Date(intended);
+        if (bill.frequency !== 'daily' && bill.frequency !== 'monthly') {
+          adjusted = adjustTransactionDate(adjusted, isPaycheck, holidays, bill.name);
+        }
+        const adjustedStr = formatInTimeZone(adjusted, TIMEZONE, "yyyy-MM-dd");
+        // Only add if in projection window
+        if (projectionDates.includes(adjustedStr)) {
+          if (!billsByDate[adjustedStr]) billsByDate[adjustedStr] = [];
+          if (!billsByDate[adjustedStr].some(b => b.id === bill.id)) {
+            billsByDate[adjustedStr].push(bill);
+          }
+        }
+        // Increment to next occurrence
+        if (bill.frequency === 'daily') current = addDays(current, bill.repeats_every);
+        else if (bill.frequency === 'weekly') current = addDays(current, 7 * bill.repeats_every);
+        else if (bill.frequency === 'monthly') current.setMonth(current.getMonth() + bill.repeats_every);
+        else if (bill.frequency === 'yearly') current.setFullYear(current.getFullYear() + bill.repeats_every);
+        else break;
+
+        if (adjustedStr === today) {
+          // Don't add bills for today in the future-dates loop
+          continue;
+        }
+      }
+    }
+    // Now, for each projection date, add the bills for that day
+    for (let idx = 0; idx < projectionDates.length; idx++) {
+      if (projectionCount >= MAX_PROJECTIONS) {
+        break;
+      }
+      const dateStr = projectionDates[idx];
+      const billsForDay: Bill[] = billsByDate[dateStr] || [];
+      for (const bill of billsForDay) {
+        runningBalance += bill.amount;
+      }
+      // Add to projections array (will be inserted in batch later)
+      const projectionObj = {
+        proj_date: dateStr,
+        projected_balance: Math.round(runningBalance * 100) / 100,
+        lowest: false,
+        highest: false,
+        bills: billsForDay,
+      };
+      projections.push(projectionObj);
+      projectionCount++;
+    }
+
+    // Mark highest/lowest (excluding today)
+    if (projections.length > 1) {
+      let highest = projections[1], lowest = projections[1];
+      projections.slice(1).forEach(p => {
+        if (p.projected_balance > highest.projected_balance) highest = p;
+        if (p.projected_balance < lowest.projected_balance) lowest = p;
+      });
+      projections.forEach(p => {
+        p.highest = p.proj_date === highest.proj_date;
+        p.lowest = p.proj_date === lowest.proj_date;
+      });
+    }
+
+    // Insert in batches
+    console.log("About to insert", projections.length, "projections");
+    if (projections.length > 0) {
+      console.log("First projection:", projections[0]);
+      console.log("Last projection:", projections[projections.length - 1]);
+    } else {
+      console.log("WARNING: No projections to insert!");
+      return; // Exit early if no projections
+    }
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < projections.length; i += BATCH_SIZE) {
+      const batch = projections.slice(i, i + BATCH_SIZE);
+      console.log(`Inserting batch ${i/BATCH_SIZE + 1}, size:`, batch.length);
+      try {
+        const insertResult = await supabase.from('projections').insert(batch);
+        if (insertResult.error) {
+          console.error("Insert error:", insertResult.error);
+        } else {
+          console.log("Batch inserted successfully");
+        }
+        await new Promise(res => setTimeout(res, 100)); // 100ms delay
+      } catch (err) {
+        console.error('Error inserting projections batch:', err, {
+          batchIndex: i / BATCH_SIZE + 1,
+          batchSize: batch.length,
+          batch,
+          totalProjections: projections.length
+        });
+        throw err;
+      }
+    }
+  } catch (err) {
+    console.error('Error in projection loop:', err);
+    throw err;
+  }
+}
+
+// Low balance alerts
+// Function to check for low balance alerts
+async function checkLowBalanceAlerts(threshold: number) {
+  console.log("Checking for low balance alerts...");
+  
+  // First check if balance ever drops below threshold
+  const { data: belowThreshold, error: checkError } = await supabase
+    .from('projections')
+    .select('*')
+    .lt('projected_balance', threshold)
+    .limit(1);
+  
+  if (checkError) {
+    console.error("Error checking for balance below threshold:", checkError);
+    return;
+  }
+
+  // Only proceed if balance drops below threshold
+  if (belowThreshold?.length > 0) {
+    // Get lowest balance
+    const { data: lowestBalance, error: lowestError } = await supabase
+      .from('projections')
+      .select('*')
+      .order('projected_balance', { ascending: true })
+      .limit(1);
+    
+    if (lowestError) {
+      console.error("Error checking for lowest balance:", lowestError);
+      return;
+    }
+
+    if (lowestBalance?.length > 0) {
+      const lowest = lowestBalance[0];
+      const formattedBalance = Math.round(lowest.projected_balance).toLocaleString('en-US', { 
+        style: 'currency', 
+        currency: 'USD', 
+        maximumFractionDigits: 0 
+      });
+      const formattedDate = format(new Date(lowest.proj_date), 'EEEE, MMMM d, yyyy');
+      const thresholdFormatted = `$${Math.round(threshold).toLocaleString('en-US')}`;
+      
+      console.log(`Low balance alert: ${formattedBalance} on ${lowest.proj_date}`);
+      
+      // Send alert
+      try {
+        const alertRes = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-alert`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: Deno.env.get("ALERT_EMAIL"),
+              subject: 'Budget Calendar App - Low Balance Alert',
+              text: `Your projected balance will drop below ${thresholdFormatted} to ${formattedBalance} on ${formattedDate}. Visit the Budget Calendar app at https://budget.theespeys.com to review.`,
+            })
+          }
+        );
+        
+        if (!alertRes.ok) {
+          throw new Error('Failed to send alert email');
+        }
+      } catch (err) {
+        console.error('Error sending alert:', err);
+      }
+    }
+  }
+}
+
+// Type definitions
+interface Bill {
+  id: string;
+  name: string;
+  category: string;
+  amount: number;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'one-time';
+  repeats_every: number;
+  start_date: string;
+  end_date?: string;
+  owner?: string;
+  note?: string;
+}
+
+interface Account {
+  id: string;
+  display_name: string;
+  last_balance: number;
+  last_synced: string;
+}
+
+interface Projection {
+  proj_date: string;
+  projected_balance: number;
+  lowest: boolean;
+  highest: boolean;
+  bills?: Bill[];
+}
+
+interface Settings {
+  projectionDays: number;
+  balanceThreshold: number;
+  manual_balance_override?: number | null;
+}

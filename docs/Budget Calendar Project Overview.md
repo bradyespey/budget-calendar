@@ -58,7 +58,14 @@ Full-stack financial forecasting web app that syncs real-time checking account b
 - **chase_balance**: Fetches and saves latest Chase balance from Monarch
 - **transactions_review**: Returns count of items needing review
 
-## Recent Improvements (August 2025)
+## Recent Improvements (September 2025)
+
+### Automation Monitoring System
+- **Monitoring Script**: `npm run check:automation` for quick status checks
+- **GitHub Actions Integration**: Automated daily runs at 7:30 AM CT
+- **Firebase Functions Orchestration**: `nightlyBudgetUpdate` coordinates full workflow
+- **Comprehensive Logging**: Tracks all automation steps and errors
+- **Manual Commands**: Easy access to all monitoring and testing commands
 
 ### Calendar Sync Optimization
 - **Batch Processing**: 50-day batches prevent timeouts on large syncs
@@ -202,6 +209,25 @@ Budget/
 - **Netlify**: Free tier for hosting
 - **Resend**: Free tier for email alerts
 - **Google APIs**: Free tier for Calendar integration
+
+## Monitoring and Maintenance
+
+### Quick Status Check
+```bash
+npm run check:automation
+```
+
+### Manual Commands
+- **GitHub Actions**: `gh run list --workflow="budget-nightly.yml"`
+- **Firebase Logs**: `firebase functions:log --only nightlyBudgetUpdate`
+- **Manual Trigger**: `gh workflow run budget-nightly.yml`
+- **Test Function**: `curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/nightlyBudgetUpdate" -H "Content-Type: application/json" -d '{}'`
+
+### Automation Status
+- **Schedule**: Daily at 7:30 AM CT (12:30 PM UTC)
+- **GitHub Actions**: ✅ Running successfully
+- **Firebase Functions**: ✅ Deployed and operational
+- **Email Alerts**: ✅ Configured via Resend API
 
 ## Next Steps
 

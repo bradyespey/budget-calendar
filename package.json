@@ -12,7 +12,8 @@
     "migrate": "tsx scripts/migrateData.ts",
     "migrate:dry-run": "tsx scripts/migrateData.ts --dry-run",
     "import:firebase": "tsx scripts/importDataToFirebase.ts",
-    "cleanup:supabase": "tsx scripts/cleanupSupabase.ts"
+    "cleanup:supabase": "tsx scripts/cleanupSupabase.ts",
+    "check:automation": "./scripts/check-automation.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8",

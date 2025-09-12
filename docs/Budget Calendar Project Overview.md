@@ -45,7 +45,7 @@ Full-stack financial forecasting web app that syncs real-time checking account b
 - **clearCalendars**: Clears all events from Google Calendars
 - **sendAlert**: Email alerting via Resend API
 - **transactionsReview**: Returns count of items needing review
-- **nightlyBudgetUpdate**: Orchestrates full nightly workflow automation
+- **runAll**: Orchestrates full nightly workflow automation (renamed from nightlyBudgetUpdate)
 - **generateTransactionIcons**: Creates icons for transactions using brand mapping and AI fallback
 - **resetAllTransactionIcons**: Bulk removal of generated icons while preserving custom ones
 - **backupTransactionIcons**: Saves all custom icons to Firebase storage for backup
@@ -60,10 +60,17 @@ Full-stack financial forecasting web app that syncs real-time checking account b
 
 ## Recent Improvements (September 2025)
 
+### Settings Page Enhancements
+- **Function Timestamps**: Added "last run" timestamps for all key Firebase functions
+- **Admin Toggle**: Gear icon to show/hide technical timestamps (persisted in localStorage)
+- **Navbar Integration**: Chase balance timestamp displayed in navbar
+- **Function Rename**: `nightlyBudgetUpdate` → `runAll` to match UI button
+- **Timestamp Tracking**: All functions now update timestamps on successful completion
+
 ### Automation Monitoring System
 - **Monitoring Script**: `npm run check:automation` for quick status checks
 - **GitHub Actions Integration**: Automated daily runs at 7:30 AM CT
-- **Firebase Functions Orchestration**: `nightlyBudgetUpdate` coordinates full workflow
+- **Firebase Functions Orchestration**: `runAll` coordinates full workflow
 - **Comprehensive Logging**: Tracks all automation steps and errors
 - **Manual Commands**: Easy access to all monitoring and testing commands
 
@@ -219,9 +226,9 @@ npm run check:automation
 
 ### Manual Commands
 - **GitHub Actions**: `gh run list --workflow="budget-nightly.yml"`
-- **Firebase Logs**: `firebase functions:log --only nightlyBudgetUpdate`
+- **Firebase Logs**: `firebase functions:log --only runAll`
 - **Manual Trigger**: `gh workflow run budget-nightly.yml`
-- **Test Function**: `curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/nightlyBudgetUpdate" -H "Content-Type: application/json" -d '{}'`
+- **Test Function**: `curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll" -H "Content-Type: application/json" -d '{}'`
 
 ### Automation Status
 - **Schedule**: Daily at 7:30 AM CT (12:30 PM UTC)

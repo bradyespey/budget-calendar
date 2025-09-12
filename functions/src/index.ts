@@ -1661,13 +1661,13 @@ export const transactionsReview = functions.region(region).https.onCall(
   });
 
 /**
- * 🌙 Nightly Budget Update Function
- * Orchestrates the full nightly workflow
+ * 🚀 Run All Function
+ * Orchestrates the full workflow (formerly nightlyBudgetUpdate)
  */
-export const nightlyBudgetUpdate = functions.region(region).https.onCall(
+export const runAll = functions.region(region).https.onCall(
   async (data, context) => {
     try {
-      logger.info("Starting nightly budget update workflow");
+      logger.info("Starting run all workflow");
       
       // Step 1: Refresh accounts (Flask API)
       logger.info("Step 1: Refreshing accounts...");
@@ -1758,18 +1758,18 @@ export const nightlyBudgetUpdate = functions.region(region).https.onCall(
         throw error;
       }
       
-      logger.info("Nightly budget update workflow completed successfully");
+      logger.info("Run all workflow completed successfully");
       
       // Send completion alert
       try {
         const alertResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/sendAlert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: 'baespey@gmail.com',
-            subject: 'Budget Calendar: Nightly Update Completed',
-            text: 'Nightly budget update workflow completed successfully at ' + new Date().toISOString()
-          })
+        body: JSON.stringify({
+          to: 'baespey@gmail.com',
+          subject: 'Budget Calendar: Run All Completed',
+          text: 'Run all workflow completed successfully at ' + new Date().toISOString()
+        })
         });
         
         if (alertResponse.ok) {
@@ -1783,23 +1783,23 @@ export const nightlyBudgetUpdate = functions.region(region).https.onCall(
       
       return { 
         success: true, 
-        message: "Nightly budget update completed successfully",
+        message: "Run all completed successfully",
         timestamp: new Date().toISOString()
       };
 
     } catch (error) {
-      logger.error("Error in nightly budget update:", error);
+      logger.error("Error in run all workflow:", error);
       
       // Send error alert
       try {
         const alertResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/sendAlert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: 'baespey@gmail.com',
-            subject: 'Budget Calendar: Nightly Update Failed',
-            text: `Nightly budget update workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-          })
+        body: JSON.stringify({
+          to: 'baespey@gmail.com',
+          subject: 'Budget Calendar: Run All Failed',
+          text: `Run all workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        })
         });
         
         if (alertResponse.ok) {

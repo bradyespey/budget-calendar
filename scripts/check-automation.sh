@@ -15,9 +15,29 @@ else
 fi
 
 echo ""
-echo "🔥 Firebase Functions Logs:"
+echo "🔥 Firebase Functions Status:"
 if command -v firebase &> /dev/null; then
-    firebase functions:log --only nightlyBudgetUpdate | head -20 | grep -E "(nightlyBudgetUpdate|Starting|completed|Error|Failed|Step)" | tail -10
+    echo "  📊 Function Execution Times:"
+    
+    # Check each function's last execution
+    functions=("nightlyBudgetUpdate" "chaseBalance" "budgetProjection" "syncCalendar" "refreshAccounts")
+    
+    for func in "${functions[@]}"; do
+        echo -n "    ${func}: "
+        last_execution=$(firebase functions:log --only "$func" | head -5 | grep "Function execution" | head -1 | grep -o "2025-[0-9-]*T[0-9:]*" | head -1)
+        
+        if [ -n "$last_execution" ]; then
+            # Convert to readable format
+            formatted_date=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$last_execution" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "$last_execution")
+            echo "Last run: $formatted_date"
+        else
+            echo "❌ No recent executions"
+        fi
+    done
+    
+    echo ""
+    echo "  📝 Recent nightlyBudgetUpdate logs:"
+    firebase functions:log --only nightlyBudgetUpdate | head -10 | grep -E "(Starting|completed|Error|Failed|Step|Function execution)" | tail -5
 else
     echo "  ❌ Firebase CLI not installed (install with: npm install -g firebase-tools)"
 fi
@@ -25,9 +45,10 @@ fi
 echo ""
 echo "💡 Quick Commands:"
 echo "  • Check GitHub Actions: gh run list --workflow=\"budget-nightly.yml\""
-echo "  • View Firebase logs: firebase functions:log --only nightlyBudgetUpdate"
-echo "  • Manual trigger: gh workflow run budget-nightly.yml"
-echo "  • Test function: curl -X POST \"https://us-central1-budgetcalendar-e6538.cloudfunctions.net/nightlyBudgetUpdate\" -H \"Content-Type: application/json\" -d \"{}\""
+echo "  • View Firebase logs: firebase functions:log --only chaseBalance"
+echo "  • Manual trigger (GitHub): gh workflow run budget-nightly.yml"
+echo "  • Manual trigger (Local): npm run trigger:nightly"
+echo "  • Individual function test: npm run dev → Settings → Run All Actions"
 
 echo ""
 echo "✨ Automation runs daily at 7:30 AM CT"

@@ -10,17 +10,19 @@ jobs:
   nightly-update:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Trigger Nightly Budget Update
         run: |
           echo "Starting nightly budget update workflow..."
-          RESPONSE=$(curl -i --location --request POST 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net/nightlyBudgetUpdate' \
-            --header 'Content-Type: application/json' \
-            --data '{}')
-          echo "Response: $RESPONSE"
-        continue-on-error: true
-
-      - name: Check if workflow succeeded
-        if: failure()
-        run: |
-          echo "::error::Nightly budget update failed. Check Firebase Functions logs for details."
-          exit 1
+          node scripts/trigger-nightly.js

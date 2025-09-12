@@ -13,13 +13,14 @@
     "migrate:dry-run": "tsx scripts/migrateData.ts --dry-run",
     "import:firebase": "tsx scripts/importDataToFirebase.ts",
     "cleanup:supabase": "tsx scripts/cleanupSupabase.ts",
-    "check:automation": "./scripts/check-automation.sh"
+    "check:automation": "./scripts/check-automation.sh",
+    "trigger:nightly": "node scripts/trigger-nightly.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8",
     "date-fns": "^3.4.0",
     "date-fns-tz": "^3.2.0",
-    "firebase": "^12.1.0",
+    "firebase": "^12.2.1",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

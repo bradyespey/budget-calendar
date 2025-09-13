@@ -1,40 +1,80 @@
-#.gitignore
-
-# Node
-node_modules/
+# Build outputs
+.vite/
+build/
 dist/
 
-# Logs
-logs/
-*.log
-
-# Vite
-.vite/
-
-# Python
-venv/
-__pycache__/
-*.py[cod]
-
-# Selenium artifacts
-chrome_profile/
+# Credentials and secrets
+*cookies*.json
+*credentials*.json
+*secrets.json
+*secret.json
+*token*.json
 monarch_cookies.json
+monarch_token.json
 
-# Supabase
-/supabase/config.toml
+# Database files
+*.db
+*.sqlite
+*.sqlite3
 
-# Env vars
+# Dependencies
+lerna-debug.log*
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor directories and files
+.idea/
+.vscode/
+*~
+*.swp
+*.swo
+
+# Environment variables
 .env
 .env.*
+*.env.*
 !.env.example
 
-# Editor
-.vscode/
-.idea/
-.DS_Store
-# Local Netlify folder
-.netlify
+# Firebase
+.firebase/
+firebase-debug.*.log
+firebase-debug.log
 
-# Other
-gas/
+# Logs
+.log*
+*.log
+logs/
+
+# Netlify
+.netlify/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+.Spotlight-V100
+.Trashes
+._*
+Thumbs.db
+ehthumbs.db
+
+# Project-specific directories
 flask/
+gas/
+old/
+other/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+env/
+venv/
+
+# Temporary files
+*.temp
+*.tmp

@@ -95,6 +95,7 @@ export function SettingsPage() {
     generateTransactionIcons?: Date;
     resetAllTransactionIcons?: Date;
     backupTransactionIcons?: Date;
+    restoreTransactionIcons?: Date;
     runAll?: Date;
   }>({});
 
@@ -487,6 +488,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await restoreTransactionIcons();
+      saveFunctionTimestamp('restoreTransactionIcons');
       
       let message = `Icon restore completed: ${result.restoredCount} restored`;
       if (result.errorCount > 0) {
@@ -795,6 +797,9 @@ export function SettingsPage() {
                     : 'No backup available (backup first)'
                   }
                 </p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.restoreTransactionIcons)}</p>
+                )}
               </div>
             </div>
           </div>

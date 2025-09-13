@@ -7,19 +7,19 @@ Full-stack financial forecasting web app that syncs real-time checking account b
 Originally built using Python, Flask, Google Apps Script, and Google Sheets, the system has since been fully rebuilt using React, Firebase, and modern cloud-native tooling. The early version parsed spreadsheets and pushed projections to Google Calendar via GAS.
 
 ## Live and Admin
-- **App URL**: https://budget.theespeys.com
-- **Firebase Console**: budgetcalendar-e6538
-- **Netlify Dashboard**: budgetcalendar
-- **GitHub Actions**: Automated nightly runs at 7:30 AM CT
-- **Flask API**: https://api.theespeys.com
+- 🌐 **App URL**: https://budget.theespeys.com
+- 🔥 **Firebase Console**: budgetcalendar-e6538
+- 🚀 **Netlify Dashboard**: budgetcalendar
+- ⏰ **GitHub Actions**: Automated nightly runs at 7:30 AM CT
+- 🐍 **Flask API**: https://api.theespeys.com
 
 ## Tech Stack
-- **Frontend**: React 18 + Vite + TypeScript + Tailwind CSS
-- **Backend**: Firebase (Firestore, Cloud Functions, Auth)
-- **Auth**: Firebase Google OAuth (restricted: YOUR_EMAIL, YOUR_EMAIL_2, YOUR_EMAIL_3)
-- **External API**: Monarch Money unofficial API [(docs)](https://github.com/hammem/monarchmoney)
-- **Hosting**: Netlify (frontend), Firebase (backend)
-- **Automation**: GitHub Actions for nightly scheduled jobs
+- ⚛️ **Frontend**: React 18 + Vite + TypeScript + Tailwind CSS
+- 🔥 **Backend**: Firebase (Firestore, Cloud Functions, Auth)
+- 🔐 **Auth**: Firebase Google OAuth (restricted: YOUR_EMAIL, YOUR_EMAIL_2, YOUR_EMAIL_3)
+- 💰 **External API**: Monarch Money unofficial API [(docs)](https://github.com/hammem/monarchmoney)
+- 🚀 **Hosting**: Netlify (frontend), Firebase (backend)
+- ⚙️ **Automation**: GitHub Actions for nightly scheduled jobs
 
 ## Quick Start
 ```bash
@@ -45,9 +45,9 @@ VITE_DEBUG_MODE=true
 ```
 
 ## Run Modes (Debug, Headless, Profiles)
-- **Debug Mode**: Set `HEADLESS_MODE=False` in Flask API `.env` to see Chrome browser for debugging
-- **Headless Mode**: Set `HEADLESS_MODE=True` in Flask API `.env` for normal operation (Chrome hidden)
-- **Chrome Profiles**: Uses persistent Chrome profile (`chrome_profile/monarch_profile`) for fast Monarch Money login with automatic fallback to credential + TOTP login
+- 🐛 **Debug Mode**: Set `HEADLESS_MODE=False` in Flask API `.env` to see Chrome browser for debugging
+- 👻 **Headless Mode**: Set `HEADLESS_MODE=True` in Flask API `.env` for normal operation (Chrome hidden)
+- 🌐 **Chrome Profiles**: Uses persistent Chrome profile (`chrome_profile/monarch_profile`) for fast Monarch Money login with automatic fallback to credential + TOTP login
 
 ## Scripts and Ops
 - **Development**: `npm run dev` - Start local development server
@@ -90,10 +90,10 @@ VITE_DEBUG_MODE=true
 - **Domains**: budget.theespeys.com (primary), budgetcalendar.netlify.app
 
 ## App Pages / Routes
-- **Dashboard**: Current balance and financial status overview with low balance alerts
-- **Transactions**: Advanced management with duplicate functionality, icon customization, clickable filtering, enhanced search, mobile-optimized layout
-- **Upcoming**: Calendar view of upcoming bills, income, projected balances
-- **Settings**: Projection settings, manual triggers, import/export, maintenance functions with admin timestamps
+- 📊 **Dashboard**: Current balance and financial status overview with low balance alerts
+- 💳 **Transactions**: Advanced management with duplicate functionality, icon customization, clickable filtering, enhanced search, mobile-optimized layout
+- 📅 **Upcoming**: Calendar view of upcoming bills, income, projected balances
+- ⚙️ **Settings**: Projection settings, manual triggers, import/export, maintenance functions with admin timestamps
 
 ## Directory Map
 ```
@@ -113,12 +113,12 @@ Budget/
 ```
 
 ## Troubleshooting
-- **CORS Issues**: Resolved by using Firebase callable functions (HTTPS onCall)
-- **Function Timeouts**: Large operations use batch processing with 9-minute timeout
-- **Duplicate Events**: Intelligent comparison prevents duplicates, automatic cleanup removes extras
-- **Large Syncs**: 50-day batch processing prevents timeouts on 100+ day operations
-- **Chrome Profile Issues**: Run `setup_chrome_profile.py` to create initial profile for Monarch Money login
-- **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
+- 🔗 **CORS Issues**: Resolved by using Firebase callable functions (HTTPS onCall)
+- ⏱️ **Function Timeouts**: Large operations use batch processing with 9-minute timeout
+- 🔄 **Duplicate Events**: Intelligent comparison prevents duplicates, automatic cleanup removes extras
+- 📦 **Large Syncs**: 50-day batch processing prevents timeouts on 100+ day operations
+- 🌐 **Chrome Profile Issues**: Run `setup_chrome_profile.py` to create initial profile for Monarch Money login
+- 🔄 **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
 
 ## AI Handoff
 Read this README, scan the repo, prioritize core functions and env-safe areas, keep env and rules aligned with this file

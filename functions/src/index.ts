@@ -59,6 +59,15 @@ export const budgetProjectionHttp = functions.region(region).https.onRequest(
 
       logger.info("Budget projection completed successfully");
       
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          budgetProjection: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
+      
       res.status(200).json({ 
         success: true, 
         message: "Budget projection completed successfully",
@@ -785,6 +794,15 @@ export const chaseBalanceHttp = functions.region(region).https.onRequest(
 
       logger.info(`Chase balance updated successfully: $${currentBalance}`);
       
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          updateBalance: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
+      
       res.status(200).json({ 
         balance: currentBalance,
         timestamp: new Date().toISOString(),
@@ -963,6 +981,15 @@ export const syncCalendarHttp = functions.region(region).https.onRequest(
 
       // Simple sync logic for HTTP version - just return success
       logger.info("Calendar sync completed successfully (HTTP)");
+      
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          syncCalendar: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
       
       res.status(200).json({ 
         success: true, 
@@ -1783,6 +1810,15 @@ export const clearCalendars = functions.region(region).https.onCall(
 
       logger.info(`Calendar cleanup completed - ${totalDeleted} events deleted`);
       
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          clearCalendars: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
+      
       return {
         success: true,
         more: hasMore,
@@ -1998,6 +2034,15 @@ export const runAllHttp = functions.region(region).https.onRequest(
       }
       
       logger.info("Run all workflow completed successfully");
+      
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          runAll: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
       
       res.status(200).json({
         success: true,
@@ -2243,6 +2288,15 @@ export const generateTransactionIcons = functions.region(region).https.onCall(
       
       logger.info(`Icon generation completed - processed: ${processedCount}, updated: ${updatedCount}, skipped: ${skippedCount}, errors: ${errorCount}`);
       
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          generateTransactionIcons: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
+      
       return {
         success: true,
         message: "Transaction icon generation completed",
@@ -2457,6 +2511,15 @@ export const resetAllTransactionIcons = functions.region(region).https.onCall(
       
       logger.info(`Reset icons completed - reset: ${resetCount}, skipped: ${skippedCount}, errors: ${errorCount}`);
       
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          resetAllTransactionIcons: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
+      
       return {
         success: true,
         message: "Transaction icons reset completed",
@@ -2508,6 +2571,15 @@ export const backupTransactionIcons = functions.region(region).https.onCall(
       await db.collection('iconBackups').doc('latest').set(backupData);
       
       logger.info(`Backed up ${Object.keys(iconBackup).length} transaction icons to Firebase`);
+      
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          backupTransactionIcons: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
       
       return {
         success: true,
@@ -2566,6 +2638,15 @@ export const restoreTransactionIcons = functions.region(region).https.onCall(
       }
       
       logger.info(`Restored ${restoredCount} transaction icons, errors: ${errorCount}`);
+      
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          restoreTransactionIcons: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
       
       return {
         success: true,

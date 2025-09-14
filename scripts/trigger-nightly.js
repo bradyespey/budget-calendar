@@ -5,8 +5,8 @@
  * This properly calls Firebase callable functions instead of raw HTTP
  */
 
-const { initializeApp } = require('firebase/app');
-const { getFunctions, httpsCallable } = require('firebase/functions');
+import { initializeApp } from 'firebase/app';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Firebase config (same as frontend)
 const firebaseConfig = {

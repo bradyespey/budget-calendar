@@ -25,7 +25,7 @@ import {
   getLastSyncTime,
 } from '../api/accounts'
 import { triggerManualRecalculation } from '../api/projections'
-import { syncCalendar, getSettings, updateSettings, clearCalendars } from '../api/firebase'
+import { syncCalendar, getSettings, updateSettings, clearCalendars, getFunctionTimestamps, saveFunctionTimestamp } from '../api/firebase'
 import { useBalance } from '../context/BalanceContext'
 import { supabase } from '../lib/supabase'
 import { useLocation } from 'react-router-dom'
@@ -102,41 +102,34 @@ export function SettingsPage() {
   // State for showing/hiding technical timestamps
   const [showTimestamps, setShowTimestamps] = useState<boolean>(false);
 
-  // Function to load timestamps from localStorage
-  function loadFunctionTimestamps() {
-    const stored = localStorage.getItem('budgetFunctionTimestamps');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const timestamps: typeof functionTimestamps = {};
-        
-        Object.keys(parsed).forEach(key => {
-          if (parsed[key]) {
-            timestamps[key as keyof typeof functionTimestamps] = new Date(parsed[key]);
-          }
-        });
-        
-        setFunctionTimestamps(timestamps);
-      } catch (e) {
-        console.error('Error loading function timestamps:', e);
-      }
+  // Function to load timestamps from Firestore
+  async function loadFunctionTimestamps() {
+    try {
+      const timestamps = await getFunctionTimestamps();
+      const typedTimestamps: typeof functionTimestamps = {};
+      
+      Object.entries(timestamps).forEach(([key, value]) => {
+        typedTimestamps[key as keyof typeof functionTimestamps] = value;
+      });
+      
+      setFunctionTimestamps(typedTimestamps);
+    } catch (e) {
+      console.error('Error loading function timestamps:', e);
     }
   }
 
   // Function to save timestamp for a specific function
-  function saveFunctionTimestamp(functionName: keyof typeof functionTimestamps) {
+  async function saveFunctionTimestampLocal(functionName: keyof typeof functionTimestamps) {
     const now = new Date();
     const newTimestamps = { ...functionTimestamps, [functionName]: now };
     setFunctionTimestamps(newTimestamps);
     
-    // Save to localStorage
-    const toStore: { [key: string]: string } = {};
-    Object.entries(newTimestamps).forEach(([key, value]) => {
-      if (value) {
-        toStore[key] = value.toISOString();
-      }
-    });
-    localStorage.setItem('budgetFunctionTimestamps', JSON.stringify(toStore));
+    // Save to Firestore
+    try {
+      await saveFunctionTimestamp(functionName);
+    } catch (e) {
+      console.error('Error saving function timestamp:', e);
+    }
   }
 
   // Function to format timestamp for display
@@ -187,7 +180,17 @@ export function SettingsPage() {
         setBalanceThresholdInput('1000');
       }
     }
-    fetchSettings()
+    
+    async function initializeData() {
+      await fetchSettings();
+      await loadFunctionTimestamps();
+      
+      // Load show timestamps preference from localStorage
+      const showTimestampsStored = localStorage.getItem('showTimestamps') === 'true';
+      setShowTimestamps(showTimestampsStored);
+    }
+    
+    initializeData();
   }, [])
 
   // Keep balanceThresholdInput in sync with localBalanceThreshold when not focused
@@ -208,7 +211,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       await refreshAccountsViaFlask();
-      saveFunctionTimestamp('refreshAccounts');
+      await saveFunctionTimestampLocal('refreshAccounts');
       showNotification('Accounts refreshed.', 'success');
     } catch (e: any) {
       showNotification(`Error refreshing accounts: ${e.message}`, 'error');
@@ -228,7 +231,7 @@ export function SettingsPage() {
       const freshSync = await getLastSyncTime();
       if (freshSync) setLastSync(freshSync);
       await setBalance(bal);
-      saveFunctionTimestamp('updateBalance');
+      await saveFunctionTimestampLocal('updateBalance');
       showNotification(`Chase balance updated: $${bal.toLocaleString()}`, 'success');
     } catch (e: any) {
       showNotification(`Error updating balance: ${e.message}`, 'error');
@@ -245,7 +248,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       await triggerManualRecalculation();
-      saveFunctionTimestamp('budgetProjection');
+      await saveFunctionTimestampLocal('budgetProjection');
       showNotification('Budget projections recalculated.', 'success');
     } catch (e: any) {
       showNotification('Error recalculating projections.', 'error');
@@ -265,7 +268,7 @@ export function SettingsPage() {
       // Call Firebase Cloud Function (it will recalculate projections internally)
       const result = await syncCalendar(calendarMode);
       
-      saveFunctionTimestamp('syncCalendar');
+      await saveFunctionTimestampLocal('syncCalendar');
       
       const email = calendarMode === 'dev'
         ? 'baespey@gmail.com'
@@ -352,7 +355,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await clearCalendars();
-      saveFunctionTimestamp('clearCalendars');
+      await saveFunctionTimestampLocal('clearCalendars');
       const email = calendarMode === 'dev'
         ? 'baespey@gmail.com'
         : 'bradyjennytx@gmail.com';
@@ -403,7 +406,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await generateTransactionIcons();
-      saveFunctionTimestamp('generateTransactionIcons');
+      await saveFunctionTimestampLocal('generateTransactionIcons');
       
       let message = `Icon generation completed: ${result.updatedCount} updated, ${result.skippedCount} skipped`;
       if (result.errorCount > 0) {
@@ -430,7 +433,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await resetAllTransactionIcons({ preserveCustom: false });
-      saveFunctionTimestamp('resetAllTransactionIcons');
+      await saveFunctionTimestampLocal('resetAllTransactionIcons');
       
       let message = `Icon reset completed: ${result.resetCount} reset, ${result.skippedCount} skipped`;
       if (result.errorCount > 0) {
@@ -453,7 +456,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await backupTransactionIcons();
-      saveFunctionTimestamp('backupTransactionIcons');
+      await saveFunctionTimestampLocal('backupTransactionIcons');
       
       // Update backup info
       setBackupInfo({
@@ -488,7 +491,7 @@ export function SettingsPage() {
     try {
       await saveSettings();
       const result = await restoreTransactionIcons();
-      saveFunctionTimestamp('restoreTransactionIcons');
+      await saveFunctionTimestampLocal('restoreTransactionIcons');
       
       let message = `Icon restore completed: ${result.restoredCount} restored`;
       if (result.errorCount > 0) {
@@ -535,7 +538,7 @@ export function SettingsPage() {
       try {
         await saveSettings();
         await refreshAccountsViaFlask();
-        saveFunctionTimestamp('refreshAccounts');
+        await saveFunctionTimestampLocal('refreshAccounts');
       } catch (e) {
         // ignore error
       }
@@ -550,7 +553,7 @@ export function SettingsPage() {
         const freshSync = await getLastSyncTime();
         if (freshSync) setLastSync(freshSync);
         await setBalance(bal);
-        saveFunctionTimestamp('updateBalance');
+        await saveFunctionTimestampLocal('updateBalance');
       } catch (e) {
         // ignore error
       }
@@ -559,7 +562,7 @@ export function SettingsPage() {
       try {
         await saveSettings();
         await triggerManualRecalculation();
-        saveFunctionTimestamp('budgetProjection');
+        await saveFunctionTimestampLocal('budgetProjection');
       } catch (e: any) {
         showNotification('Error running Budget Projection: ' + (e.message || e), 'error');
         setBusy(false);
@@ -574,7 +577,7 @@ export function SettingsPage() {
         
         // Call Firebase Cloud Function
         await syncCalendar(calendarMode);
-        saveFunctionTimestamp('syncCalendar');
+        await saveFunctionTimestampLocal('syncCalendar');
       } catch (e: any) {
         showNotification('Error syncing calendar: ' + (e.message || e), 'error');
         setBusy(false);
@@ -582,7 +585,7 @@ export function SettingsPage() {
         setRunAllStep(null);
         return;
       }
-      saveFunctionTimestamp('runAll');
+      await saveFunctionTimestampLocal('runAll');
       showNotification('All actions completed successfully.', 'success');
     } catch (e: any) {
       showNotification('Error running all actions: ' + (e.message || e), 'error');

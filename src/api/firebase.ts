@@ -6,8 +6,10 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
+  setDoc,
   query, 
   orderBy, 
+  where,
   Timestamp,
   writeBatch 
 } from 'firebase/firestore';

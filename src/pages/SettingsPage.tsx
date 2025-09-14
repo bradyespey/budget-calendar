@@ -119,16 +119,13 @@ export function SettingsPage() {
 
   // Function to save timestamp for a specific function
   async function saveFunctionTimestampLocal(functionName: keyof typeof functionTimestamps) {
-    console.log(`Saving timestamp for ${functionName}...`);
     const now = new Date();
     const newTimestamps = { ...functionTimestamps, [functionName]: now };
     setFunctionTimestamps(newTimestamps);
     
     // Save to Firestore
     try {
-      console.log(`Calling saveFunctionTimestamp for ${functionName}...`);
       await saveFunctionTimestamp(functionName);
-      console.log(`Successfully saved timestamp for ${functionName}`);
     } catch (e) {
       console.error('Error saving function timestamp:', e);
     }

@@ -1936,6 +1936,64 @@ export const transactionsReview = functions.region(region).https.onCall(
   });
 
 /**
+ * HTTP trigger version of refreshAccounts - calls Flask API for account refresh
+ */
+export const refreshAccountsHttp = functions.region(region).https.onRequest(
+  async (req, res) => {
+    try {
+      logger.info("Starting account refresh via Flask API (HTTP trigger)");
+
+      // Get Flask API config from Firebase config
+      const config = functions.config();
+      const apiAuthValue = config.api?.auth;
+      const apiRefreshUrl = "https://api.theespeys.com/refresh_accounts";
+      
+      if (!apiAuthValue) {
+        throw new Error('API_AUTH not configured in Firebase functions config');
+      }
+
+      // Call Flask API for account refresh
+      const refreshResponse = await fetch(apiRefreshUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${Buffer.from(apiAuthValue).toString('base64')}`
+        }
+      });
+
+      if (!refreshResponse.ok) {
+        throw new Error(`Account refresh failed: ${refreshResponse.status}`);
+      }
+
+      const result = await refreshResponse.text();
+      logger.info("Account refresh completed successfully");
+
+      // Save timestamp to admin collection
+      try {
+        await db.collection('admin').doc('functionTimestamps').set({
+          refreshAccounts: new Date()
+        }, { merge: true });
+      } catch (error) {
+        logger.warn("Failed to save function timestamp:", error);
+      }
+
+      res.status(200).json({ 
+        success: true, 
+        message: "Account refresh completed successfully",
+        result: result,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error("Account refresh failed:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+);
+
+/**
  * 🚀 Run All Function (HTTP Trigger for GitHub Actions)
  * Orchestrates the full workflow without authentication
  */
@@ -1944,27 +2002,22 @@ export const runAllHttp = functions.region(region).https.onRequest(
     try {
       logger.info("Starting run all workflow (HTTP trigger)");
       
-      // Step 1: Refresh accounts (Flask API)
+      // Step 1: Refresh accounts
       logger.info("Step 1: Refreshing accounts...");
       try {
-        // Call Flask API for account refresh
-        const apiAuth = functions.config().api?.auth;
-        if (!apiAuth) {
-          throw new Error('API_AUTH not configured in Firebase functions config');
-        }
-        
-        const refreshResponse = await fetch('https://api.theespeys.com/refresh_accounts', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${Buffer.from(apiAuth).toString('base64')}`
-          }
+        // Call refreshAccountsHttp function
+        const refreshResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshAccountsHttp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
         });
         
         if (!refreshResponse.ok) {
           throw new Error(`Account refresh failed: ${refreshResponse.status}`);
         }
         
-        logger.info("Account refresh completed (Flask API)");
+        const refreshResult = await refreshResponse.json();
+        logger.info("Account refresh completed:", refreshResult);
       } catch (error) {
         logger.error("Account refresh failed:", error);
         throw error;

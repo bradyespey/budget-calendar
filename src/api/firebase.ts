@@ -232,6 +232,34 @@ export async function updateSettings(updates: Partial<Settings>): Promise<void> 
   await updateDoc(settingsRef, firestoreUpdates);
 }
 
+// FUNCTION TIMESTAMPS API
+export async function getFunctionTimestamps(): Promise<Record<string, Date>> {
+  const timestampsRef = doc(db, 'admin', 'functionTimestamps');
+  const timestampsDoc = await getDoc(timestampsRef);
+  
+  if (!timestampsDoc.exists()) {
+    return {};
+  }
+  
+  const data = timestampsDoc.data();
+  const timestamps: Record<string, Date> = {};
+  
+  Object.entries(data).forEach(([key, value]) => {
+    if (value && typeof value === 'object' && 'toDate' in value) {
+      timestamps[key] = (value as Timestamp).toDate();
+    }
+  });
+  
+  return timestamps;
+}
+
+export async function saveFunctionTimestamp(functionName: string): Promise<void> {
+  const timestampsRef = doc(db, 'admin', 'functionTimestamps');
+  await setDoc(timestampsRef, {
+    [functionName]: Timestamp.now()
+  }, { merge: true });
+}
+
 // CLOUD FUNCTIONS API
 export async function refreshAccounts(): Promise<any> {
   const refreshAccountsFunction = httpsCallable(functions, 'refreshAccounts');

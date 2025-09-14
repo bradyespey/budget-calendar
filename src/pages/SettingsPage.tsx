@@ -27,7 +27,6 @@ import {
 import { triggerManualRecalculation } from '../api/projections'
 import { syncCalendar, getSettings, updateSettings, clearCalendars, getFunctionTimestamps, saveFunctionTimestamp } from '../api/firebase'
 import { useBalance } from '../context/BalanceContext'
-import { supabase } from '../lib/supabase'
 import { useLocation } from 'react-router-dom'
 import { importBillsFromCSV } from '../utils/importBills'
 import { validateProjections } from '../utils/validateProjections'
@@ -120,13 +119,16 @@ export function SettingsPage() {
 
   // Function to save timestamp for a specific function
   async function saveFunctionTimestampLocal(functionName: keyof typeof functionTimestamps) {
+    console.log(`Saving timestamp for ${functionName}...`);
     const now = new Date();
     const newTimestamps = { ...functionTimestamps, [functionName]: now };
     setFunctionTimestamps(newTimestamps);
     
     // Save to Firestore
     try {
+      console.log(`Calling saveFunctionTimestamp for ${functionName}...`);
       await saveFunctionTimestamp(functionName);
+      console.log(`Successfully saved timestamp for ${functionName}`);
     } catch (e) {
       console.error('Error saving function timestamp:', e);
     }
@@ -878,10 +880,7 @@ export function SettingsPage() {
                     className="text-xs px-2 py-1 h-auto"
                     onClick={async () => {
                       setManualBalanceOverride("");
-                      await supabase
-                        .from('settings')
-                        .update({ manual_balance_override: null })
-                        .eq('id', 1);
+                      await updateSettings({ manualBalanceOverride: null });
                     }}
                   >
                     Clear

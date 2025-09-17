@@ -68,6 +68,7 @@ VITE_DEBUG_MODE=true
 - **clearCalendars**: Clears all events from Google Calendars
 - **sendAlert**: Email alerting via Resend API
 - **runAll**: Orchestrates full nightly workflow automation
+- **storeRecurringTransactions**: Populates recurring transactions in Firestore for cached access
 - **generateTransactionIcons**: Creates icons for transactions using brand mapping and AI fallback
 - **resetAllTransactionIcons**: Bulk removal of generated icons while preserving custom ones
 - **backupTransactionIcons**: Saves all custom icons to Firebase storage for backup
@@ -129,7 +130,9 @@ Budget/
 - **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
 - **Monarch API**: Uses GraphQL `Web_GetUpcomingRecurringTransactionItems` operation for recurring transactions
 - **Data Matching**: Zero tolerance amount matching, timezone-safe date comparison, frequency-aware matching with repeats_every logic
-- **Date Range**: Focused queries return next upcoming instances instead of distant future dates
+- **Date Range**: Future-focused queries (today to 3 months) return next immediate upcoming dates matching Monarch UI exactly
+- **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes
+- **Loading States**: Fixed infinite loading on Transactions page when using cached data
 
 ## AI Handoff
 Read this README, scan the repo, prioritize core functions and env-safe areas, keep env and rules aligned with this file

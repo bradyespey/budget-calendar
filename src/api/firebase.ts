@@ -196,6 +196,47 @@ export async function clearProjections(): Promise<void> {
   await batch.commit();
 }
 
+// RECURRING TRANSACTIONS API
+export interface RecurringTransaction {
+  id?: string;
+  streamId: string;
+  merchantName: string;
+  merchantLogoUrl?: string;
+  frequency: string;
+  amount: number;
+  isApproximate?: boolean;
+  dueDate: string;
+  categoryId?: string;
+  categoryName?: string;
+  accountId?: string;
+  accountName?: string;
+  accountLogoUrl?: string;
+  updatedAt?: Date;
+}
+
+export async function getRecurringTransactions(): Promise<RecurringTransaction[]> {
+  const recurringRef = collection(db, 'recurring_transactions');
+  const q = query(recurringRef, orderBy('merchantName'));
+  const snapshot = await getDocs(q);
+  
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    streamId: doc.data().streamId,
+    merchantName: doc.data().merchantName,
+    merchantLogoUrl: doc.data().merchantLogoUrl,
+    frequency: doc.data().frequency,
+    amount: doc.data().amount,
+    isApproximate: doc.data().isApproximate,
+    dueDate: doc.data().dueDate,
+    categoryId: doc.data().categoryId,
+    categoryName: doc.data().categoryName,
+    accountId: doc.data().accountId,
+    accountName: doc.data().accountName,
+    accountLogoUrl: doc.data().accountLogoUrl,
+    updatedAt: doc.data().updatedAt?.toDate(),
+  }));
+}
+
 // SETTINGS API
 export async function getSettings(): Promise<Settings> {
   const settingsRef = doc(db, 'settings', 'config');

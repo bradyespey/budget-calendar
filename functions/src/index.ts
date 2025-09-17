@@ -2086,6 +2086,28 @@ export const runAllHttp = functions.region(region).https.onRequest(
         throw error;
       }
       
+      // Step 5: Refresh recurring transactions
+      logger.info("Step 5: Refreshing recurring transactions...");
+      try {
+        // Call storeRecurringTransactions function via HTTP
+        const recurringResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/storeRecurringTransactionsHttp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        
+        if (!recurringResponse.ok) {
+          throw new Error(`Recurring transactions refresh failed: ${recurringResponse.status}`);
+        }
+        
+        const recurringResult = await recurringResponse.json();
+        logger.info("Recurring transactions refresh completed:", recurringResult);
+      } catch (error) {
+        logger.error("Recurring transactions refresh failed:", error);
+        // Don't throw error - this is optional and shouldn't break the workflow
+        logger.warn("Continuing despite recurring transactions refresh failure");
+      }
+      
       logger.info("Run all workflow completed successfully");
       
       // Save timestamp to admin collection
@@ -2209,6 +2231,28 @@ export const runAll = functions.region(region).https.onCall(
       } catch (error) {
         logger.error("Calendar sync failed:", error);
         throw error;
+      }
+      
+      // Step 5: Refresh recurring transactions
+      logger.info("Step 5: Refreshing recurring transactions...");
+      try {
+        // Call storeRecurringTransactions function via HTTP
+        const recurringResponse = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/storeRecurringTransactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        
+        if (!recurringResponse.ok) {
+          throw new Error(`Recurring transactions refresh failed: ${recurringResponse.status}`);
+        }
+        
+        const recurringResult = await recurringResponse.json();
+        logger.info("Recurring transactions refresh completed:", recurringResult);
+      } catch (error) {
+        logger.error("Recurring transactions refresh failed:", error);
+        // Don't throw error - this is optional and shouldn't break the workflow
+        logger.warn("Continuing despite recurring transactions refresh failure");
       }
       
       logger.info("Run all workflow completed successfully");
@@ -3152,3 +3196,379 @@ export const monarchRecurringStreams = functions.region(region).https.onRequest(
       });
     }
   });
+
+// Store recurring transactions in Firestore (for cached access like projections)
+export const storeRecurringTransactions = functions.region(region).https.onCall(
+  async (data, context) => {
+    try {
+      const monarchToken = functions.config().monarch?.token;
+      if (!monarchToken) {
+        throw new functions.https.HttpsError('failed-precondition', 'Monarch token not configured');
+      }
+
+      const monarchApiUrl = "https://api.monarchmoney.com/graphql";
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Token ${monarchToken}`,
+      };
+
+      // Use a future-focused date range to get upcoming instances only
+      const now = new Date();
+      const startDate = now.toISOString().split('T')[0]; // Start from today
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString().split('T')[0]; // End in 3 months
+
+      const query = `
+        query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {
+          recurringTransactionItems(
+            startDate: $startDate
+            endDate: $endDate
+            filters: $filters
+          ) {
+            stream {
+              id
+              frequency
+              amount
+              isApproximate
+              merchant {
+                id
+                name
+                logoUrl
+                __typename
+              }
+              __typename
+            }
+            date
+            category {
+              id
+              name
+              __typename
+            }
+            account {
+              id
+              displayName
+              logoUrl
+              __typename
+            }
+            __typename
+          }
+        }
+      `;
+
+      const response = await fetch(monarchApiUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          operationName: "Web_GetUpcomingRecurringTransactionItems",
+          query: query,
+          variables: {
+            startDate: startDate,
+            endDate: endDate,
+            filters: {}
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new functions.https.HttpsError('unavailable', `Monarch API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.errors) {
+        throw new functions.https.HttpsError('unknown', 'GraphQL errors in Monarch API response', result.errors);
+      }
+
+      const items = result.data?.recurringTransactionItems || [];
+      logger.info(`Fetched ${items.length} recurring transaction items`);
+      
+      // Group items by stream ID and find the most representative due date
+      const streamMap = new Map();
+      
+      items.forEach((item: any) => {
+        if (item.stream) {
+          const streamId = item.stream.id;
+          const itemDate = item.date;
+          
+          if (!streamMap.has(streamId)) {
+            // First occurrence of this stream
+            streamMap.set(streamId, {
+              ...item.stream,
+              category: item.category,
+              account: item.account,
+              dueDate: itemDate,
+              allDates: [itemDate]
+            });
+          } else {
+            const existing = streamMap.get(streamId);
+            existing.allDates.push(itemDate);
+            
+            // Use the earliest upcoming date (since we're only fetching future dates)
+            const existingDate = new Date(existing.dueDate);
+            const itemDateObj = new Date(itemDate);
+            
+            if (itemDateObj < existingDate) {
+              existing.dueDate = itemDate;
+            }
+          }
+        }
+      });
+      
+      const streamArray = Array.from(streamMap.values()).map(stream => ({
+        ...stream,
+        // Remove the allDates field as it's not needed in the response
+        allDates: undefined
+      }));
+
+      logger.info(`Processed ${streamArray.length} unique recurring streams`);
+
+      // Store each stream in Firestore
+      const batch = db.batch();
+      const recurringRef = db.collection('recurring_transactions');
+      
+      // Clear existing data first
+      const existingDocs = await recurringRef.get();
+      existingDocs.docs.forEach((doc: any) => {
+        batch.delete(doc.ref);
+      });
+
+      // Add new data
+      streamArray.forEach((stream: any) => {
+        const docRef = recurringRef.doc(stream.id);
+        batch.set(docRef, {
+          streamId: stream.id,
+          merchantName: stream.merchant?.name || 'Unknown',
+          merchantLogoUrl: stream.merchant?.logoUrl || null,
+          frequency: stream.frequency,
+          amount: stream.amount,
+          isApproximate: stream.isApproximate || false,
+          dueDate: stream.dueDate,
+          categoryId: stream.category?.id || null,
+          categoryName: stream.category?.name || null,
+          accountId: stream.account?.id || null,
+          accountName: stream.account?.displayName || null,
+          accountLogoUrl: stream.account?.logoUrl || null,
+          updatedAt: new Date(),
+        });
+      });
+
+      await batch.commit();
+
+      // Update settings with last updated timestamp
+      const settingsRef = db.collection('settings').doc('main');
+      await settingsRef.set({
+        lastRecurringUpdateAt: new Date()
+      }, { merge: true });
+
+      logger.info(`Successfully stored ${streamArray.length} recurring transactions in Firestore`);
+
+      return {
+        success: true,
+        count: streamArray.length,
+        updatedAt: new Date().toISOString()
+      };
+
+    } catch (error: any) {
+      logger.error('storeRecurringTransactions error:', error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError('internal', 'Failed to store recurring transactions', error.message);
+    }
+  }
+);
+
+// HTTP version of storeRecurringTransactions for nightly automation
+export const storeRecurringTransactionsHttp = functions.region(region).https.onRequest(
+  async (req, res) => {
+    // Handle CORS
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+
+    try {
+      const monarchToken = functions.config().monarch?.token;
+      if (!monarchToken) {
+        res.status(500).json({ error: 'Monarch token not configured' });
+        return;
+      }
+
+      const monarchApiUrl = "https://api.monarchmoney.com/graphql";
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Token ${monarchToken}`,
+      };
+
+      // Use a future-focused date range to get upcoming instances only
+      const now = new Date();
+      const startDate = now.toISOString().split('T')[0]; // Start from today
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString().split('T')[0]; // End in 3 months
+
+      const query = `
+        query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {
+          recurringTransactionItems(
+            startDate: $startDate
+            endDate: $endDate
+            filters: $filters
+          ) {
+            stream {
+              id
+              frequency
+              amount
+              isApproximate
+              merchant {
+                id
+                name
+                logoUrl
+                __typename
+              }
+              __typename
+            }
+            date
+            category {
+              id
+              name
+              __typename
+            }
+            account {
+              id
+              displayName
+              logoUrl
+              __typename
+            }
+            __typename
+          }
+        }
+      `;
+
+      const response = await fetch(monarchApiUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          operationName: "Web_GetUpcomingRecurringTransactionItems",
+          query: query,
+          variables: {
+            startDate: startDate,
+            endDate: endDate,
+            filters: {}
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        res.status(500).json({ error: `Monarch API error: ${response.status}` });
+        return;
+      }
+
+      const result = await response.json();
+      
+      if (result.errors) {
+        res.status(500).json({ 
+          error: 'GraphQL errors in Monarch API response',
+          details: result.errors
+        });
+        return;
+      }
+
+      const items = result.data?.recurringTransactionItems || [];
+      logger.info(`Fetched ${items.length} recurring transaction items`);
+      
+      // Group items by stream ID and find the most representative due date
+      const streamMap = new Map();
+      
+      items.forEach((item: any) => {
+        if (item.stream) {
+          const streamId = item.stream.id;
+          const itemDate = item.date;
+          
+          if (!streamMap.has(streamId)) {
+            // First occurrence of this stream
+            streamMap.set(streamId, {
+              ...item.stream,
+              category: item.category,
+              account: item.account,
+              dueDate: itemDate,
+              allDates: [itemDate]
+            });
+          } else {
+            const existing = streamMap.get(streamId);
+            existing.allDates.push(itemDate);
+            
+            // Use the earliest upcoming date (since we're only fetching future dates)
+            const existingDate = new Date(existing.dueDate);
+            const itemDateObj = new Date(itemDate);
+            
+            if (itemDateObj < existingDate) {
+              existing.dueDate = itemDate;
+            }
+          }
+        }
+      });
+      
+      const streamArray = Array.from(streamMap.values()).map(stream => ({
+        ...stream,
+        // Remove the allDates field as it's not needed in the response
+        allDates: undefined
+      }));
+
+      logger.info(`Processed ${streamArray.length} unique recurring streams`);
+
+      // Store each stream in Firestore
+      const batch = db.batch();
+      const recurringRef = db.collection('recurring_transactions');
+      
+      // Clear existing data first
+      const existingDocs = await recurringRef.get();
+      existingDocs.docs.forEach((doc: any) => {
+        batch.delete(doc.ref);
+      });
+
+      // Add new data
+      streamArray.forEach((stream: any) => {
+        const docRef = recurringRef.doc(stream.id);
+        batch.set(docRef, {
+          streamId: stream.id,
+          merchantName: stream.merchant?.name || 'Unknown',
+          merchantLogoUrl: stream.merchant?.logoUrl || null,
+          frequency: stream.frequency,
+          amount: stream.amount,
+          isApproximate: stream.isApproximate || false,
+          dueDate: stream.dueDate,
+          categoryId: stream.category?.id || null,
+          categoryName: stream.category?.name || null,
+          accountId: stream.account?.id || null,
+          accountName: stream.account?.displayName || null,
+          accountLogoUrl: stream.account?.logoUrl || null,
+          updatedAt: new Date(),
+        });
+      });
+
+      await batch.commit();
+
+      // Update settings with last updated timestamp
+      const settingsRef = db.collection('settings').doc('main');
+      await settingsRef.set({
+        lastRecurringUpdateAt: new Date()
+      }, { merge: true });
+
+      logger.info(`Successfully stored ${streamArray.length} recurring transactions in Firestore`);
+
+      res.status(200).json({
+        success: true,
+        count: streamArray.length,
+        updatedAt: new Date().toISOString()
+      });
+
+    } catch (error: any) {
+      logger.error('storeRecurringTransactionsHttp error:', error);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        details: error.message 
+      });
+    }
+  }
+);

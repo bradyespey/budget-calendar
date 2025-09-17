@@ -122,49 +122,103 @@ export function RecurringPage() {
   }, [searchTerm]);
 
   const fetchRecurringTransactions = useCallback(async () => {
-    // Check cache first
-    const cacheKey = 'monarch-recurring-streams';
-    const cachedData = apiCache.get(cacheKey);
-    if (cachedData) {
-      setRecurringData(cachedData);
-      setLastFetch(new Date());
-      return;
-    }
-
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/monarchRecurringStreams', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      // Import here to avoid circular dependencies
+      const { getRecurringTransactions } = await import('../api/firebase');
+      const recurringTransactions = await getRecurringTransactions();
       
-      // Transform streams data to match the expected format
+      // If no data in database, trigger a refresh automatically
+      if (recurringTransactions.length === 0) {
+        console.log('No recurring transactions in database, triggering refresh...');
+        try {
+          const { httpsCallable } = await import('firebase/functions');
+          const { functions } = await import('../lib/firebaseConfig');
+          const storeRecurring = httpsCallable(functions, 'storeRecurringTransactions');
+          await storeRecurring({});
+          
+          // Fetch again after refresh
+          const refreshedTransactions = await getRecurringTransactions();
+          if (refreshedTransactions.length > 0) {
+            console.log(`Auto-refreshed and found ${refreshedTransactions.length} recurring transactions`);
+            // Continue with the refreshed data
+            const transformedResult = {
+              success: true,
+              count: refreshedTransactions.length,
+              transactions: refreshedTransactions.map((transaction) => ({
+                stream: {
+                  id: transaction.streamId,
+                  frequency: transaction.frequency,
+                  amount: transaction.amount,
+                  isApproximate: transaction.isApproximate,
+                  merchant: {
+                    id: transaction.streamId,
+                    name: transaction.merchantName,
+                    logoUrl: transaction.merchantLogoUrl
+                  }
+                },
+                date: transaction.dueDate,
+                isPast: false,
+                transactionId: null,
+                amount: transaction.amount,
+                amountDiff: 0,
+                category: {
+                  id: transaction.categoryId,
+                  name: transaction.categoryName
+                },
+                account: {
+                  id: transaction.accountId,
+                  displayName: transaction.accountName,
+                  logoUrl: transaction.accountLogoUrl
+                }
+              }))
+            };
+            
+            setRecurringData(transformedResult);
+            setLastFetch(new Date());
+            return;
+          }
+        } catch (refreshError) {
+          console.warn('Auto-refresh failed:', refreshError);
+          // Continue with empty data rather than failing
+        }
+      }
+      
+      // Transform database data to match expected format
       const transformedResult = {
-        ...result,
-        transactions: result.streams?.map((stream: any) => ({
-          stream: stream,
-          date: stream.dueDate || null,
+        success: true,
+        count: recurringTransactions.length,
+        transactions: recurringTransactions.map((transaction) => ({
+          stream: {
+            id: transaction.streamId,
+            frequency: transaction.frequency,
+            amount: transaction.amount,
+            isApproximate: transaction.isApproximate,
+            merchant: {
+              id: transaction.streamId, // Use streamId as merchant ID
+              name: transaction.merchantName,
+              logoUrl: transaction.merchantLogoUrl
+            }
+          },
+          date: transaction.dueDate,
           isPast: false,
           transactionId: null,
-          amount: stream.amount,
+          amount: transaction.amount,
           amountDiff: 0,
-          category: stream.category,
-          account: stream.account
-        })) || []
+          category: {
+            id: transaction.categoryId,
+            name: transaction.categoryName
+          },
+          account: {
+            id: transaction.accountId,
+            displayName: transaction.accountName,
+            logoUrl: transaction.accountLogoUrl
+          }
+        }))
       };
       
-      // Cache the result for 5 minutes
-      apiCache.set(cacheKey, transformedResult, 5 * 60 * 1000);
       setRecurringData(transformedResult);
       setLastFetch(new Date());
     } catch (err) {

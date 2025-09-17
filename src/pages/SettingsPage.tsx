@@ -26,6 +26,8 @@ import {
 } from '../api/accounts'
 import { triggerManualRecalculation } from '../api/projections'
 import { syncCalendar, getSettings, updateSettings, clearCalendars, getFunctionTimestamps, saveFunctionTimestamp } from '../api/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { functions } from '../lib/firebaseConfig'
 import { useBalance } from '../context/BalanceContext'
 import { useLocation } from 'react-router-dom'
 import { importBillsFromCSV } from '../utils/importBills'
@@ -95,6 +97,7 @@ export function SettingsPage() {
     resetAllTransactionIcons?: Date;
     backupTransactionIcons?: Date;
     restoreTransactionIcons?: Date;
+    storeRecurringTransactions?: Date;
     runAll?: Date;
   }>({});
 
@@ -279,6 +282,28 @@ export function SettingsPage() {
       }
     } catch (e: any) {
       showNotification(`Error syncing calendar: ${e.message}`, 'error');
+    } finally {
+      setBusy(false);
+      setActiveAction(null);
+    }
+  }
+
+  async function handleRefreshRecurring() {
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+    setBusy(true);
+    setActiveAction('recurring');
+    try {
+      await saveSettings();
+      
+      // Call Firebase Cloud Function to store recurring transactions
+      const storeRecurring = httpsCallable(functions, 'storeRecurringTransactions');
+      const result = await storeRecurring({});
+      
+      await saveFunctionTimestampLocal('storeRecurringTransactions');
+      
+      showNotification(`Recurring transactions refreshed. Stored ${result.data.count} transactions.`, 'success');
+    } catch (e: any) {
+      showNotification(`Error refreshing recurring transactions: ${e.message}`, 'error');
     } finally {
       setBusy(false);
       setActiveAction(null);
@@ -531,7 +556,7 @@ export function SettingsPage() {
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('all');
-    setRunAllStep('Step 1/5: Refreshing Accounts...');
+    setRunAllStep('Step 1/6: Refreshing Accounts...');
     try {
       // 1. Refresh Accounts (ignore errors)
       try {
@@ -542,10 +567,10 @@ export function SettingsPage() {
         // ignore error
       }
       // 2. Wait 60 seconds
-      setRunAllStep('Step 2/5: Waiting 60 seconds for account refresh...');
+      setRunAllStep('Step 2/6: Waiting 60 seconds for account refresh...');
       await new Promise(res => setTimeout(res, 60000));
       // 3. Update Balance (ignore errors)
-      setRunAllStep('Step 3/5: Updating Balance...');
+      setRunAllStep('Step 3/6: Updating Balance...');
       try {
         await saveSettings();
         const bal = await refreshChaseBalanceInDb();
@@ -557,7 +582,7 @@ export function SettingsPage() {
         // ignore error
       }
       // 4. Budget Projection (must finish)
-      setRunAllStep('Step 4/5: Running Budget Projection...');
+      setRunAllStep('Step 4/6: Running Budget Projection...');
       try {
         await saveSettings();
         await triggerManualRecalculation();
@@ -570,7 +595,7 @@ export function SettingsPage() {
         return;
       }
       // 5. Sync Calendar (must finish)
-      setRunAllStep('Step 5/5: Syncing Calendar...');
+      setRunAllStep('Step 5/6: Syncing Calendar...');
       try {
         await saveSettings();
         
@@ -583,6 +608,15 @@ export function SettingsPage() {
         setActiveAction(null);
         setRunAllStep(null);
         return;
+      }
+      // 6. Refresh Recurring Transactions (ignore errors)
+      setRunAllStep('Step 6/6: Refreshing Recurring Transactions...');
+      try {
+        const storeRecurring = httpsCallable(functions, 'storeRecurringTransactions');
+        await storeRecurring({});
+        await saveFunctionTimestampLocal('storeRecurringTransactions');
+      } catch (e) {
+        // ignore error - this is optional
       }
       await saveFunctionTimestampLocal('runAll');
       showNotification('All actions completed successfully.', 'success');
@@ -738,6 +772,16 @@ export function SettingsPage() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Syncs the budget projection with Google Calendar</p>
                 {showTimestamps && (
                   <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.syncCalendar)}</p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-green-600 hover:bg-green-700 text-white rounded-full shadow" onClick={handleRefreshRecurring} disabled={busy}>
+                  {busy && activeAction === 'recurring' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="recurring">🔄</span>}
+                  Refresh Recurring
+                </Button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Refreshes recurring transactions data from Monarch API</p>
+                {showTimestamps && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.storeRecurringTransactions)}</p>
                 )}
               </div>
             </div>

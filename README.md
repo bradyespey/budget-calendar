@@ -2,9 +2,9 @@
 **Scope**: This README replaces prior selected overview docs
 
 ## Overview
-Full-stack financial forecasting web app that syncs real-time checking account balances via Monarch Money API, calculates projected cash flow, and displays upcoming bills/income in a calendar UI. Features intelligent recurring transaction comparison between Monarch Money and manual bills with exact matching validation. Supports manual updates and automated nightly workflows.
+Full-stack financial forecasting web app that syncs real-time checking account balances via Monarch Money API, calculates projected cash flow, and displays upcoming bills/income in a calendar UI. Features intelligent recurring transaction comparison between Monarch Money and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality. Supports manual updates and automated nightly workflows.
 
-Originally built using Python, Flask, Google Apps Script, and Google Sheets, the system has since been fully rebuilt using React, Firebase, and modern cloud-native tooling. The early version parsed spreadsheets and pushed projections to Google Calendar via GAS.
+Originally built using Python, Flask, Google Apps Script, and Google Sheets, the system has since been fully rebuilt using React, Firebase, and modern cloud-native tooling.
 
 ## Live and Admin
 - 🌐 **App URL**: https://budget.theespeys.com
@@ -62,7 +62,7 @@ VITE_DEBUG_MODE=true
 - **refreshAccounts**: Triggers Monarch account refresh via Flask API
 - **chaseBalance**: Fetches and saves latest Chase balance from Monarch
 - **monarchTest**: Tests Monarch Money API connectivity (accounts, categories, merchants)
-- **monarchRecurringTransactions**: Fetches recurring transactions from Monarch Money API
+- **monarchRecurringStreams**: Fetches all unique recurring transaction streams with next upcoming due dates
 - **budgetProjection**: Complete projection calculation with complex scheduling logic
 - **syncCalendar**: Google Calendar integration with batch processing and duplicate prevention
 - **clearCalendars**: Clears all events from Google Calendars
@@ -92,38 +92,44 @@ VITE_DEBUG_MODE=true
 - **Domains**: budget.theespeys.com (primary), budgetcalendar.netlify.app
 
 ## App Pages / Routes
-- 📊 **Dashboard**: Current balance and financial status overview with low balance alerts
-- 💳 **Transactions**: Advanced management with duplicate functionality, icon customization, clickable filtering, enhanced search, mobile-optimized layout
-- 🔄 **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation
-- 📅 **Upcoming**: Calendar view of upcoming bills, income, projected balances
-- ⚙️ **Settings**: Projection settings, manual triggers, import/export, maintenance functions with admin timestamps
+- **Dashboard**: Current balance and financial status overview with low balance alerts
+- **Transactions**: Advanced management with duplicate functionality, icon customization, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting on all columns
+- **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality
+- **Upcoming**: Calendar view of upcoming bills, income, projected balances
+- **Settings**: Projection settings, manual triggers, import/export, maintenance functions with admin timestamps
 
 ## Directory Map
 ```
 Budget/
 ├── src/                    # React frontend
-│   ├── components/        # UI components
-│   ├── pages/            # App pages (Dashboard, Transactions, Upcoming, Settings)
-│   ├── context/          # Auth and balance context
-│   ├── api/              # Firebase function calls
-│   └── utils/            # Helper functions
-├── functions/src/         # Firebase Cloud Functions
-├── flask/                 # Flask API server
-│   └── app.py            # Main API endpoints
+│   ├── components/        # UI components (Button, Card, Input, etc)
+│   ├── pages/            # App pages (Dashboard, Transactions, Recurring, Upcoming, Settings)
+│   ├── context/          # Auth and balance context providers
+│   ├── api/              # Firebase function calls and data access
+│   ├── types/            # TypeScript type definitions
+│   └── utils/            # Helper functions and validation
+├── functions/src/         # Firebase Cloud Functions (us-central1)
+├── flask/                 # Flask API server (api.theespeys.com)
+│   ├── app.py            # Main API endpoints
+│   ├── scripts/          # Selenium automation scripts
+│   └── docs/             # Flask-specific documentation
 ├── scripts/               # Automation and migration scripts
 ├── .github/workflows/     # GitHub Actions automation
-└── netlify.toml          # Netlify configuration
+├── netlify.toml          # Netlify configuration
+├── firebase.json         # Firebase configuration
+└── package.json          # Node.js dependencies and scripts
 ```
 
 ## Troubleshooting
-- 🔗 **CORS Issues**: Resolved by using Firebase callable functions (HTTPS onCall)
-- ⏱️ **Function Timeouts**: Large operations use batch processing with 9-minute timeout
-- 🔄 **Duplicate Events**: Intelligent comparison prevents duplicates, automatic cleanup removes extras
-- 📦 **Large Syncs**: 50-day batch processing prevents timeouts on 100+ day operations
-- 🌐 **Chrome Profile Issues**: Run `setup_chrome_profile.py` to create initial profile for Monarch Money login
-- 🔄 **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
-- 🔄 **Monarch API**: Uses GraphQL `Web_GetUpcomingRecurringTransactionItems` operation for recurring transactions
-- ✅ **Exact Matching**: Recurring comparison uses zero tolerance for amount matching to ensure data accuracy
+- **CORS Issues**: Resolved by using Firebase callable functions (HTTPS onCall)
+- **Function Timeouts**: Large operations use batch processing with 9-minute timeout
+- **Duplicate Events**: Intelligent comparison prevents duplicates, automatic cleanup removes extras
+- **Large Syncs**: 50-day batch processing prevents timeouts on 100+ day operations
+- **Chrome Profile Issues**: Run `setup_chrome_profile.py` to create initial profile for Monarch Money login
+- **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
+- **Monarch API**: Uses GraphQL `Web_GetUpcomingRecurringTransactionItems` operation for recurring transactions
+- **Data Matching**: Zero tolerance amount matching, timezone-safe date comparison, frequency-aware matching with repeats_every logic
+- **Date Range**: Focused queries return next upcoming instances instead of distant future dates
 
 ## AI Handoff
 Read this README, scan the repo, prioritize core functions and env-safe areas, keep env and rules aligned with this file

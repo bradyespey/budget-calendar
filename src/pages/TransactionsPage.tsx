@@ -1,6 +1,6 @@
 //src/pages/TransactionsPage.tsx
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Layout } from '../components/Layout/Layout';
 import { Plus, Edit2, Trash2, Check, X, Copy, ImageIcon, RotateCcw } from 'lucide-react';
@@ -15,9 +15,10 @@ import { getBills, createBill, updateBill, deleteBill } from '../api/bills';
 import { getCategories, Category } from '../api/categories';
 import { Bill } from '../types';
 import { format, parseISO } from 'date-fns';
+import { apiCache } from '../utils/apiCache';
 
 type FormMode = 'create' | 'edit' | 'view';
-type SortField = 'name' | 'category' | 'amount' | 'frequency' | 'start_date' | 'owner';
+type SortField = 'name' | 'category' | 'amount' | 'frequency' | 'start_date' | 'end_date' | 'owner';
 type SortDirection = 'asc' | 'desc';
 
 const FREQUENCY_OPTIONS = [
@@ -185,9 +186,20 @@ export function TransactionsPage() {
     }
   };
 
+  // Debounced search term to prevent excessive filtering
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     filterAndSortBills();
-  }, [bills, searchTerm, categoryFilter, frequencyFilter, ownerFilter, sortField, sortDirection]);
+  }, [bills, debouncedSearchTerm, categoryFilter, frequencyFilter, ownerFilter, sortField, sortDirection]);
 
   useEffect(() => {
     // If editing or creating a paycheck, force type to income and disable toggle
@@ -205,10 +217,20 @@ export function TransactionsPage() {
     setSortDirection('asc');
   };
 
-  const fetchBills = async (preserveScroll = false) => {
+  const fetchBills = useCallback(async (preserveScroll = false) => {
+    // Check cache first
+    const cacheKey = 'bills';
+    const cachedData = apiCache.get(cacheKey);
+    if (cachedData) {
+      setBills(cachedData);
+      return;
+    }
+
     try {
       setLoading(true);
       const data = await getBills();
+      // Cache bills for 10 minutes
+      apiCache.set(cacheKey, data, 10 * 60 * 1000);
       setBills(data);
     } catch (error) {
       console.error('Error fetching bills:', error);
@@ -227,16 +249,26 @@ export function TransactionsPage() {
         }, 100);
       }
     }
-  };
+  }, [scrollPosition, deletedItemId]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
+    // Check cache first
+    const cacheKey = 'categories';
+    const cachedData = apiCache.get(cacheKey);
+    if (cachedData) {
+      setCategories(cachedData);
+      return;
+    }
+
     try {
       const data = await getCategories();
+      // Cache categories for 30 minutes
+      apiCache.set(cacheKey, data, 30 * 60 * 1000);
       setCategories(data);
     } catch (error) {
       console.error('Error fetching categories:', error);
       // Fallback to hardcoded categories if API fails
-      setCategories([
+      const fallbackCategories = [
         { id: '1', name: 'auto', created_at: '', transaction_count: 0 },
         { id: '2', name: 'cloud storage', created_at: '', transaction_count: 0 },
         { id: '3', name: 'counseling', created_at: '', transaction_count: 0 },
@@ -256,19 +288,21 @@ export function TransactionsPage() {
         { id: '17', name: 'transfer', created_at: '', transaction_count: 0 },
         { id: '18', name: 'travel', created_at: '', transaction_count: 0 },
         { id: '19', name: 'utilities', created_at: '', transaction_count: 0 },
-      ]);
+      ];
+      setCategories(fallbackCategories);
     }
-  };
+  }, []);
 
-  const filterAndSortBills = () => {
+  const filterAndSortBills = useCallback(() => {
     let filtered = [...bills];
     
-    if (searchTerm) {
+    if (debouncedSearchTerm) {
+      const lowerSearchTerm = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(bill => 
-        bill.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bill.note?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        Math.abs(bill.amount).toString().includes(searchTerm) ||
-        formatCurrency(bill.amount).includes(searchTerm)
+        bill.name.toLowerCase().includes(lowerSearchTerm) ||
+        bill.note?.toLowerCase().includes(lowerSearchTerm) ||
+        Math.abs(bill.amount).toString().includes(debouncedSearchTerm) ||
+        formatCurrency(bill.amount).includes(debouncedSearchTerm)
       );
     }
     
@@ -304,6 +338,9 @@ export function TransactionsPage() {
         case 'start_date':
           comparison = new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
           break;
+        case 'end_date':
+          comparison = new Date(a.end_date || 0).getTime() - new Date(b.end_date || 0).getTime();
+          break;
         case 'owner':
           comparison = (a.owner || '').localeCompare(b.owner || '');
           break;
@@ -313,7 +350,7 @@ export function TransactionsPage() {
     });
     
     setFilteredBills(filtered);
-  };
+  }, [bills, debouncedSearchTerm, categoryFilter, frequencyFilter, ownerFilter, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (field === sortField) {
@@ -468,8 +505,8 @@ export function TransactionsPage() {
   };
 
   const getSortIcon = (field: SortField) => {
-    if (field !== sortField) return '↕️';
-    return sortDirection === 'asc' ? '↑' : '↓';
+    if (field !== sortField) return '';
+    return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
   const handleCategoryClick = (category: string) => {
@@ -790,7 +827,12 @@ export function TransactionsPage() {
                     >
                       Start Date {getSortIcon('start_date')}
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">End Date</th>
+                    <th 
+                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => handleSort('end_date')}
+                    >
+                      End Date{getSortIcon('end_date')}
+                    </th>
                     <th 
                       className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
                       onClick={() => handleSort('owner')}

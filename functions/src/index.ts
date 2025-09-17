@@ -2981,3 +2981,174 @@ export const monarchRecurringTransactions = functions.region(region).https.onReq
       });
     }
   });
+
+/**
+ * 🔄 Get All Recurring Streams Function
+ * Fetches all unique recurring transaction streams from Monarch Money
+ * This provides the "All recurring" view with each transaction appearing only once
+ * Uses wide date range to capture all instances, then extracts unique streams
+ */
+export const monarchRecurringStreams = functions.region(region).https.onRequest(
+  async (req, res) => {
+    // Handle CORS
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+    
+    try {
+      logger.info("Getting all unique recurring transaction streams from Monarch Money");
+      const config = functions.config();
+      const monarchToken = config.monarch?.token;
+      
+      if (!monarchToken) {
+        res.status(500).json({ error: 'Missing monarch.token in Firebase config' });
+        return;
+      }
+
+      const monarchApiUrl = "https://api.monarchmoney.com/graphql";
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Token ${monarchToken}`,
+      };
+
+      // Use a future-focused date range to get upcoming instances only
+      const now = new Date();
+      const startDate = now.toISOString().split('T')[0]; // Start from today
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString().split('T')[0]; // End in 3 months
+
+      const query = `
+        query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {
+          recurringTransactionItems(
+            startDate: $startDate
+            endDate: $endDate
+            filters: $filters
+          ) {
+            stream {
+              id
+              frequency
+              amount
+              isApproximate
+              merchant {
+                id
+                name
+                logoUrl
+                __typename
+              }
+              __typename
+            }
+            date
+            category {
+              id
+              name
+              __typename
+            }
+            account {
+              id
+              displayName
+              logoUrl
+              __typename
+            }
+            __typename
+          }
+        }
+      `;
+
+      const response = await fetch(monarchApiUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          operationName: "Web_GetUpcomingRecurringTransactionItems",
+          query: query,
+          variables: {
+            startDate: startDate,
+            endDate: endDate,
+            filters: {}
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        res.status(500).json({ error: `Monarch API error: ${response.status}` });
+        return;
+      }
+
+      const result = await response.json();
+      
+      if (result.errors) {
+        res.status(500).json({ 
+          error: 'GraphQL errors in Monarch API response',
+          details: result.errors
+        });
+        return;
+      }
+
+      const items = result.data?.recurringTransactionItems || [];
+      logger.info(`Fetched ${items.length} recurring transaction items`);
+      
+      // Group items by stream ID and find the most representative due date
+      const streamMap = new Map();
+      
+      items.forEach((item: any) => {
+        if (item.stream) {
+          const streamId = item.stream.id;
+          const itemDate = item.date;
+          
+          if (!streamMap.has(streamId)) {
+            // First occurrence of this stream
+            streamMap.set(streamId, {
+              ...item.stream,
+              category: item.category,
+              account: item.account,
+              dueDate: itemDate,
+              allDates: [itemDate]
+            });
+          } else {
+            const existing = streamMap.get(streamId);
+            existing.allDates.push(itemDate);
+            
+            // Use the earliest upcoming date (since we're only fetching future dates)
+            const existingDate = new Date(existing.dueDate);
+            const itemDateObj = new Date(itemDate);
+            
+            if (itemDateObj < existingDate) {
+              existing.dueDate = itemDate;
+            }
+          }
+        }
+      });
+      
+      const streamArray = Array.from(streamMap.values()).map(stream => ({
+        ...stream,
+        // Remove the allDates field as it's not needed in the response
+        allDates: undefined
+      }));
+      logger.info(`Extracted ${streamArray.length} unique recurring streams`);
+      
+      // Count frequencies for logging
+      const frequencies: Record<string, number> = {};
+      streamArray.forEach((stream: any) => {
+        frequencies[stream.frequency] = (frequencies[stream.frequency] || 0) + 1;
+      });
+      logger.info(`Frequency distribution: ${JSON.stringify(frequencies)}`);
+      
+      res.status(200).json({
+        success: true,
+        count: streamArray.length,
+        streams: streamArray,
+        frequencies: frequencies,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error("Error getting recurring transaction streams:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString()
+      });
+    }
+  });

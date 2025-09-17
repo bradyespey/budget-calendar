@@ -756,9 +756,9 @@ export function TransactionsPage() {
       {mode === 'view' && (
         <Card className="w-full">
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[80vh]">
               <table className="w-full min-w-[700px]">
-                <thead>
+                <thead className="sticky top-0 z-50 bg-gray-800 dark:bg-gray-800">
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <th 
                       className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"

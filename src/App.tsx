@@ -10,6 +10,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { TransactionsPage } from './pages/TransactionsPage'
 import { UpcomingPage } from './pages/UpcomingPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { RecurringPage } from './pages/RecurringPage'
 
 
 function App() {
@@ -52,6 +53,14 @@ function App() {
             element={
               <RequireAuth>
                 <Layout><SettingsPage /></Layout>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/recurring"
+            element={
+              <RequireAuth>
+                <Layout><RecurringPage /></Layout>
               </RequireAuth>
             }
           />

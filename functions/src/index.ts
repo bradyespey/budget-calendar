@@ -2750,3 +2750,234 @@ export const getIconBackupInfo = functions.region(region).https.onCall(
     }
   }
 );
+
+/**
+ * 🔍 Monarch Test Function
+ * Tests available Monarch Money GraphQL endpoints
+ */
+export const monarchTest = functions.region(region).https.onRequest(
+  async (req, res) => {
+    // Handle CORS
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+    
+    try {
+      logger.info("Testing Monarch Money API endpoints");
+      const config = functions.config();
+      const monarchToken = config.monarch?.token;
+      
+      if (!monarchToken) {
+        res.status(500).json({ error: 'Missing monarch.token in Firebase config' });
+        return;
+      }
+
+      const monarchApiUrl = "https://api.monarchmoney.com/graphql";
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Token ${monarchToken}`,
+      };
+
+      // Test the three known working endpoints
+      const [accountsResponse, categoriesResponse, merchantsResponse] = await Promise.all([
+        fetch(monarchApiUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            operationName: "GetAccounts",
+            query: `query GetAccounts { accounts { id displayName displayBalance } }`
+          }),
+        }),
+        fetch(monarchApiUrl, {
+          method: "POST", 
+          headers,
+          body: JSON.stringify({
+            operationName: "GetCategories",
+            query: `query GetCategories { categories { id name } }`
+          }),
+        }),
+        fetch(monarchApiUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            operationName: "GetMerchants", 
+            query: `query GetMerchants { merchants { id name } }`
+          }),
+        })
+      ]);
+
+      if (!accountsResponse.ok || !categoriesResponse.ok || !merchantsResponse.ok) {
+        res.status(500).json({ error: 'One or more Monarch API calls failed' });
+        return;
+      }
+
+      const [accountsData, categoriesData, merchantsData] = await Promise.all([
+        accountsResponse.json(),
+        categoriesResponse.json(),
+        merchantsResponse.json()
+      ]);
+
+      // Check for GraphQL errors
+      if (accountsData.errors || categoriesData.errors || merchantsData.errors) {
+        res.status(500).json({ 
+          error: 'GraphQL errors in Monarch API responses',
+          details: {
+            accounts: accountsData.errors,
+            categories: categoriesData.errors, 
+            merchants: merchantsData.errors
+          }
+        });
+        return;
+      }
+
+      logger.info("Successfully fetched Monarch data");
+      
+      res.status(200).json({
+        accounts: accountsData.data.accounts || [],
+        categories: categoriesData.data.categories || [],
+        merchants: merchantsData.data.merchants || [],
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error("Error in Monarch test:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+/**
+ * 🔄 Get Recurring Transactions Function
+ * Fetches recurring transactions from Monarch Money using the working GraphQL operation
+ */
+export const monarchRecurringTransactions = functions.region(region).https.onRequest(
+  async (req, res) => {
+    // Handle CORS
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+    
+    try {
+      logger.info("Getting recurring transactions from Monarch Money");
+      const config = functions.config();
+      const monarchToken = config.monarch?.token;
+      
+      if (!monarchToken) {
+        res.status(500).json({ error: 'Missing monarch.token in Firebase config' });
+        return;
+      }
+
+      // Get date range (current month by default)
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      
+      const startDate = startOfMonth.toISOString().split('T')[0];
+      const endDate = endOfMonth.toISOString().split('T')[0];
+
+      const monarchApiUrl = "https://api.monarchmoney.com/graphql";
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Token ${monarchToken}`,
+      };
+
+      const query = `
+        query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {
+          recurringTransactionItems(
+            startDate: $startDate
+            endDate: $endDate
+            filters: $filters
+          ) {
+            stream {
+              id
+              frequency
+              amount
+              isApproximate
+              merchant {
+                id
+                name
+                logoUrl
+                __typename
+              }
+              __typename
+            }
+            date
+            isPast
+            transactionId
+            amount
+            amountDiff
+            category {
+              id
+              name
+              __typename
+            }
+            account {
+              id
+              displayName
+              logoUrl
+              __typename
+            }
+            __typename
+          }
+        }
+      `;
+
+      const response = await fetch(monarchApiUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          operationName: "Web_GetUpcomingRecurringTransactionItems",
+          query: query,
+          variables: {
+            startDate: startDate,
+            endDate: endDate,
+            filters: {}
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        res.status(500).json({ error: `Monarch API error: ${response.status}` });
+        return;
+      }
+
+      const result = await response.json();
+      
+      if (result.errors) {
+        res.status(500).json({ 
+          error: 'GraphQL errors in Monarch API response',
+          details: result.errors
+        });
+        return;
+      }
+
+      logger.info(`Successfully fetched ${result.data?.recurringTransactionItems?.length || 0} recurring transactions`);
+      
+      res.status(200).json({
+        success: true,
+        count: result.data?.recurringTransactionItems?.length || 0,
+        transactions: result.data?.recurringTransactionItems || [],
+        dateRange: { startDate, endDate },
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error("Error getting recurring transactions:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString()
+      });
+    }
+  });

@@ -223,6 +223,7 @@ export function TransactionsPage() {
     const cachedData = apiCache.get(cacheKey);
     if (cachedData) {
       setBills(cachedData);
+      setLoading(false); // Fix: Always set loading to false
       return;
     }
 

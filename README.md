@@ -95,7 +95,7 @@ VITE_DEBUG_MODE=true
 
 ## App Pages / Routes
 - **Dashboard**: Current balance and financial status overview with low balance alerts
-- **Transactions**: Advanced management with duplicate functionality, icon customization, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting on all columns
+- **Transactions**: Advanced management with duplicate functionality, icon customization, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting on all columns, Monarch status tracking with visual indicators
 - **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality
 - **Upcoming**: Calendar view of upcoming bills, income, projected balances
 - **Settings**: Projection settings, manual triggers, import/export, maintenance functions with admin timestamps
@@ -131,9 +131,10 @@ Budget/
 - **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
 - **Monarch API**: Uses GraphQL `Web_GetUpcomingRecurringTransactionItems` operation for recurring transactions
 - **Data Matching**: Zero tolerance amount matching, timezone-safe date comparison, frequency-aware matching with repeats_every logic
-- **Date Range**: Future-focused queries (today to 3 months) return next immediate upcoming dates matching Monarch UI exactly
+- **Date Range**: Extended queries (today to 1.5 years) capture all yearly transactions, return next immediate upcoming dates matching Monarch UI exactly
 - **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes
 - **Loading States**: Fixed infinite loading on Transactions page when using cached data
+- **Monarch Status**: Added reverse matching (bills → Monarch) with visual indicators and status filtering
 
 ## AI Handoff
 Read this README, scan the repo, prioritize core functions and env-safe areas, keep env and rules aligned with this file

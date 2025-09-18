@@ -13,12 +13,13 @@ import { TransactionIcon } from '../components/TransactionIcon';
 import { updateTransactionIcon, resetTransactionIcon } from '../api/icons';
 import { getBills, createBill, updateBill, deleteBill } from '../api/bills';
 import { getCategories, Category } from '../api/categories';
+import { getRecurringTransactions, RecurringTransaction } from '../api/firebase';
 import { Bill } from '../types';
 import { format, parseISO } from 'date-fns';
 import { apiCache } from '../utils/apiCache';
 
 type FormMode = 'create' | 'edit' | 'view';
-type SortField = 'name' | 'category' | 'amount' | 'frequency' | 'start_date' | 'end_date' | 'owner';
+type SortField = 'name' | 'category' | 'amount' | 'frequency' | 'start_date' | 'end_date' | 'owner' | 'monarch_status';
 type SortDirection = 'asc' | 'desc';
 
 const FREQUENCY_OPTIONS = [
@@ -148,11 +149,14 @@ export function TransactionsPage() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [filteredBills, setFilteredBills] = useState<Bill[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [monarchTransactions, setMonarchTransactions] = useState<RecurringTransaction[]>([]);
+  const [billsWithMonarchStatus, setBillsWithMonarchStatus] = useState<(Bill & { monarchStatus: 'found' | 'missing' })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [frequencyFilter, setFrequencyFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
+  const [monarchStatusFilter, setMonarchStatusFilter] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [mode, setMode] = useState<FormMode>('view');
@@ -177,6 +181,7 @@ export function TransactionsPage() {
   useEffect(() => {
     fetchBills();
     fetchCategories();
+    fetchMonarchTransactions();
   }, []);
 
   // Handle navbar Transactions click
@@ -198,8 +203,14 @@ export function TransactionsPage() {
   }, [searchTerm]);
 
   useEffect(() => {
+    if (bills.length > 0 && monarchTransactions.length > 0) {
+      performMonarchComparison();
+    }
+  }, [bills, monarchTransactions]);
+
+  useEffect(() => {
     filterAndSortBills();
-  }, [bills, debouncedSearchTerm, categoryFilter, frequencyFilter, ownerFilter, sortField, sortDirection]);
+  }, [billsWithMonarchStatus, debouncedSearchTerm, categoryFilter, frequencyFilter, ownerFilter, monarchStatusFilter, sortField, sortDirection]);
 
   useEffect(() => {
     // If editing or creating a paycheck, force type to income and disable toggle
@@ -213,6 +224,7 @@ export function TransactionsPage() {
     setCategoryFilter('');
     setFrequencyFilter('');
     setOwnerFilter('');
+    setMonarchStatusFilter('');
     setSortField('name');
     setSortDirection('asc');
   };
@@ -294,8 +306,112 @@ export function TransactionsPage() {
     }
   }, []);
 
+  const fetchMonarchTransactions = useCallback(async () => {
+    // Check cache first
+    const cacheKey = 'monarch-recurring';
+    const cachedData = apiCache.get(cacheKey);
+    if (cachedData) {
+      setMonarchTransactions(cachedData);
+      return;
+    }
+
+    try {
+      const data = await getRecurringTransactions();
+      // Cache for 10 minutes
+      apiCache.set(cacheKey, data, 10 * 60 * 1000);
+      setMonarchTransactions(data);
+    } catch (error) {
+      console.error('Error fetching Monarch transactions:', error);
+      // Continue without Monarch data
+      setMonarchTransactions([]);
+    }
+  }, []);
+
+  // Helper functions for matching logic (from RecurringPage)
+  const normalizeName = (name: string) => {
+    return name.toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+  };
+
+  const normalizeFrequency = (frequency: string, repeatsEvery?: number) => {
+    const freq = frequency.toLowerCase();
+    
+    // Handle repeats_every logic for Bills
+    if (repeatsEvery && repeatsEvery > 1) {
+      if (freq === 'monthly' && repeatsEvery === 3) return 'quarterly';
+      if (freq === 'monthly' && repeatsEvery === 6) return 'semiannually';
+      if (freq === 'weekly' && repeatsEvery === 2) return 'biweekly';
+      if (freq === 'yearly' && repeatsEvery === 2) return 'biannually';
+    }
+    
+    // Handle standard frequencies
+    if (freq === 'monthly') return 'monthly';
+    if (freq === 'weekly') return 'weekly';
+    if (freq === 'daily') return 'daily';
+    if (freq === 'yearly') return 'yearly';
+    if (freq === 'biweekly') return 'biweekly';
+    if (freq === 'semimonthly_mid_end') return 'semimonthly';
+    if (freq === 'quarterly') return 'quarterly';
+    return freq;
+  };
+
+  const performMonarchComparison = useCallback(() => {
+    if (bills.length === 0 || monarchTransactions.length === 0) {
+      setBillsWithMonarchStatus(bills.map(bill => ({ ...bill, monarchStatus: 'missing' as const })));
+      return;
+    }
+
+    // Pre-normalize all Monarch transaction names for better performance
+    const normalizedMonarchTransactions = monarchTransactions.map(transaction => ({
+      ...transaction,
+      normalizedName: normalizeName(transaction.merchantName || ''),
+      normalizedFrequency: normalizeFrequency(transaction.frequency),
+      amount: Math.abs(transaction.amount)
+    }));
+
+    const billsWithStatus = bills.map(bill => {
+      const normalizedBillName = normalizeName(bill.name);
+      const billAmount = Math.abs(bill.amount);
+      const billFreq = normalizeFrequency(bill.frequency, bill.repeats_every);
+
+      // Find potential matches by name
+      const nameMatches = normalizedMonarchTransactions.filter(transaction => {
+        return transaction.normalizedName === normalizedBillName ||
+               transaction.normalizedName.includes(normalizedBillName) ||
+               normalizedBillName.includes(transaction.normalizedName);
+      });
+
+      let hasMatch = false;
+
+      if (nameMatches.length > 0) {
+        // Look for exact match (name + amount + frequency)
+        const exactMatch = nameMatches.find(transaction => {
+          const amountDiff = Math.abs(billAmount - transaction.amount);
+          const amountTolerance = 0; // Zero tolerance like in RecurringPage
+          
+          return amountDiff <= amountTolerance && transaction.normalizedFrequency === billFreq;
+        });
+
+        if (exactMatch) {
+          hasMatch = true;
+        } else {
+          // Consider partial match as found (name matches even if amount/frequency don't)
+          hasMatch = true;
+        }
+      }
+
+      return {
+        ...bill,
+        monarchStatus: hasMatch ? 'found' as const : 'missing' as const
+      };
+    });
+
+    setBillsWithMonarchStatus(billsWithStatus);
+  }, [bills, monarchTransactions]);
+
   const filterAndSortBills = useCallback(() => {
-    let filtered = [...bills];
+    let filtered = [...billsWithMonarchStatus];
     
     if (debouncedSearchTerm) {
       const lowerSearchTerm = debouncedSearchTerm.toLowerCase();
@@ -317,6 +433,10 @@ export function TransactionsPage() {
     
     if (ownerFilter) {
       filtered = filtered.filter(bill => bill.owner === ownerFilter);
+    }
+    
+    if (monarchStatusFilter) {
+      filtered = filtered.filter(bill => bill.monarchStatus === monarchStatusFilter);
     }
     
     // Sort bills
@@ -345,13 +465,16 @@ export function TransactionsPage() {
         case 'owner':
           comparison = (a.owner || '').localeCompare(b.owner || '');
           break;
+        case 'monarch_status':
+          comparison = a.monarchStatus.localeCompare(b.monarchStatus);
+          break;
       }
       
       return sortDirection === 'asc' ? comparison : -comparison;
     });
     
     setFilteredBills(filtered);
-  }, [bills, debouncedSearchTerm, categoryFilter, frequencyFilter, ownerFilter, sortField, sortDirection]);
+  }, [billsWithMonarchStatus, debouncedSearchTerm, categoryFilter, frequencyFilter, ownerFilter, monarchStatusFilter, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (field === sortField) {
@@ -779,6 +902,16 @@ export function TransactionsPage() {
                 ...OWNER_OPTIONS
               ]}
             />
+            <Select
+              className="w-full sm:w-40"
+              value={monarchStatusFilter}
+              onChange={(e) => setMonarchStatusFilter(e.target.value)}
+              options={[
+                { value: '', label: 'All Status' },
+                { value: 'found', label: 'Found in Monarch' },
+                { value: 'missing', label: 'Missing from Monarch' }
+              ]}
+            />
             <Button
               variant="outline"
               size="sm"
@@ -840,19 +973,25 @@ export function TransactionsPage() {
                     >
                       Owner {getSortIcon('owner')}
                     </th>
+                    <th 
+                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => handleSort('monarch_status')}
+                    >
+                      Monarch Status {getSortIcon('monarch_status')}
+                    </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={9} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                         Loading transactions...
                       </td>
                     </tr>
                   ) : filteredBills.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={9} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                         No transactions found. {bills.length > 0 ? 'Try adjusting your filters.' : 'Create your first transaction.'}
                       </td>
                     </tr>
@@ -996,6 +1135,13 @@ export function TransactionsPage() {
                           >
                             {bill.owner || 'Both'}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center">
+                          {bill.monarchStatus === 'found' ? (
+                            <Check className="w-5 h-5 text-green-600 dark:text-green-400 mx-auto" />
+                          ) : (
+                            <X className="w-5 h-5 text-red-600 dark:text-red-400 mx-auto" />
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <div className="flex space-x-2">

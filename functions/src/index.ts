@@ -3215,7 +3215,7 @@ export const storeRecurringTransactions = functions.region(region).https.onCall(
       // Use a future-focused date range to get upcoming instances only
       const now = new Date();
       const startDate = now.toISOString().split('T')[0]; // Start from today
-      const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString().split('T')[0]; // End in 3 months
+      const endDate = new Date(now.getFullYear() + 1, now.getMonth() + 6, 0).toISOString().split('T')[0]; // End in 1.5 years to catch all yearly transactions
 
       const query = `
         query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {
@@ -3406,7 +3406,7 @@ export const storeRecurringTransactionsHttp = functions.region(region).https.onR
       // Use a future-focused date range to get upcoming instances only
       const now = new Date();
       const startDate = now.toISOString().split('T')[0]; // Start from today
-      const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString().split('T')[0]; // End in 3 months
+      const endDate = new Date(now.getFullYear() + 1, now.getMonth() + 6, 0).toISOString().split('T')[0]; // End in 1.5 years to catch all yearly transactions
 
       const query = `
         query Web_GetUpcomingRecurringTransactionItems($startDate: Date!, $endDate: Date!, $filters: RecurringTransactionFilter) {

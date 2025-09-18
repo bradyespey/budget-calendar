@@ -14,7 +14,8 @@
     "import:firebase": "tsx scripts/importDataToFirebase.ts",
     "cleanup:supabase": "tsx scripts/cleanupSupabase.ts",
     "check:automation": "./scripts/check-automation.sh",
-    "trigger:nightly": "node scripts/trigger-nightly.js"
+    "trigger:nightly": "node scripts/trigger-nightly.js",
+    "deploy:watch": "./scripts/deploy-and-watch.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8",

@@ -91,6 +91,7 @@ VITE_DEBUG_MODE=true
 - **Functions**: `npx firebase deploy --only functions`
 - **Publish Directory**: `dist`
 - **Domains**: budget.theespeys.com (primary), budgetcalendar.netlify.app
+- **Build Monitoring**: `npm run deploy:watch` (pushes + watches build completion)
 
 ## App Pages / Routes
 - **Dashboard**: Current balance and financial status overview with low balance alerts

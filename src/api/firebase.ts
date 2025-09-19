@@ -250,7 +250,6 @@ export async function refreshRecurringTransactions(): Promise<void> {
   }
   
   const result = await response.json();
-  console.log('Refreshed recurring transactions:', result);
 }
 
 // SETTINGS API

@@ -59,21 +59,21 @@ VITE_DEBUG_MODE=true
 - **Import**: `npm run import:firebase` - Import data to Firebase
 
 ### Firebase Functions (us-central1)
+**Quick Actions:**
 - **refreshAccounts**: Triggers Monarch account refresh via Flask API
-- **chaseBalance**: Fetches and saves latest Chase balance from Monarch
-- **monarchTest**: Tests Monarch Money API connectivity (accounts, categories, merchants)
-- **monarchRecurringStreams**: Fetches all unique recurring transaction streams with next upcoming due dates
+- **refreshTransactions**: Fetches recurring transactions with live amounts from Monarch API
+- **updateBalance**: Updates Chase balance from external API
 - **budgetProjection**: Complete projection calculation with complex scheduling logic
 - **syncCalendar**: Google Calendar integration with batch processing and duplicate prevention
-- **clearCalendars**: Clears all events from Google Calendars
-- **sendAlert**: Email alerting via Resend API
 - **runAll**: Orchestrates full nightly workflow automation
-- **storeRecurringTransactions**: Populates recurring transactions in Firestore for cached access
-- **generateTransactionIcons**: Creates icons for transactions using brand mapping and AI fallback
-- **resetAllTransactionIcons**: Bulk removal of generated icons while preserving custom ones
-- **backupTransactionIcons**: Saves all custom icons to Firebase storage for backup
-- **restoreTransactionIcons**: Restores icons from Firebase backup
-- **getIconBackupInfo**: Returns information about the latest icon backup
+
+**Maintenance:**
+- **validateProjections**: Validates projection data in Firestore
+- **clearCalendars**: Clears all events from Google Calendars
+- **generateIcons**: Creates icons for transactions using brand mapping and AI fallback
+- **resetAllIcons**: Bulk removal of generated icons while preserving custom ones
+- **backupIcons**: Saves all custom icons to Firebase storage for backup
+- **restoreIcons**: Restores icons from Firebase backup
 
 ### Flask API Endpoints (api.theespeys.com)
 - **refresh_accounts**: Triggers Monarch account refresh via Selenium
@@ -95,7 +95,7 @@ VITE_DEBUG_MODE=true
 
 ## App Pages / Routes
 - **Dashboard**: Current balance and financial status overview with low balance alerts
-- **Transactions**: Advanced management with duplicate functionality, icon customization, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting on all columns, Monarch status tracking with visual indicators
+- **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling
 - **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality
 - **Upcoming**: Calendar view of upcoming bills, income, projected balances
 - **Settings**: Projection settings, manual triggers, import/export, maintenance functions with admin timestamps
@@ -129,7 +129,7 @@ Budget/
 - **Large Syncs**: 50-day batch processing prevents timeouts on 100+ day operations
 - **Chrome Profile Issues**: Run `setup_chrome_profile.py` to create initial profile for Monarch Money login
 - **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
-- **Monarch API**: Uses GraphQL `Web_GetUpcomingRecurringTransactionItems` operation for recurring transactions
+- **Monarch API**: Uses GraphQL `Web_GetAllRecurringTransactionItems` with `recurringTransactionStreams` for live amounts and credit card data
 - **Data Matching**: Zero tolerance amount matching, timezone-safe date comparison, frequency-aware matching with repeats_every logic
 - **Date Range**: Extended queries (today to 1.5 years) capture all yearly transactions, return next immediate upcoming dates matching Monarch UI exactly
 - **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes

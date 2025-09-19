@@ -215,7 +215,7 @@ export interface RecurringTransaction {
 }
 
 export async function getRecurringTransactions(): Promise<RecurringTransaction[]> {
-  const recurringRef = collection(db, 'recurring_transactions');
+  const recurringRef = collection(db, 'recurringTransactions');
   const q = query(recurringRef, orderBy('merchantName'));
   const snapshot = await getDocs(q);
   
@@ -223,11 +223,11 @@ export async function getRecurringTransactions(): Promise<RecurringTransaction[]
     id: doc.id,
     streamId: doc.data().streamId,
     merchantName: doc.data().merchantName,
-    merchantLogoUrl: doc.data().merchantLogoUrl,
+    merchantLogoUrl: doc.data().logoUrl,
     frequency: doc.data().frequency,
     amount: doc.data().amount,
     isApproximate: doc.data().isApproximate,
-    dueDate: doc.data().dueDate,
+    dueDate: doc.data().nextDueDate,
     categoryId: doc.data().categoryId,
     categoryName: doc.data().categoryName,
     accountId: doc.data().accountId,
@@ -235,6 +235,22 @@ export async function getRecurringTransactions(): Promise<RecurringTransaction[]
     accountLogoUrl: doc.data().accountLogoUrl,
     updatedAt: doc.data().updatedAt?.toDate(),
   }));
+}
+
+export async function refreshRecurringTransactions(): Promise<void> {
+  // Call the main refresh function with accurate Monarch data
+  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshTransactions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to refresh recurring transactions: ${response.status}`);
+  }
+  
+  const result = await response.json();
+  console.log('Refreshed recurring transactions:', result);
 }
 
 // SETTINGS API

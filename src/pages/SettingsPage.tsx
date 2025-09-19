@@ -288,22 +288,31 @@ export function SettingsPage() {
     }
   }
 
-  async function handleRefreshRecurring() {
+  async function handleRefreshTransactions() {
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
-    setActiveAction('recurring');
+    setActiveAction('transactions');
     try {
       await saveSettings();
       
-      // Call Firebase Cloud Function to store recurring transactions
-      const storeRecurring = httpsCallable(functions, 'storeRecurringTransactions');
-      const result = await storeRecurring({});
+      // Call the main refresh function with accurate Monarch data
+      const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshTransactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
       
-      await saveFunctionTimestampLocal('storeRecurringTransactions');
+      if (!response.ok) {
+        throw new Error(`Failed to refresh transactions: ${response.status}`);
+      }
       
-      showNotification(`Recurring transactions refreshed. Stored ${result.data.count} transactions.`, 'success');
+      const result = await response.json();
+      
+      await saveFunctionTimestampLocal('refreshRecurringTransactions');
+      
+      showNotification(`Transactions refreshed. Stored ${result.count} transactions.`, 'success');
     } catch (e: any) {
-      showNotification(`Error refreshing recurring transactions: ${e.message}`, 'error');
+      showNotification(`Error refreshing transactions: ${e.message}`, 'error');
     } finally {
       setBusy(false);
       setActiveAction(null);
@@ -775,13 +784,13 @@ export function SettingsPage() {
                 )}
               </div>
               <div className="space-y-1">
-                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-green-600 hover:bg-green-700 text-white rounded-full shadow" onClick={handleRefreshRecurring} disabled={busy}>
-                  {busy && activeAction === 'recurring' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="recurring">🔄</span>}
-                  Refresh Recurring
+                <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-green-600 hover:bg-green-700 text-white rounded-full shadow" onClick={handleRefreshTransactions} disabled={busy}>
+                  {busy && activeAction === 'transactions' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="transactions">🔄</span>}
+                  Refresh Transactions
                 </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Refreshes recurring transactions data from Monarch API</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Refreshes recurring transactions data from Monarch API with accurate amounts</p>
                 {showTimestamps && (
-                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.storeRecurringTransactions)}</p>
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.refreshRecurringTransactions)}</p>
                 )}
               </div>
             </div>

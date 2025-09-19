@@ -264,6 +264,7 @@ export const CATEGORY_ICON_MAPPING: IconMapping = {
  * Attempts to find an icon for a transaction by name and category
  */
 export function findTransactionIcon(transactionName: string, category: string): { iconUrl: string; iconType: 'brand' | 'category' } | null {
+  if (!transactionName || !category) return null;
   const normalizedName = transactionName.toLowerCase().trim();
   
   // First, try exact brand match

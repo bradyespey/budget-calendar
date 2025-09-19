@@ -33,7 +33,6 @@ export function Navbar({ toggleTheme, isDarkMode, onTransactionsClick }: NavbarP
   const navLinks = [
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/transactions', label: 'Transactions' },
-    { path: '/recurring', label: 'Recurring' },
     { path: '/upcoming', label: 'Upcoming' },
     { path: '/settings', label: 'Settings' },
   ];

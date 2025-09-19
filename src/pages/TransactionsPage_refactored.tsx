@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Layout } from '../components/Layout/Layout';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { TransactionsFilters } from '../components/TransactionsFilters';
@@ -161,20 +161,29 @@ export function TransactionsPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Transactions
-        </h1>
+              Transactions
+            </h1>
             <p className="text-gray-600 dark:text-gray-400">
               Manage manual transactions and view Monarch recurring data
-        </p>
-      </div>
+            </p>
+          </div>
           <div className="flex gap-2">
+            <Button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
             <Button onClick={handleCreateTransaction} size="sm">
               <Plus className="h-4 w-4 mr-2" />
-            Add Transaction
-          </Button>
-                </div>
-              </div>
-              
+              Add Transaction
+            </Button>
+          </div>
+        </div>
+
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
             <p className="text-red-800 dark:text-red-200">{error}</p>
@@ -224,7 +233,7 @@ export function TransactionsPage() {
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                 {combinedTransactions.filter(t => t.source === 'manual').length}
-                  </div>
+              </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Manual Transactions</div>
             </CardContent>
           </Card>
@@ -234,8 +243,8 @@ export function TransactionsPage() {
                 {combinedTransactions.length}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Total Transactions</div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Form Modal */}
@@ -250,3 +259,5 @@ export function TransactionsPage() {
     </Layout>
   );
 }
+
+

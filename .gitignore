@@ -61,19 +61,32 @@ Thumbs.db
 ehthumbs.db
 
 # Project-specific directories
+docs/
 flask/
 gas/
 old/
 other/
 
-# Python
+# Test files and debugging
+test_*.py
+test-*.ts
+*_test.py
+*_test.ts
+fix_*.js
+compare-*.js
+debug_*.py
+
+# Virtual environments
+venv/
+venv_*/
 .venv/
+
+# Python
 __pycache__/
 *.py[cod]
 *.pyd
 *.pyo
 env/
-venv/
 
 # Temporary files
 *.temp

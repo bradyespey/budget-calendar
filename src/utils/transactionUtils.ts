@@ -22,11 +22,6 @@ export const FREQUENCY_OPTIONS = [
   { value: 'one-time', label: 'One-time' },
 ];
 
-export const OWNER_OPTIONS = [
-  { value: 'Both', label: 'Both' },
-  { value: 'Brady', label: 'Brady' },
-  { value: 'Jenny', label: 'Jenny' },
-];
 
 export function shortenAccountName(accountName: string): string {
   const accountMappings: Record<string, string> = {

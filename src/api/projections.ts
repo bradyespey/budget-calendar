@@ -139,8 +139,17 @@ export async function getHighLowProjections() {
 
 export async function triggerManualRecalculation() {
   try {
-    const budgetProjectionFunction = httpsCallable(functions, 'budgetProjection');
-    const result = await budgetProjectionFunction();
+    const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/budgetProjection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to trigger budget projection: ${response.status}`);
+    }
+
+    const result = await response.json();
     return result.data;
   } catch (error) {
     console.error('Error triggering recalculation:', error);

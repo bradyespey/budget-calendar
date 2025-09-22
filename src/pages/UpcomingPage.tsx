@@ -6,7 +6,7 @@ import { format, parseISO } from 'date-fns';
 import { getProjections } from '../api/projections';
 import { Projection } from '../types';
 import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
-import { getSettings } from '../api/firebase';
+import { getSettings, getFunctionTimestamps } from '../api/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { useLocation } from 'react-router-dom';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -28,10 +28,51 @@ export function UpcomingPage() {
   const [upcomingDays, setUpcomingDays] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastProjected, setLastProjected] = useState<Date | null>(null);
+  const [budgetProjectionTimestamp, setBudgetProjectionTimestamp] = useState<Date | null>(null);
+  const [syncCalendarTimestamp, setSyncCalendarTimestamp] = useState<Date | null>(null);
   const location = useLocation();
+
+  // Load function timestamps
+  const loadTimestamps = async () => {
+    try {
+      const timestamps = await getFunctionTimestamps();
+      if (timestamps.budgetProjection) {
+        setBudgetProjectionTimestamp(timestamps.budgetProjection);
+      }
+      if (timestamps.syncCalendar) {
+        setSyncCalendarTimestamp(timestamps.syncCalendar);
+      }
+    } catch (err) {
+      console.error('Error loading timestamps:', err);
+    }
+  };
+
+  // Format timestamp for display
+  const formatTimestamp = (date: Date | null): string => {
+    if (!date) return 'Never updated';
+    
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMinutes < 1) return 'Just updated';
+    if (diffMinutes < 60) return `Updated ${diffMinutes}m ago`;
+    if (diffHours < 24) return `Updated ${diffHours}h ago`;
+    if (diffDays < 7) return `Updated ${diffDays}d ago`;
+    
+    return `Updated ${date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`;
+  };
 
   useEffect(() => {
     fetchUpcomingData();
+    loadTimestamps();
     async function fetchLastProjected() {
       try {
         const settings = await getSettings();
@@ -91,6 +132,7 @@ export function UpcomingPage() {
 
   const getBalanceChange = (day: DayData, index: number): number => {
     if (index === 0) return 0;
+    // Calculate the change in balance (negative means money went out, positive means money came in)
     return day.balance - upcomingDays[index - 1].balance;
   };
 
@@ -107,27 +149,23 @@ export function UpcomingPage() {
   }
 
   return (
-    <div className="space-y-8 px-4 max-w-3xl mx-auto">
-      {/* Page Description */}
-      <div className="text-center space-y-2 py-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Upcoming Bills
+    <div className="space-y-6 px-4 max-w-3xl mx-auto">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Upcoming Bills: {upcomingDays.length}-Day Projection
         </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-          Preview your upcoming bills and projected account balance with automatic Google Calendar sync. Bills are moved to the next business day if they fall on weekends or holidays, while paychecks move to the previous business day.
+        <p className="text-gray-600 dark:text-gray-400">
+          Preview upcoming bills and projected balance with Google Calendar sync. Bills move to next business day on weekends/holidays, paychecks move to previous business day.
         </p>
-      </div>
-      
-      <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-2 mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white md:mr-8">
-          {upcomingDays.length}-Day Projection
-        </h2>
-        {lastProjected && (
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            <strong>Last projected:</strong> {format(lastProjected, "MMMM d, yyyy, h:mm a")}
-            <span className="ml-2 text-xs">({formatDistanceToNow(lastProjected, { addSuffix: true })})</span>
-          </div>
-        )}
+        <div className="flex flex-col sm:flex-row gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {budgetProjectionTimestamp && (
+            <span>Projections: {formatTimestamp(budgetProjectionTimestamp)}</span>
+          )}
+          {syncCalendarTimestamp && (
+            <span>Calendar Sync: {formatTimestamp(syncCalendarTimestamp)}</span>
+          )}
+        </div>
       </div>
       
       <div className="flex justify-center">

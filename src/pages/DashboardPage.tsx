@@ -15,6 +15,7 @@ import { getBills } from '../api/bills'
 import { Bill, Projection } from '../types'
 import { format, parseISO } from 'date-fns'
 import { useBalance } from '../context/BalanceContext'
+import { getFunctionTimestamps } from '../api/firebase'
 
 interface CategoryAverage {
   monthly: number
@@ -50,8 +51,44 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [sortField, setSortField] = useState<'category' | 'monthly' | 'yearly'>('category')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [refreshAccountsTimestamp, setRefreshAccountsTimestamp] = useState<Date | null>(null)
 
   const { balance: totalBalance, lastSync } = useBalance()
+
+  // Load refresh accounts timestamp
+  const loadTimestamp = async () => {
+    try {
+      const timestamps = await getFunctionTimestamps();
+      if (timestamps.refreshAccounts) {
+        setRefreshAccountsTimestamp(timestamps.refreshAccounts);
+      }
+    } catch (err) {
+      console.error('Error loading timestamp:', err);
+    }
+  };
+
+  // Format timestamp for display
+  const formatTimestamp = (date: Date | null): string => {
+    if (!date) return 'Never updated';
+    
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMinutes < 1) return 'Just updated';
+    if (diffMinutes < 60) return `Updated ${diffMinutes}m ago`;
+    if (diffHours < 24) return `Updated ${diffHours}h ago`;
+    if (diffDays < 7) return `Updated ${diffDays}d ago`;
+    
+    return `Updated ${date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`;
+  };
 
   // ── Fetch data ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -65,6 +102,7 @@ export function DashboardPage() {
         setBills(billsData)
         setHighLow(highLowData)
         calculateAverages(billsData)
+        loadTimestamp()
       } catch (e) {
         console.error('Error fetching dashboard data:', e)
         // Ensure cards render zeros rather than staying empty
@@ -192,13 +230,13 @@ export function DashboardPage() {
 
   // ── UI ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-8 px-4 max-w-5xl mx-auto">
-      {/* Page Description */}
-      <div className="text-center space-y-2 py-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+    <div className="space-y-6 px-4 max-w-5xl mx-auto">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Financial Dashboard
         </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+        <p className="text-gray-600 dark:text-gray-400">
           Your financial overview at a glance with current account balance, projected future balances, spending patterns, and projections calculated from recurring bills.
         </p>
       </div>
@@ -221,6 +259,11 @@ export function DashboardPage() {
                 {lastSync && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     as of {format(lastSync, 'MMM d, yyyy h:mm a')}
+                  </p>
+                )}
+                {refreshAccountsTimestamp && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Refresh: {formatTimestamp(refreshAccountsTimestamp)}
                   </p>
                 )}
               </div>

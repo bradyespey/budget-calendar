@@ -64,12 +64,12 @@ VITE_DEBUG_MODE=true
 - **refreshTransactions**: Fetches recurring transactions with live amounts from Monarch API
 - **updateBalance**: Updates Chase balance from external API
 - **budgetProjection**: Complete projection calculation with complex scheduling logic
-- **syncCalendar**: Google Calendar integration with batch processing and duplicate prevention
+- **syncCalendar**: Google Calendar integration with separate bills/balance calendars, intelligent change detection, and comma-formatted amounts
 - **runAll**: Orchestrates full nightly workflow automation
 
 **Maintenance:**
 - **validateProjections**: Validates projection data in Firestore
-- **clearCalendars**: Clears all events from Google Calendars
+- **clearCalendars**: Clears all events from both dev and prod calendars (bills and balance)
 - **generateIcons**: Creates icons for transactions using brand mapping and AI fallback
 - **resetAllIcons**: Bulk removal of generated icons while preserving custom ones
 - **backupIcons**: Saves all custom icons to Firebase storage for backup

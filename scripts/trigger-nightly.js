@@ -9,17 +9,21 @@ async function triggerRunAll() {
   console.log('🚀 Starting run all workflow...');
   
   try {
-    // Call the runAllHttp function directly via HTTPS
-    // This function orchestrates the entire workflow internally without authentication
-    const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAllHttp', {
+    // Create AbortController for timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8 * 60 * 1000); // 8 minute timeout
+    
+    // Call the runAll function directly via HTTPS
+    const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        data: {}
-      })
+      body: JSON.stringify({}),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -31,8 +35,12 @@ async function triggerRunAll() {
     process.exit(0);
     
   } catch (error) {
-    console.error('💥 Run all failed:', error.message);
-    console.error('Full error:', error);
+    if (error.name === 'AbortError') {
+      console.error('💥 Run all timed out after 8 minutes');
+    } else {
+      console.error('💥 Run all failed:', error.message);
+      console.error('Full error:', error);
+    }
     process.exit(1);
   }
 }

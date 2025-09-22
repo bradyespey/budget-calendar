@@ -1,7 +1,9 @@
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
-import { db, region } from '../index';
+
+const db = admin.firestore();
+const region = 'us-central1';
 
 export const getIconBackupInfo = functions.region(region).https.onCall(
   async (data, context) => {

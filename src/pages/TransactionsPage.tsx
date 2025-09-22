@@ -11,9 +11,11 @@ import { TransactionsTable } from '../components/TransactionsTable';
 import { TransactionForm, FormMode } from '../components/TransactionForm';
 import { useTransactions, CombinedTransaction } from '../hooks/useTransactions';
 import { useTransactionFilters } from '../hooks/useTransactionFilters';
+import { getFunctionTimestamps } from '../api/firebase';
 
 export function TransactionsPage() {
   const location = useLocation();
+  const [refreshTransactionsTimestamp, setRefreshTransactionsTimestamp] = useState<Date | null>(null);
   
   // Custom hooks
   const {
@@ -80,7 +82,6 @@ export function TransactionsPage() {
         repeats_every: formData.repeats_every,
         start_date: formData.start_date,
         note: formData.note,
-        owner: formData.owner,
       };
 
       if (formMode === 'create') {
@@ -109,9 +110,45 @@ export function TransactionsPage() {
     }
   };
 
+  // Load refresh transactions timestamp
+  const loadTimestamp = async () => {
+    try {
+      const timestamps = await getFunctionTimestamps();
+      if (timestamps.refreshRecurringTransactions) {
+        setRefreshTransactionsTimestamp(timestamps.refreshRecurringTransactions);
+      }
+    } catch (err) {
+      console.error('Error loading timestamp:', err);
+    }
+  };
+
+  // Format timestamp for display
+  const formatTimestamp = (date: Date | null): string => {
+    if (!date) return 'Never updated';
+    
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMinutes < 1) return 'Just updated';
+    if (diffMinutes < 60) return `Updated ${diffMinutes}m ago`;
+    if (diffHours < 24) return `Updated ${diffHours}h ago`;
+    if (diffDays < 7) return `Updated ${diffDays}d ago`;
+    
+    return `Updated ${date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`;
+  };
+
   // Effects
   useEffect(() => {
     fetchData();
+    loadTimestamp();
   }, [fetchData]);
 
   useEffect(() => {
@@ -161,12 +198,17 @@ export function TransactionsPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Transactions
-        </h1>
+              Transactions
+            </h1>
             <p className="text-gray-600 dark:text-gray-400">
               Manage manual transactions and view Monarch recurring data
-        </p>
-      </div>
+            </p>
+            {refreshTransactionsTimestamp && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {formatTimestamp(refreshTransactionsTimestamp)}
+              </p>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button onClick={handleCreateTransaction} size="sm">
               <Plus className="h-4 w-4 mr-2" />

@@ -10,7 +10,6 @@ export interface Bill {
   repeats_every: number
   start_date: string
   end_date?: string
-  owner?: 'Both' | 'Brady' | 'Jenny'
   note?: string
   iconUrl?: string | null
   iconType?: 'brand' | 'generated' | 'category' | 'custom' | null

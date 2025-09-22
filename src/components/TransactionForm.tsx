@@ -7,7 +7,7 @@ import { Select } from './ui/Select';
 import { CategorySelect } from './ui/CategorySelect';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { Category } from '../api/categories';
-import { FREQUENCY_OPTIONS, OWNER_OPTIONS } from '../utils/transactionUtils';
+import { FREQUENCY_OPTIONS } from '../utils/transactionUtils';
 
 export type FormMode = 'create' | 'edit' | 'view';
 
@@ -22,7 +22,6 @@ interface TransactionFormProps {
     repeats_every: number;
     start_date: string;
     note: string;
-    owner: 'Both' | 'Brady' | 'Jenny';
   };
   onSubmit: (data: any) => Promise<void>;
   onCancel: () => void;
@@ -37,7 +36,6 @@ export function TransactionForm({ mode, categories, initialData, onSubmit, onCan
     repeats_every: 1,
     start_date: new Date().toISOString().split('T')[0],
     note: '',
-    owner: 'Both' as 'Both' | 'Brady' | 'Jenny',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -116,13 +114,6 @@ export function TransactionForm({ mode, categories, initialData, onSubmit, onCan
               required
             />
             
-            <Select
-              label="Owner"
-              value={formData.owner}
-              onChange={(e) => setFormData({ ...formData, owner: e.target.value as 'Both' | 'Brady' | 'Jenny' })}
-              options={OWNER_OPTIONS}
-              required
-            />
             
             <Input
               label="Note"

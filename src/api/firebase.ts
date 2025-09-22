@@ -330,27 +330,49 @@ export async function refreshAccounts(): Promise<any> {
 }
 
 export async function runBudgetProjection(): Promise<any> {
-  const budgetProjectionFunction = httpsCallable(functions, 'budgetProjection');
-  const result = await budgetProjectionFunction();
+  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/budgetProjection', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to run budget projection: ${response.status}`);
+  }
+
+  const result = await response.json();
   return result.data;
 }
 
 export async function clearCalendars(): Promise<any> {
-  const clearCalendarsFunction = httpsCallable(functions, 'clearCalendars');
-  const result = await clearCalendarsFunction();
-  return result.data;
+  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/clearCalendars', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to clear calendars: ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result; // Return the result directly, not result.data
 }
 
-export async function sendAlert(message: string): Promise<any> {
-  const sendAlertFunction = httpsCallable(functions, 'sendAlert');
-  const result = await sendAlertFunction({ message });
-  return result.data;
-}
 
 export async function syncCalendar(env: 'dev' | 'prod' = 'dev'): Promise<any> {
-  const syncCalendarFunction = httpsCallable(functions, 'syncCalendar');
-  const result = await syncCalendarFunction({ env });
-  return result.data;
+  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/syncCalendar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ env })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to sync calendar: ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result; // Return the result directly, not result.data
 }
 
 // UTILITY FUNCTIONS

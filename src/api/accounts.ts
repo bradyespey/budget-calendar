@@ -58,8 +58,17 @@ export async function getLastSyncTime(): Promise<Date | null> {
 
 // ── Refresh accounts via Firebase Cloud Function ────────────────────────────────────────
 export async function refreshAccountsViaFlask(): Promise<void> {
-  const refreshAccountsFunction = httpsCallable(functions, 'refreshAccounts');
-  const result = await refreshAccountsFunction();
+  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshAccounts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to refresh accounts: ${response.status}`);
+  }
+
+  const result = await response.json();
   
   const data = result.data as { success: boolean; message: string };
   if (!data.success) {
@@ -73,17 +82,16 @@ export async function refreshAccountsViaFlask(): Promise<void> {
  *    Now calls the function and returns persisted balance.
  */
 export async function refreshChaseBalanceInDb(): Promise<number> {
-  const chaseBalanceFunction = httpsCallable(functions, 'chaseBalance');
-  const result = await chaseBalanceFunction();
-  
-  const data = result.data as { balance: number };
-  return data.balance;
-}
+  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/updateBalance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
 
-export async function getTransactionsReviewCount(): Promise<number> {
-  const transactionsReviewFunction = httpsCallable(functions, 'transactionsReview');
-  const result = await transactionsReviewFunction();
-  
-  const data = result.data as { transactions_to_review: number };
-  return data.transactions_to_review;
+  if (!response.ok) {
+    throw new Error(`Failed to update balance: ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.data.balance;
 }

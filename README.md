@@ -2,7 +2,7 @@
 **Scope**: This README replaces prior selected overview docs
 
 ## Overview
-Full-stack financial forecasting web app that syncs real-time checking account balances via Monarch Money API, calculates projected cash flow, and displays upcoming bills/income in a calendar UI. Features intelligent recurring transaction comparison between Monarch Money and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality. Supports manual updates and automated nightly workflows.
+Full-stack financial forecasting web app that syncs real-time checking account balances via Monarch Money API, calculates projected cash flow, and displays upcoming bills/income in a calendar UI. Features intelligent recurring transaction comparison between Monarch Money and manual bills with exact matching validation, frequency-aware date comparison, comprehensive sorting functionality, automatic weekend/holiday adjustment, and unified data management with intelligent refresh logic. Supports manual updates and automated nightly workflows.
 
 Originally built using Python, Flask, Google Apps Script, and Google Sheets, the system has since been fully rebuilt using React, Firebase, and modern cloud-native tooling.
 
@@ -61,7 +61,7 @@ VITE_DEBUG_MODE=true
 ### Firebase Functions (us-central1)
 **Quick Actions:**
 - **refreshAccounts**: Triggers Monarch account refresh via Flask API
-- **refreshTransactions**: Fetches recurring transactions with live amounts from Monarch API
+- **refreshTransactions**: Intelligent refresh of Monarch transactions with smart comparison (create/update/delete only when needed)
 - **updateBalance**: Updates Chase balance from external API
 - **budgetProjection**: Complete projection calculation with complex scheduling logic
 - **syncCalendar**: Google Calendar integration with separate bills/balance calendars, intelligent change detection, and comma-formatted amounts
@@ -95,7 +95,7 @@ VITE_DEBUG_MODE=true
 
 ## App Pages / Routes
 - **Dashboard**: Current balance and financial status overview with low balance alerts
-- **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling
+- **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling, and optimized form performance
 - **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality
 - **Upcoming**: Calendar view of upcoming bills, income, projected balances
 - **Settings**: Projection settings, manual triggers, import/export, maintenance functions with admin timestamps
@@ -132,9 +132,11 @@ Budget/
 - **Monarch API**: Uses GraphQL `Web_GetAllRecurringTransactionItems` with `recurringTransactionStreams` for live amounts and credit card data
 - **Data Matching**: Zero tolerance amount matching, timezone-safe date comparison, frequency-aware matching with repeats_every logic
 - **Date Range**: Extended queries (today to 1.5 years) capture all yearly transactions, return next immediate upcoming dates matching Monarch UI exactly
-- **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes
+- **Weekend/Holiday Adjustment**: Automatic date adjustment for events - paychecks move to previous business day, bills move to next business day, with US holiday API integration
+- **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes, optimized form state management
 - **Loading States**: Fixed infinite loading on Transactions page when using cached data
 - **Monarch Status**: Added reverse matching (bills → Monarch) with visual indicators and status filtering
+- **Data Management**: Unified `bills` table as single source of truth, intelligent refresh logic prevents unnecessary updates, removed legacy transaction tables
 
 ## AI Handoff
 Read this README, scan the repo, prioritize core functions and env-safe areas, keep env and rules aligned with this file

@@ -1,51 +1,11 @@
 //src/utils/validateProjections.ts
 
 import { getSettings, getBills, getProjections } from '../api/firebase'
-import { addDays, parseISO, startOfDay, format, isWeekend } from 'date-fns'
+import { addDays, parseISO, startOfDay, format } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
+import { fetchUSHolidays, adjustTransactionDate } from './dateAdjustment'
 
 const TIMEZONE = 'America/Chicago'
-
-// --- Holiday and date adjustment logic (ported from projection function) ---
-async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
-  const holidays = new Set<string>();
-  for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
-    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/US`);
-    if (res.ok) {
-      const data = await res.json();
-      data.forEach((h: { date: string }) => holidays.add(h.date));
-    }
-  }
-  return holidays;
-}
-
-function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<string>): Date {
-  let d = new Date(date);
-  const dateStr = (d: Date) => formatInTimeZone(d, TIMEZONE, 'yyyy-MM-dd');
-  while (true) {
-    if (isPaycheck) {
-      if (isWeekend(d)) {
-        d.setDate(d.getDate() - 1);
-        continue;
-      }
-      if (holidays.has(dateStr(d))) {
-        d.setDate(d.getDate() - 1);
-        continue;
-      }
-    } else {
-      if (isWeekend(d)) {
-        d.setDate(d.getDate() + (8 - d.getDay()) % 7);
-        continue;
-      }
-      if (holidays.has(dateStr(d))) {
-        d.setDate(d.getDate() + 1);
-        continue;
-      }
-    }
-    break;
-  }
-  return d;
-}
 
 interface ValidationResult {
   missingInProjections: Array<{

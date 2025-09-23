@@ -18,13 +18,15 @@ export interface CombinedTransaction {
   account: string;
   source: 'manual' | 'monarch';
   // Manual transaction fields
-  note?: string;
-  owner?: 'Both' | 'Brady' | 'Jenny';
+  notes?: string;
   iconUrl?: string | null;
   iconType?: 'brand' | 'generated' | 'category' | 'custom' | null;
   // Monarch transaction fields
   merchantLogoUrl?: string;
   isEditable: boolean;
+  // Raw data for editing
+  rawFrequency?: string;
+  repeats_every?: number;
 }
 
 // Helper functions
@@ -65,14 +67,13 @@ export function useTransactions() {
       setLoading(true);
       setError(null);
       
-      const [billsData, monarchData, categoriesData] = await Promise.all([
+      const [billsData, categoriesData] = await Promise.all([
         getBills(),
-        getRecurringTransactions(),
         getCategories()
       ]);
       
       setBills(billsData);
-      setMonarchTransactions(monarchData);
+      setMonarchTransactions([]); // No longer using separate monarch collection
       setCategories(categoriesData);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -82,49 +83,33 @@ export function useTransactions() {
     }
   }, []);
 
-  // Combine manual and Monarch transactions
+  // Combine manual and Monarch transactions (now all from bills collection)
   const combineTransactions = useCallback(() => {
     const combined: CombinedTransaction[] = [];
 
-    // Add filtered manual bills (only Food & Drinks and Garner Security Deposit)
+    // Add all bills (both manual and Monarch sources)
     bills.forEach(bill => {
-      if (bill.category === 'food & drinks' || bill.name.toLowerCase().includes('garner security deposit')) {
         combined.push({
-          id: `manual-${bill.id}`,
+          id: bill.id,
           name: bill.name,
           category: bill.category,
           amount: bill.amount,
-          frequency: formatFrequency(bill.frequency, bill.repeats_every),
+          frequency: formatFrequency(bill.frequency, bill.repeats_every || 1),
           dueDate: bill.start_date,
-          account: '—', // Manual transactions don't have account info
-          source: 'manual',
-          note: bill.note,
-          owner: bill.owner,
+          account: bill.source === 'monarch' ? (bill.accountName || 'Unknown') : '—',
+          source: bill.source || 'manual',
+          notes: bill.notes,
           iconUrl: bill.iconUrl,
           iconType: bill.iconType,
-          isEditable: true
+          merchantLogoUrl: bill.logoUrl,
+          isEditable: bill.source !== 'monarch',
+          rawFrequency: bill.frequency,
+          repeats_every: bill.repeats_every || 1
         });
-      }
-    });
-
-    // Add Monarch recurring transactions
-    monarchTransactions.forEach(transaction => {
-      combined.push({
-        id: `monarch-${transaction.streamId}`,
-        name: transaction.merchantName,
-        category: transaction.categoryName || 'other',
-        amount: transaction.amount,
-        frequency: capitalize(transaction.frequency),
-        dueDate: transaction.dueDate,
-        account: transaction.accountName || 'Unknown',
-        source: 'monarch',
-        merchantLogoUrl: transaction.merchantLogoUrl,
-        isEditable: false
-      });
     });
 
     setCombinedTransactions(combined);
-  }, [bills, monarchTransactions]);
+  }, [bills]);
 
   // Handle refresh
   const handleRefresh = async () => {

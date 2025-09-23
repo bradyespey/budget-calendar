@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { CombinedTransaction } from './useTransactions';
 
-export type SortField = 'name' | 'dueDate' | 'frequency' | 'account' | 'category' | 'amount' | 'source';
+export type SortField = 'name' | 'dueDate' | 'frequency' | 'account' | 'category' | 'amount' | 'source' | 'note';
 export type SortDirection = 'asc' | 'desc';
 
 export function useTransactionFilters(transactions: CombinedTransaction[]) {
@@ -20,7 +20,8 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
   const filteredTransactions = useMemo(() => {
     let filtered = transactions.filter(transaction => {
       const matchesSearch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           transaction.category.toLowerCase().includes(searchTerm.toLowerCase());
+                           transaction.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (transaction.note && transaction.note.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesFrequency = !frequencyFilter || transaction.frequency.toLowerCase().includes(frequencyFilter.toLowerCase());
       const matchesAccount = !accountFilter || transaction.account.toLowerCase().includes(accountFilter.toLowerCase());
       const matchesCategory = !categoryFilter || transaction.category.toLowerCase().includes(categoryFilter.toLowerCase());

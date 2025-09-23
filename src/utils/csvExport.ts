@@ -5,7 +5,7 @@ export async function exportBillsToCSV() {
   const bills = await getBills();
   if (!bills) return;
   
-  const headers = ['Name', 'Category', 'Amount', 'Repeats Every', 'Frequency', 'Start Date', 'End Date', 'Owner', 'Note', 'Monthly Cost', 'Yearly Cost'];
+  const headers = ['Name', 'Category', 'Amount', 'Repeats Every', 'Frequency', 'Start Date', 'End Date', 'Note', 'Monthly Cost', 'Yearly Cost'];
 
   const titleCase = (s: string) => s.replace(/\b\w/g, c => c.toUpperCase());
   const freqLabel = (f: string) => {
@@ -60,8 +60,7 @@ export async function exportBillsToCSV() {
         `"${freqLabel(bill.frequency)}"`,
         `"${format(parseISO(bill.start_date), 'M/d/yyyy')}"`,
         bill.end_date ? `"${format(parseISO(bill.end_date), 'M/d/yyyy')}"` : '',
-        bill.owner ? `"${bill.owner}"` : '',
-        bill.note ? `"${bill.note}"` : '',
+        bill.notes ? `"${bill.notes}"` : '',
         bill.amount !== 0 ? currency(monthly) : '$0',
         bill.amount !== 0 ? currency(yearly) : '$0'
       ].join(',');
@@ -76,13 +75,13 @@ export async function exportBillsToCSV() {
 }
 
 export function downloadSampleCSV() {
-  const headers = ['Name', 'Category', 'Amount', 'Repeats Every', 'Frequency', 'Start Date', 'End Date', 'Owner', 'Note', 'Monthly Cost', 'Yearly Cost'];
+  const headers = ['Name', 'Category', 'Amount', 'Repeats Every', 'Frequency', 'Start Date', 'End Date', 'Note', 'Monthly Cost', 'Yearly Cost'];
   const sampleData = [
-    ['Test Rent Monthly', 'House', '-$1,000', '1', 'Months', '8/7/2025', '', 'Both', 'Monthly rent payment', '-$1,000', '-$12,000'],
-    ['Test Groceries Weekly', 'Food & Drinks', '-$50', '1', 'Weeks', '8/9/2025', '', 'Both', '', '-$217', '-$2,600'],
-    ['Test Credit Card', 'Credit Card', '-$500', '1', 'Months', '8/11/2025', '', 'Brady', '', '-$500', '-$6,000'],
-    ['Test Subscription Every 5 Days', 'Subscription', '-$20', '5', 'Days', '8/13/2025', '9/11/2025', 'Jenny', '', '-$122', '-$1,460'],
-    ['Test Gym Yearly', 'Fitness', '-$100', '1', 'Years', '8/15/2025', '', 'Brady', 'Once a year test', '-$8', '-$100']
+    ['Test Rent Monthly', 'House', '-$1,000', '1', 'Months', '8/7/2025', '', 'Monthly rent payment', '-$1,000', '-$12,000'],
+    ['Test Groceries Weekly', 'Food & Drinks', '-$50', '1', 'Weeks', '8/9/2025', '', '', '-$217', '-$2,600'],
+    ['Test Credit Card', 'Credit Card', '-$500', '1', 'Months', '8/11/2025', '', '', '-$500', '-$6,000'],
+    ['Test Subscription Every 5 Days', 'Subscription', '-$20', '5', 'Days', '8/13/2025', '9/11/2025', '', '-$122', '-$1,460'],
+    ['Test Gym Yearly', 'Fitness', '-$100', '1', 'Years', '8/15/2025', '', 'Once a year test', '-$8', '-$100']
   ];
   
   const csvContent = [

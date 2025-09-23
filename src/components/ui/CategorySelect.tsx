@@ -9,6 +9,7 @@ import { getCategories, createCategory, Category } from '../../api/categories';
 
 interface CategorySelectProps {
   label?: string;
+  name?: string;
   value: string;
   onChange: (value: string) => void;
   error?: string;
@@ -17,6 +18,7 @@ interface CategorySelectProps {
 
 export function CategorySelect({ 
   label, 
+  name,
   value, 
   onChange, 
   error, 
@@ -69,11 +71,20 @@ export function CategorySelect({
       return;
     }
 
+    // Check if category already exists
+    const existingCategory = categories.find(cat => 
+      cat.name.toLowerCase() === newCategoryName.toLowerCase()
+    );
+    if (existingCategory) {
+      setAddingError('Category already exists');
+      return;
+    }
+
     setIsLoading(true);
     setAddingError('');
 
     try {
-      const newCategory = await createCategory(newCategoryName);
+      const newCategory = await createCategory(newCategoryName.trim());
       setCategories([...categories, newCategory]);
       onChange(newCategory.name);
       setNewCategoryName('');
@@ -100,6 +111,10 @@ export function CategorySelect({
     const selectedValue = e.target.value;
     if (selectedValue === '__ADD_NEW__') {
       setIsAddingNew(true);
+      // Reset the select value to prevent the "__ADD_NEW__" from being selected
+      setTimeout(() => {
+        e.target.value = value || '';
+      }, 0);
     } else {
       onChange(selectedValue);
     }
@@ -153,12 +168,14 @@ export function CategorySelect({
 
   return (
     <Select
+      name={name}
       label={label}
       value={value}
       onChange={handleSelectChange}
       error={error}
       helperText={helperText}
       options={[
+        { value: '', label: 'Select a category...' },
         ...categoryOptions,
         { value: '__ADD_NEW__', label: '+ Add New Category' }
       ]}

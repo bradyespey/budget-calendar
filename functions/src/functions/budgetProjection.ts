@@ -1,9 +1,104 @@
 import { getFirestore } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
+import { isWeekend } from "date-fns";
 
 const db = getFirestore();
 const region = 'us-central1';
+
+// Holiday and date adjustment logic
+async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
+  const holidays = new Set<string>();
+  for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+    try {
+      const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/US`);
+      if (res.ok) {
+        const data = await res.json();
+        data.forEach((h: { date: string }) => holidays.add(h.date));
+      }
+    } catch (error) {
+      logger.warn(`Failed to fetch holidays for ${year}:`, error);
+    }
+  }
+  return holidays;
+}
+
+function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<string>): Date {
+  let d = new Date(date);
+  const dateStr = (d: Date) => d.toISOString().split('T')[0];
+  
+  while (true) {
+    if (isPaycheck) {
+      // Paychecks move to previous weekday (not weekend or holiday)
+      if (isWeekend(d)) {
+        d.setDate(d.getDate() - 1);
+        continue;
+      }
+      if (holidays.has(dateStr(d))) {
+        d.setDate(d.getDate() - 1);
+        continue;
+      }
+    } else {
+      // Bills move to next weekday (not weekend or holiday)
+      if (isWeekend(d)) {
+        // Move to next Monday (or Tuesday if Monday is a holiday)
+        d.setDate(d.getDate() + (8 - d.getDay()) % 7);
+        continue;
+      }
+      if (holidays.has(dateStr(d))) {
+        d.setDate(d.getDate() + 1);
+        continue;
+      }
+    }
+    break;
+  }
+  return d;
+}
+
+function shouldBillOccurOnDate(bill: any, date: Date): boolean {
+  const billDate = new Date(bill.startDate);
+  
+  if (bill.frequency === 'daily') return true;
+  if (bill.frequency === 'weekly') {
+    const daysDiff = Math.floor((date.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
+    return daysDiff >= 0 && daysDiff % 7 === 0;
+  }
+  if (bill.frequency === 'monthly') {
+    const billDay = billDate.getDate();
+    const checkDay = date.getDate();
+    
+    // Handle end-of-month scenarios
+    // If the bill is scheduled for the 29th, 30th, or 31st, but the current month doesn't have that many days,
+    // schedule it on the last day of the month
+    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    
+    if (billDay > lastDayOfMonth) {
+      // Bill day doesn't exist in this month, so use the last day of the month
+      return checkDay === lastDayOfMonth;
+    } else {
+      // Normal case: bill day exists in this month
+      return billDay === checkDay;
+    }
+  }
+  if (bill.frequency === 'yearly') {
+    const billDay = billDate.getDate();
+    const checkDay = date.getDate();
+    
+    // Handle end-of-month scenarios for yearly bills too (e.g., Feb 29th)
+    if (billDate.getMonth() === date.getMonth()) {
+      const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+      
+      if (billDay > lastDayOfMonth) {
+        return checkDay === lastDayOfMonth;
+      } else {
+        return billDay === checkDay;
+      }
+    }
+  }
+  
+  return false;
+}
+
 
 async function computeProjections(settings: any) {
   try {
@@ -60,34 +155,64 @@ async function computeProjections(settings: any) {
   logger.info(`Today CST date: ${todayCST}`);
   logger.info(`Projection days: ${projectionDays}`);
   
+  // Fetch holidays for the projection period
+  const endDate = new Date(cstTime);
+  endDate.setDate(endDate.getDate() + projectionDays);
+  const holidays = await fetchUSHolidays(cstTime, endDate);
+  logger.info(`Fetched ${holidays.size} holidays for projection period`);
+  
   // First pass: Calculate all projections and find true highest/lowest
   const projectionDataList = [];
   let lowest = { balance: currentBalance, date: todayCST };
   let highest = { balance: currentBalance, date: todayCST };
   
+  // Pre-compute all bill occurrences with adjustments for the entire projection period
+  const billOccurrences = new Map<string, any[]>(); // dateStr -> bills[]
+  
+  // Initialize all projection dates
+  for (let i = 0; i < projectionDays; i++) {
+    const projectionDate = new Date(cstTime);
+    projectionDate.setDate(projectionDate.getDate() + i);
+    const dateStr = projectionDate.toISOString().split('T')[0];
+    billOccurrences.set(dateStr, []);
+  }
+  
+  // For each bill, find all its occurrences in the projection period and adjust them
+  for (const bill of bills) {
+    for (let i = 0; i < projectionDays; i++) {
+      const checkDate = new Date(cstTime);
+      checkDate.setDate(checkDate.getDate() + i);
+      
+      if (shouldBillOccurOnDate(bill, checkDate)) {
+        if (bill.frequency === 'daily') {
+          // Daily bills don't get adjusted
+          const dateStr = checkDate.toISOString().split('T')[0];
+          if (billOccurrences.has(dateStr)) {
+            billOccurrences.get(dateStr)!.push(bill);
+          }
+        } else {
+          // Adjust the date for weekends/holidays
+          const isPaycheck = bill.category && bill.category.toLowerCase() === 'paycheck';
+          const adjustedDate = adjustTransactionDate(checkDate, isPaycheck, holidays);
+          const adjustedDateStr = adjustedDate.toISOString().split('T')[0];
+          
+          // Add to the adjusted date if it's within our projection period
+          if (billOccurrences.has(adjustedDateStr)) {
+            billOccurrences.get(adjustedDateStr)!.push(bill);
+          }
+        }
+      }
+    }
+  }
+  
+  // Now process each projection date
   for (let i = 0; i < projectionDays; i++) {
     const projectionDate = new Date(cstTime);
     projectionDate.setDate(projectionDate.getDate() + i);
     const dateStr = projectionDate.toISOString().split('T')[0];
     
-    const billsDueToday = bills.filter(bill => {
-      const billDate = new Date(bill.startDate);
-      const today = new Date(dateStr);
-      
-      if (bill.frequency === 'daily') return true;
-      if (bill.frequency === 'weekly') {
-        const daysDiff = Math.floor((today.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
-        return daysDiff >= 0 && daysDiff % 7 === 0;
-      }
-      if (bill.frequency === 'monthly') {
-        return billDate.getDate() === today.getDate();
-      }
-      if (bill.frequency === 'yearly') {
-        return billDate.getDate() === today.getDate() && billDate.getMonth() === today.getMonth();
-      }
-      
-      return false;
-    });
+    // Get the bills for this date (already adjusted)
+    const billsToProcess = billOccurrences.get(dateStr) || [];
     
     // For today (i === 0), show transactions but don't update balance projection yet
     // Balance projection starts from tomorrow since today's transactions are likely processed
@@ -97,10 +222,10 @@ async function computeProjections(settings: any) {
       // Apply bills to running balance starting from tomorrow
       // CURRENT DATA: Bills are stored as negative amounts but should be treated as expenses
       // So we need to ADD the bill amounts (which are negative) to SUBTRACT from balance
-      const totalBillsToday = billsDueToday.reduce((sum, bill) => sum + bill.amount, 0);
+      const totalBillsToday = billsToProcess.reduce((sum, bill) => sum + bill.amount, 0);
       runningBalance += totalBillsToday; // Add negative amounts = subtract from balance
       balanceToStore = runningBalance;
-      logger.info(`Day ${i} (${dateStr}): ${billsDueToday.length} bills totaling $${totalBillsToday}, new balance: $${balanceToStore}`);
+      logger.info(`Day ${i} (${dateStr}): ${billsToProcess.length} bills totaling $${totalBillsToday}, new balance: $${balanceToStore}`);
     }
     
     // Track true highest and lowest
@@ -115,7 +240,7 @@ async function computeProjections(settings: any) {
     projectionDataList.push({
       projDate: dateStr,
       projectedBalance: balanceToStore,
-      bills: billsDueToday,
+      bills: billsToProcess,
       dateStr
     });
   }

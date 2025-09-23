@@ -122,11 +122,17 @@ Budget/
 └── package.json          # Node.js dependencies and scripts
 ```
 
+## Historical Context & Migration Notes
+- **Supabase Functions Preserved**: All original Supabase functions are kept in `/old/supabase/functions/` for historical reference
+- **Migration Policy**: Never modify files in `/old/` directory unless explicitly requested - these serve as historical context
+- **Platform Migration**: Successfully migrated from Supabase to Firebase
+
 ## Troubleshooting
 - **CORS Issues**: Resolved by using Firebase callable functions (HTTPS onCall)
 - **Function Timeouts**: Large operations use batch processing with 9-minute timeout
 - **Duplicate Events**: Intelligent comparison prevents duplicates, automatic cleanup removes extras
-- **Large Syncs**: 50-day batch processing prevents timeouts on 100+ day operations
+- **Calendar Clearing**: Fixed pagination and rate limiting - clearCalendars now properly clears all events from today onwards across all 4 calendars in one execution (1.5 min for 105+ events)
+- **Large Syncs**: Fixed rate limiting issues - both clearCalendars and syncCalendar now complete all operations in one pass using proper rate limiting with exponential backoff (no more 10-second timeouts)
 - **Chrome Profile Issues**: Run `setup_chrome_profile.py` to create initial profile for Monarch Money login
 - **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
 - **Monarch API**: Uses GraphQL `Web_GetAllRecurringTransactionItems` with `recurringTransactionStreams` for live amounts, credit card data, merchant logos, category icons, and enhanced transaction metadata

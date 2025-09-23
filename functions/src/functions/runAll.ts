@@ -116,7 +116,7 @@ export const runAll = functions.region(region).https.onRequest(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ env: 'prod' })
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 45 seconds')), 45000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 8 minutes')), 480000))
       ]).then(async (response: any) => {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);

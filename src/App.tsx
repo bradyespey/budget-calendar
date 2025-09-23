@@ -5,7 +5,6 @@ import { AuthProvider } from './context/AuthContext'
 import { RequireAuth } from './components/Layout/RequireAuth'
 import { Layout } from './components/Layout/Layout'
 import { LoginPage } from './pages/LoginPage'
-import { AuthCallback } from './pages/AuthCallback'
 import { DashboardPage } from './pages/DashboardPage'
 import { TransactionsPage } from './pages/TransactionsPage'
 import { UpcomingPage } from './pages/UpcomingPage'
@@ -19,7 +18,6 @@ function App() {
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
 
 
           {/* Protected */}

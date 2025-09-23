@@ -46,13 +46,14 @@ export const syncCalendar = functions.region(region).https.onRequest(
       }
       
       // Get all projections from database
+      // Note: Projections already include weekend/holiday adjustments from budgetProjection function
       const projectionsSnapshot = await db.collection('projections').get();
       const projections = projectionsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as any[];
       
-      logger.info(`Found ${projections.length} projections to sync`);
+      logger.info(`Found ${projections.length} projections to sync (with weekend/holiday adjustments)`);
       
       if (projections.length === 0) {
         res.status(200).json({

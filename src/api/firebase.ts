@@ -33,8 +33,7 @@ export interface Bill {
   repeatsEvery: number;
   startDate: string;
   endDate?: string | null;
-  owner?: string | null;
-  note?: string | null;
+  notes?: string | null;
 }
 
 export interface Category {

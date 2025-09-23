@@ -4,6 +4,21 @@ import * as functions from "firebase-functions/v1";
 
 const region = 'us-central1';
 
+// Helper function to map Monarch categories to our categories
+function mapMonarchCategory(monarchCategory: string): string {
+  const categoryMap: { [key: string]: string } = {
+    'subscription': 'Streaming',
+    'food & drinks': 'Food & Drinks',
+    'travel': 'Travel',
+    'other': 'Other',
+    'golf': 'Golf',
+    'paycheck': 'Paycheck'
+  };
+  
+  const normalized = monarchCategory.toLowerCase();
+  return categoryMap[normalized] || monarchCategory;
+}
+
 export const refreshTransactions = functions.region(region).https.onRequest(
   async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
@@ -28,13 +43,13 @@ export const refreshTransactions = functions.region(region).https.onRequest(
         "Authorization": `Token ${monarchToken}`,
       };
 
-      // Clear existing data
-      const existingSnapshot = await admin.firestore().collection('recurringTransactions').get();
-      const batch = admin.firestore().batch();
-      existingSnapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
+      // Get existing Monarch bills for comparison
+      const existingSnapshot = await admin.firestore().collection('bills').where('source', '==', 'monarch').get();
+      const existingBills = new Map();
+      existingSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        existingBills.set(data.streamId, { id: doc.id, ...data });
       });
-      await batch.commit();
 
       const recurringQuery = `
         query Web_GetAllRecurringTransactionItems($filters: RecurringTransactionFilter, $includeLiabilities: Boolean) {
@@ -113,34 +128,87 @@ export const refreshTransactions = functions.region(region).https.onRequest(
         const stream = item.stream;
         const nextTransaction = item.nextForecastedTransaction;
 
-        const docData = {
-          streamId: stream.id,
-          merchantName: stream.name || 'Unknown',
+        // Convert to bills format
+        const billData = {
+          name: stream.name || 'Unknown',
+          amount: -(Math.abs(nextTransaction.amount || 0)), // Make expenses negative
+          category: mapMonarchCategory(item.category?.name || 'Other'),
           frequency: stream.frequency || 'monthly',
-          amount: nextTransaction.amount || 0,
-          nextDueDate: nextTransaction.date || null,
-          categoryName: item.category?.name || 'Uncategorized',
-          categoryIcon: item.category?.icon || '📄',
+          startDate: nextTransaction.date || new Date().toISOString().split('T')[0],
+          endDate: null,
+          repeatsEvery: 1,
+          notes: null, // Don't save notes for Monarch transactions
+          source: 'monarch',
+          streamId: stream.id,
           accountName: item.account?.displayName || 'Unknown Account',
           accountIcon: item.account?.icon || 'dollar-sign',
           logoUrl: stream.logoUrl || null,
+          categoryIcon: item.category?.icon || '📄',
           isActive: stream.isActive !== false,
           isApproximate: stream.isApproximate || false,
-          source: 'monarch',
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
-        const docRef = admin.firestore().collection('recurringTransactions').doc();
-        storeBatch.set(docRef, docData);
+        // Check if this bill already exists and needs updating
+        const existingBill = existingBills.get(stream.id);
+        
+        if (existingBill) {
+          // Compare key fields to see if update is needed
+          const needsUpdate = (
+            existingBill.name !== billData.name ||
+            existingBill.amount !== billData.amount ||
+            existingBill.category !== billData.category ||
+            existingBill.frequency !== billData.frequency ||
+            existingBill.startDate !== billData.startDate ||
+            existingBill.accountName !== billData.accountName ||
+            existingBill.isActive !== billData.isActive
+          );
+          
+          if (needsUpdate) {
+            // Update existing bill
+            const docRef = admin.firestore().collection('bills').doc(existingBill.id);
+            storeBatch.update(docRef, billData);
+            logger.info(`Updating bill for ${stream.name} (${stream.id})`);
+          }
+          
+          // Mark as processed
+          existingBills.delete(stream.id);
+        } else {
+          // Create new bill
+          const newBillData = {
+            ...billData,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          };
+          const docRef = admin.firestore().collection('bills').doc();
+          storeBatch.set(docRef, newBillData);
+          logger.info(`Creating new bill for ${stream.name} (${stream.id})`);
+        }
+        
         storedCount++;
       }
 
       await storeBatch.commit();
 
+      // Delete bills that no longer exist in Monarch
+      const deleteBatch = admin.firestore().batch();
+      let deletedCount = 0;
+      
+      for (const [streamId, bill] of existingBills) {
+        logger.info(`Deleting bill for ${bill.name} (${streamId}) - no longer in Monarch`);
+        const docRef = admin.firestore().collection('bills').doc(bill.id);
+        deleteBatch.delete(docRef);
+        deletedCount++;
+      }
+      
+      if (deletedCount > 0) {
+        await deleteBatch.commit();
+      }
+
       res.status(200).json({
         success: true,
         message: 'Recurring transactions refreshed successfully',
         count: storedCount,
+        deleted: deletedCount,
         updatedAt: new Date().toISOString()
       });
 

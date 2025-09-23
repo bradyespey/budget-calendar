@@ -22,8 +22,7 @@ export interface Database {
           repeats_every: number
           start_date: string
           end_date: string | null
-          owner: string | null
-          note: string | null
+          notes: string | null
         }
         Insert: {
           id?: string
@@ -34,8 +33,7 @@ export interface Database {
           repeats_every?: number
           start_date: string
           end_date?: string | null
-          owner?: string | null
-          note?: string | null
+          notes?: string | null
         }
         Update: {
           id?: string
@@ -46,8 +44,7 @@ export interface Database {
           repeats_every?: number
           start_date?: string
           end_date?: string | null
-          owner?: string | null
-          note?: string | null
+          notes?: string | null
         }
       }
       accounts: {

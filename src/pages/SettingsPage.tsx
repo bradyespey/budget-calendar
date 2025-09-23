@@ -385,6 +385,7 @@ export function SettingsPage() {
     }
   }, []);
 
+
   async function handleAllActions() {
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
@@ -584,6 +585,7 @@ export function SettingsPage() {
               onSyncCalendar={handleSyncCalendar}
               onAllActions={handleAllActions}
             />
+            
           </div>
         </CardContent>
       </Card>

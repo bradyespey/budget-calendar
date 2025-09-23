@@ -79,8 +79,7 @@ export async function importBillsFromCSV(csvData: string): Promise<{ total: numb
       repeats_every: parseInt(data['Repeats Every'] || '1', 10) || 1,
       start_date,
       end_date,
-      owner:       data.Owner as Bill['owner'],
-      note:        data.Note
+      notes:       data.Note
     })
   }
 

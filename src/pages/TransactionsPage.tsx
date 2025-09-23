@@ -170,11 +170,10 @@ export function TransactionsPage() {
         name: selectedTransaction.name,
         category: selectedTransaction.category,
         amount: selectedTransaction.amount,
-        frequency: 'monthly', // Will need to derive from selectedTransaction
-        repeats_every: 1,
+        frequency: selectedTransaction.rawFrequency || 'monthly',
+        repeats_every: selectedTransaction.repeats_every || 1,
         start_date: selectedTransaction.dueDate,
-        note: selectedTransaction.note || '',
-        owner: selectedTransaction.owner || 'Both' as const,
+        notes: selectedTransaction.notes || '',
       };
       return billData;
     }
@@ -283,7 +282,6 @@ export function TransactionsPage() {
         {/* Form Modal */}
         <TransactionForm
           mode={formMode}
-          categories={categories}
           initialData={getInitialFormData()}
           onSubmit={handleSubmitForm}
           onCancel={() => setFormMode('view')}

@@ -31,10 +31,13 @@ export async function getBills() {
         repeats_every: d.repeatsEvery ?? d.repeats_every ?? 1,
         start_date: d.startDate ?? d.start_date,
         end_date: d.endDate ?? d.end_date,
-        owner: d.owner,
-        note: d.note,
+        notes: d.notes,
         iconUrl: d.iconUrl,
         iconType: d.iconType,
+        source: d.source,
+        streamId: d.streamId,
+        accountName: d.accountName,
+        logoUrl: d.logoUrl,
       } as Bill;
     });
   } catch (error) {
@@ -83,10 +86,10 @@ export async function createBill(bill: Omit<Bill, 'id'>) {
       frequency: bill.frequency,
       repeatsEvery: bill.repeats_every,
       startDate: bill.start_date,
+      source: 'manual', // Mark as manual transaction
     };
     if (bill.end_date) payload.endDate = bill.end_date;
-    if (bill.owner) payload.owner = bill.owner;
-    if (bill.note) payload.note = bill.note;
+    if (bill.notes) payload.notes = bill.notes;
     if (bill.iconUrl) payload.iconUrl = bill.iconUrl;
     if (bill.iconType) payload.iconType = bill.iconType;
 
@@ -114,8 +117,7 @@ export async function updateBill(id: string, updates: Partial<Omit<Bill, 'id'>>)
     if (updates.repeats_every !== undefined) firestoreUpdates.repeatsEvery = updates.repeats_every;
     if (updates.start_date !== undefined) firestoreUpdates.startDate = updates.start_date;
     if (updates.end_date !== undefined) firestoreUpdates.endDate = updates.end_date;
-    if (updates.owner !== undefined) firestoreUpdates.owner = updates.owner;
-    if (updates.note !== undefined) firestoreUpdates.note = updates.note;
+    if (updates.notes !== undefined) firestoreUpdates.notes = updates.notes;
     if (updates.iconUrl !== undefined) firestoreUpdates.iconUrl = updates.iconUrl;
     if (updates.iconType !== undefined) firestoreUpdates.iconType = updates.iconType;
     

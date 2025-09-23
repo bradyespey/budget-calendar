@@ -77,6 +77,12 @@ export function TransactionsTable({
                 >
                   Source {sortField === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
+                <th 
+                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
+                  onClick={() => onSort('note')}
+                >
+                  Notes {sortField === 'note' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="text-left px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
@@ -99,7 +105,7 @@ export function TransactionsTable({
                     </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {format(parseISO(transaction.dueDate), 'MMM d')}
+                    {transaction.dueDate ? format(parseISO(transaction.dueDate), 'MMM d') : '—'}
                   </td>
                   <td className="px-4 py-3">
                     <span 
@@ -145,6 +151,11 @@ export function TransactionsTable({
                     >
                       {transaction.source === 'manual' ? 'Manual' : 'Monarch'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs">
+                    <div className="truncate" title={transaction.note || ''}>
+                      {transaction.note || '—'}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {transaction.isEditable && (

@@ -10,9 +10,13 @@ export interface Bill {
   repeats_every: number
   start_date: string
   end_date?: string
-  note?: string
+  notes?: string
   iconUrl?: string | null
   iconType?: 'brand' | 'generated' | 'category' | 'custom' | null
+  source?: 'manual' | 'monarch'
+  streamId?: string
+  accountName?: string
+  logoUrl?: string
 }
 
 export interface Account {

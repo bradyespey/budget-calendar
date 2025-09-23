@@ -19,3 +19,4 @@ export { resetAllIcons } from './functions/resetAllIcons';
 export { backupIcons } from './functions/backupIcons';
 export { restoreIcons } from './functions/restoreIcons';
 export { getIconBackupInfo } from './functions/getIconBackupInfo';
+export { consolidateData } from './functions/consolidateData';

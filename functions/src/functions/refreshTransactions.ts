@@ -5,7 +5,24 @@ import * as functions from "firebase-functions/v1";
 const region = 'us-central1';
 
 // Helper function to map Monarch categories to our categories
-function mapMonarchCategory(monarchCategory: string): string {
+function mapMonarchCategory(monarchCategory: string, merchantName?: string): string {
+  // Credit card payment mapping - check merchant name first
+  const creditCardMerchants = [
+    'Chase Southwest Credit Card',
+    'Amazon Prime Credit', 
+    'American Express Credit',
+    'Apple Card',
+    'Chase Freedom - Brady',
+    'Chase Freedom - Jenny',
+    'Capital One Credit - Brady',
+    'PayPal Credit',
+    'PECU Credit Card'
+  ];
+  
+  if (merchantName && creditCardMerchants.includes(merchantName)) {
+    return 'Credit Card Payment';
+  }
+  
   const categoryMap: { [key: string]: string } = {
     'subscription': 'Streaming',
     'food & drinks': 'Food & Drinks',
@@ -66,6 +83,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
               logoUrl
               merchant {
                 id
+                name
                 __typename
               }
               __typename
@@ -79,6 +97,11 @@ export const refreshTransactions = functions.region(region).https.onRequest(
               id
               name
               icon
+              group {
+                id
+                name
+                __typename
+              }
               __typename
             }
             account {
@@ -86,6 +109,19 @@ export const refreshTransactions = functions.region(region).https.onRequest(
               displayName
               icon
               logoUrl
+              type {
+                name
+                __typename
+              }
+              subtype {
+                name
+                __typename
+              }
+              institution {
+                id
+                name
+                __typename
+              }
               __typename
             }
             __typename
@@ -128,22 +164,34 @@ export const refreshTransactions = functions.region(region).https.onRequest(
         const stream = item.stream;
         const nextTransaction = item.nextForecastedTransaction;
 
-        // Convert to bills format
+        // Convert to bills format with enhanced data
         const billData = {
           name: stream.name || 'Unknown',
-          amount: -(Math.abs(nextTransaction.amount || 0)), // Make expenses negative
-          category: mapMonarchCategory(item.category?.name || 'Other'),
+          amount: nextTransaction.amount || 0, // Preserve original sign from Monarch
+          category: mapMonarchCategory(item.category?.name || 'Other', stream.name),
           frequency: stream.frequency || 'monthly',
-          startDate: nextTransaction.date || new Date().toISOString().split('T')[0],
+          startDate: nextTransaction.date || new Date().toISOString().split('T')[0], // Use nextForecastedTransaction date
           endDate: null,
           repeatsEvery: 1,
           notes: null, // Don't save notes for Monarch transactions
           source: 'monarch',
           streamId: stream.id,
+          // Account data
           accountName: item.account?.displayName || 'Unknown Account',
           accountIcon: item.account?.icon || 'dollar-sign',
-          logoUrl: stream.logoUrl || null,
-          categoryIcon: item.category?.icon || '📄',
+          accountType: item.account?.type?.name || null,
+          accountSubtype: item.account?.subtype?.name || null,
+          institutionName: item.account?.institution?.name || null,
+          institutionId: item.account?.institution?.id || null,
+          // Icon data
+          logoUrl: stream.logoUrl || null, // Monarch merchant logo
+          merchantName: stream.merchant?.name || null,
+          merchantId: stream.merchant?.id || null,
+          // Category data
+          categoryIcon: mapMonarchCategory(item.category?.name || 'Other', stream.name) === 'Credit Card Payment' ? '💳' : (item.category?.icon || '📄'),
+          categoryGroup: item.category?.group?.name || null,
+          categoryGroupId: item.category?.group?.id || null,
+          // Metadata
           isActive: stream.isActive !== false,
           isApproximate: stream.isApproximate || false,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()

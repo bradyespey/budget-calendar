@@ -20,6 +20,8 @@ interface TransactionFormProps {
     repeats_every: number | string;
     start_date: string;
     notes: string;
+    iconUrl?: string;
+    iconType?: 'brand' | 'generated' | 'category' | 'custom' | null;
   };
   onSubmit: (data: any) => Promise<void>;
   onCancel: () => void;
@@ -47,6 +49,8 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
     repeats_every: 1,
     start_date: getCSTDate(),
     notes: '',
+    iconUrl: '',
+    iconType: null as 'brand' | 'generated' | 'category' | 'custom' | null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [transactionType, setTransactionType] = useState<'debit' | 'credit'>(
@@ -56,7 +60,11 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
   // Update form data when initialData changes (for editing)
   useEffect(() => {
     if (initialData && mode === 'edit') {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        iconUrl: initialData.iconUrl || '',
+        iconType: initialData.iconType || null,
+      });
       setTransactionType(initialData.amount >= 0 ? 'credit' : 'debit');
     }
   }, [initialData, mode]);
@@ -121,7 +129,9 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
       const submitData = {
         ...formData,
         amount: finalAmount,
-        repeats_every: typeof formData.repeats_every === 'string' ? parseInt(formData.repeats_every) || 1 : formData.repeats_every
+        repeats_every: typeof formData.repeats_every === 'string' ? parseInt(formData.repeats_every) || 1 : formData.repeats_every,
+        iconUrl: formData.iconUrl || null,
+        iconType: formData.iconType || null
       };
       await onSubmit(submitData);
     } catch (error) {
@@ -257,6 +267,41 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
               onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
               placeholder="Add a note..."
             />
+            
+            {/* Icon URL Input Field */}
+            <div className="w-full">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Custom Icon URL (Optional)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={formData.iconUrl || ''}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    iconUrl: e.target.value,
+                    iconType: e.target.value ? 'custom' : null
+                  }))}
+                  placeholder="https://example.com/icon.png"
+                  className="flex-1 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white py-2 px-3 shadow-sm transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+                {formData.iconUrl && (
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+                    <img 
+                      src={formData.iconUrl} 
+                      alt="Icon preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Enter a URL to a custom icon image (PNG, JPG, SVG)
+              </p>
+            </div>
             
             <div className="flex gap-2 pt-4">
               <Button 

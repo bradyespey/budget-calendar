@@ -80,6 +80,13 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
       return billDay === checkDay;
     }
   }
+  if (bill.frequency === 'Semimonthly_mid_end' || bill.frequency === 'semimonthly_mid_end') {
+    const checkDay = date.getDate();
+    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    
+    // Semimonthly_mid_end occurs on the 15th and last day of each month
+    return checkDay === 15 || checkDay === lastDayOfMonth;
+  }
   if (bill.frequency === 'yearly') {
     const billDay = billDate.getDate();
     const checkDay = date.getDate();
@@ -220,10 +227,11 @@ async function computeProjections(settings: any) {
     
     if (i > 0) {
       // Apply bills to running balance starting from tomorrow
-      // CURRENT DATA: Bills are stored as negative amounts but should be treated as expenses
-      // So we need to ADD the bill amounts (which are negative) to SUBTRACT from balance
+      // Bills now preserve their original sign from Monarch:
+      // - Negative amounts = expenses (subtract from balance)
+      // - Positive amounts = income (add to balance)
       const totalBillsToday = billsToProcess.reduce((sum, bill) => sum + bill.amount, 0);
-      runningBalance += totalBillsToday; // Add negative amounts = subtract from balance
+      runningBalance += totalBillsToday; // Add amounts directly (negative = expense, positive = income)
       balanceToStore = runningBalance;
       logger.info(`Day ${i} (${dateStr}): ${billsToProcess.length} bills totaling $${totalBillsToday}, new balance: $${balanceToStore}`);
     }
@@ -294,6 +302,12 @@ export const budgetProjection = functions.region(region).https.onRequest(
         settings = defaultSettings;
       } else {
         settings = settingsDoc.data();
+      }
+      
+      // Override projectionDays from request body if provided
+      if (req.body && req.body.projectionDays && settings) {
+        settings.projectionDays = req.body.projectionDays;
+        logger.info(`Using projectionDays from request: ${settings.projectionDays}`);
       }
 
       await computeProjections(settings);

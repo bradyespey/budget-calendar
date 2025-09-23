@@ -23,6 +23,12 @@ export interface CombinedTransaction {
   iconType?: 'brand' | 'generated' | 'category' | 'custom' | null;
   // Monarch transaction fields
   merchantLogoUrl?: string;
+  merchantName?: string;
+  categoryIcon?: string;
+  categoryGroup?: string;
+  accountType?: string;
+  accountSubtype?: string;
+  institutionName?: string;
   isEditable: boolean;
   // Raw data for editing
   rawFrequency?: string;
@@ -44,6 +50,21 @@ function pluralize(frequency: string) {
 
 function formatFrequency(frequency: string, repeatsEvery: number = 1): string {
   if (frequency === 'one-time') return 'One-time';
+  
+  // Map Monarch frequency values to better display names
+  const frequencyMap: { [key: string]: string } = {
+    'Semimonthly_mid_end': 'Twice a month (15th & last day)',
+    'semimonthly_mid_end': 'Twice a month (15th & last day)',
+    'semimonthly': 'Twice a month',
+    'biweekly': 'Every 2 weeks',
+    'bi-monthly': 'Every 2 months'
+  };
+  
+  // Check if we have a mapped frequency
+  const mappedFrequency = frequencyMap[frequency.toLowerCase()];
+  if (mappedFrequency) {
+    return mappedFrequency;
+  }
   
   if (repeatsEvery === 1) {
     return capitalize(frequency);
@@ -102,6 +123,12 @@ export function useTransactions() {
           iconUrl: bill.iconUrl,
           iconType: bill.iconType,
           merchantLogoUrl: bill.logoUrl,
+          merchantName: bill.merchantName,
+          categoryIcon: bill.categoryIcon,
+          categoryGroup: bill.categoryGroup,
+          accountType: bill.accountType,
+          accountSubtype: bill.accountSubtype,
+          institutionName: bill.institutionName,
           isEditable: bill.source !== 'monarch',
           rawFrequency: bill.frequency,
           repeats_every: bill.repeats_every || 1

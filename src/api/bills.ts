@@ -38,6 +38,16 @@ export async function getBills() {
         streamId: d.streamId,
         accountName: d.accountName,
         logoUrl: d.logoUrl,
+        // Enhanced fields from Monarch
+        merchantName: d.merchantName,
+        merchantId: d.merchantId,
+        categoryIcon: d.categoryIcon,
+        categoryGroup: d.categoryGroup,
+        categoryGroupId: d.categoryGroupId,
+        accountType: d.accountType,
+        accountSubtype: d.accountSubtype,
+        institutionName: d.institutionName,
+        institutionId: d.institutionId,
       } as Bill;
     });
   } catch (error) {

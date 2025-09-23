@@ -95,7 +95,7 @@ VITE_DEBUG_MODE=true
 
 ## App Pages / Routes
 - **Dashboard**: Current balance and financial status overview with low balance alerts
-- **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling, and optimized form performance
+- **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling, optimized form performance, category icons, merchant logos, and manual icon input
 - **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality
 - **Upcoming**: Calendar view of upcoming bills, income, projected balances
 - **Settings**: Projection settings, manual triggers, import/export, maintenance functions with admin timestamps
@@ -129,14 +129,14 @@ Budget/
 - **Large Syncs**: 50-day batch processing prevents timeouts on 100+ day operations
 - **Chrome Profile Issues**: Run `setup_chrome_profile.py` to create initial profile for Monarch Money login
 - **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
-- **Monarch API**: Uses GraphQL `Web_GetAllRecurringTransactionItems` with `recurringTransactionStreams` for live amounts and credit card data
+- **Monarch API**: Uses GraphQL `Web_GetAllRecurringTransactionItems` with `recurringTransactionStreams` for live amounts, credit card data, merchant logos, category icons, and enhanced transaction metadata
 - **Data Matching**: Zero tolerance amount matching, timezone-safe date comparison, frequency-aware matching with repeats_every logic
 - **Date Range**: Extended queries (today to 1.5 years) capture all yearly transactions, return next immediate upcoming dates matching Monarch UI exactly
 - **Weekend/Holiday Adjustment**: Automatic date adjustment for events - paychecks move to previous business day, bills move to next business day, with US holiday API integration
 - **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes, optimized form state management
 - **Loading States**: Fixed infinite loading on Transactions page when using cached data
 - **Monarch Status**: Added reverse matching (bills → Monarch) with visual indicators and status filtering
-- **Data Management**: Unified `bills` table as single source of truth, intelligent refresh logic prevents unnecessary updates, removed legacy transaction tables
+- **Data Management**: Unified `bills` table as single source of truth, intelligent refresh logic prevents unnecessary updates, removed legacy transaction tables, enhanced with merchant logos, category icons, and credit card payment mapping
 
 ## AI Handoff
 Read this README, scan the repo, prioritize core functions and env-safe areas, keep env and rules aligned with this file

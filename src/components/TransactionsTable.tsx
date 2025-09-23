@@ -127,10 +127,13 @@ export function TransactionsTable({
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                     <span 
-                      className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                      className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors flex items-center gap-1"
                       onClick={() => onFilterClick('category', transaction.category)}
                       title={`Filter by ${transaction.category}`}
                     >
+                      {transaction.categoryIcon && (
+                        <span className="text-sm">{transaction.categoryIcon}</span>
+                      )}
                       {capitalize(transaction.category)}
                     </span>
                   </td>

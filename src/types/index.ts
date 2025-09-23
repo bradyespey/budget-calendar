@@ -17,6 +17,16 @@ export interface Bill {
   streamId?: string
   accountName?: string
   logoUrl?: string
+  // Enhanced fields from Monarch API
+  merchantName?: string
+  merchantId?: string
+  categoryIcon?: string
+  categoryGroup?: string
+  categoryGroupId?: string
+  accountType?: string
+  accountSubtype?: string
+  institutionName?: string
+  institutionId?: string
 }
 
 export interface Account {

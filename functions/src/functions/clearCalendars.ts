@@ -20,7 +20,13 @@ async function getCalendarAuth() {
   return auth;
 }
 
-export const clearCalendars = functions.region(region).https.onRequest(
+export const clearCalendars = functions
+  .region(region)
+  .runWith({
+    timeoutSeconds: 540, // 9 minutes max timeout
+    memory: '1GB' // Increased memory for large operations
+  })
+  .https.onRequest(
   async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -57,48 +63,112 @@ export const clearCalendars = functions.region(region).https.onRequest(
       let prodBillsCleared = 0;
       let prodBalanceCleared = 0;
       
+      // Helper function to handle rate limiting
+      async function withRateLimit<T>(operation: () => Promise<T>, maxRetries = 5): Promise<T> {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            return await operation();
+          } catch (error: any) {
+            if (error?.code === 429 || error?.message?.includes('quota') || error?.message?.includes('rate limit')) {
+              const delayMs = Math.min(1000 * Math.pow(2, attempt), 30000); // Exponential backoff, max 30s
+              logger.warn(`Rate limited, retrying in ${delayMs}ms (attempt ${attempt}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+              continue;
+            }
+            throw error; // Re-throw if not a rate limit error
+          }
+        }
+        throw new Error(`Failed after ${maxRetries} attempts due to rate limiting`);
+      }
+
+      // Helper function to get all events with pagination and rate limiting
+      async function getAllEvents(calendarId: string, calendarName: string) {
+        const allEvents: any[] = [];
+        let pageToken: string | undefined = undefined;
+        let totalFetched = 0;
+        
+        do {
+          const response: any = await withRateLimit(async () => {
+            logger.info(`Fetching events for ${calendarName} (page ${pageToken ? 'next' : 'first'})...`);
+            return await calendar.events.list({
+              calendarId,
+              timeMin: todayCST.toISOString(),
+              timeMax: oneYearFromNow.toISOString(),
+              singleEvents: true,
+              maxResults: 1000, // Reduced to avoid hitting limits
+              pageToken
+            });
+          });
+          
+          if (response.data.items) {
+            allEvents.push(...response.data.items);
+            totalFetched += response.data.items.length;
+            logger.info(`Fetched ${response.data.items.length} events from ${calendarName} (total: ${totalFetched})`);
+          }
+          
+          pageToken = response.data.nextPageToken;
+          
+          // Add delay between pages to avoid rate limiting
+          if (pageToken) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } while (pageToken);
+        
+        logger.info(`Total events found in ${calendarName}: ${allEvents.length}`);
+        return allEvents;
+      }
+      
+      // Helper function to delete events in batches with aggressive rate limiting handling
+      async function deleteEventsInBatches(events: any[], calendarId: string, calendarName: string) {
+        let deletedCount = 0;
+        const BATCH_SIZE = 5; // Smaller batches to avoid rate limits
+        
+        for (let i = 0; i < events.length; i += BATCH_SIZE) {
+          const batch = events.slice(i, i + BATCH_SIZE);
+          logger.info(`Deleting batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(events.length / BATCH_SIZE)} from ${calendarName} (${batch.length} events)`);
+          
+          // Process each delete sequentially to avoid overwhelming the API
+          for (const event of batch) {
+            if (event.id) {
+              try {
+                await withRateLimit(async () => {
+                  await calendar.events.delete({
+                    calendarId,
+                    eventId: event.id
+                  });
+                });
+                deletedCount++;
+                logger.info(`Deleted ${calendarName} event: ${event.summary} (${event.start?.date})`);
+              } catch (error) {
+                logger.error(`Failed to delete event ${event.id} from ${calendarName}:`, error);
+              }
+              
+              // Small delay between individual deletes
+              await new Promise(resolve => setTimeout(resolve, 50));
+            }
+          }
+          
+          // Longer delay between batches
+          if (i + BATCH_SIZE < events.length) {
+            logger.info(`Completed batch ${Math.floor(i / BATCH_SIZE) + 1}, pausing before next batch...`);
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        }
+        
+        return deletedCount;
+      }
+      
       // Always clear ALL calendars regardless of settings
       // Clear dev bills calendar
       if (devBillsCalendarId) {
         try {
           logger.info("Clearing dev bills calendar events...");
-          const devBillsEvents = await calendar.events.list({
-            calendarId: devBillsCalendarId,
-            timeMin: todayCST.toISOString(),
-            timeMax: oneYearFromNow.toISOString(),
-            singleEvents: true,
-            maxResults: 2500 // Google's max
-          });
+          const devBillsEvents = await getAllEvents(devBillsCalendarId, "dev bills");
           
-          if (devBillsEvents.data.items && devBillsEvents.data.items.length > 0) {
-            logger.info(`Found ${devBillsEvents.data.items.length} events to delete in dev bills calendar`);
-            
-            // Delete in batches to avoid timeout
-            for (let i = 0; i < devBillsEvents.data.items.length; i += 10) {
-              const batch = devBillsEvents.data.items.slice(i, i + 10);
-              const deletePromises = batch.map(event => {
-                if (event.id) {
-                  return calendar.events.delete({
-                    calendarId: devBillsCalendarId,
-                    eventId: event.id
-                  }).then(() => {
-                    clearedCount++;
-                    devBillsCleared++;
-                    logger.info(`Deleted dev bills event: ${event.summary} (${event.start?.date})`);
-                  }).catch(err => {
-                    logger.error(`Failed to delete event ${event.id}:`, err);
-                  });
-                }
-                return Promise.resolve();
-              });
-              
-              await Promise.allSettled(deletePromises);
-              
-              // Add small delay between batches
-              if (i + 10 < devBillsEvents.data.items.length) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            }
+          if (devBillsEvents.length > 0) {
+            const deleted = await deleteEventsInBatches(devBillsEvents, devBillsCalendarId, "dev bills");
+            clearedCount += deleted;
+            devBillsCleared = deleted;
           } else {
             logger.info("No events found in dev bills calendar");
           }
@@ -111,43 +181,12 @@ export const clearCalendars = functions.region(region).https.onRequest(
       if (devBalanceCalendarId) {
         try {
           logger.info("Clearing dev balance calendar events...");
-          const devBalanceEvents = await calendar.events.list({
-            calendarId: devBalanceCalendarId,
-            timeMin: todayCST.toISOString(),
-            timeMax: oneYearFromNow.toISOString(),
-            singleEvents: true,
-            maxResults: 2500 // Google's max
-          });
+          const devBalanceEvents = await getAllEvents(devBalanceCalendarId, "dev balance");
           
-          if (devBalanceEvents.data.items && devBalanceEvents.data.items.length > 0) {
-            logger.info(`Found ${devBalanceEvents.data.items.length} events to delete in dev balance calendar`);
-            
-            // Delete in batches to avoid timeout
-            for (let i = 0; i < devBalanceEvents.data.items.length; i += 10) {
-              const batch = devBalanceEvents.data.items.slice(i, i + 10);
-              const deletePromises = batch.map(event => {
-                if (event.id) {
-                  return calendar.events.delete({
-                    calendarId: devBalanceCalendarId,
-                    eventId: event.id
-                  }).then(() => {
-                    clearedCount++;
-                    devBalanceCleared++;
-                    logger.info(`Deleted dev balance event: ${event.summary} (${event.start?.date})`);
-                  }).catch(err => {
-                    logger.error(`Failed to delete event ${event.id}:`, err);
-                  });
-                }
-                return Promise.resolve();
-              });
-              
-              await Promise.allSettled(deletePromises);
-              
-              // Add small delay between batches
-              if (i + 10 < devBalanceEvents.data.items.length) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            }
+          if (devBalanceEvents.length > 0) {
+            const deleted = await deleteEventsInBatches(devBalanceEvents, devBalanceCalendarId, "dev balance");
+            clearedCount += deleted;
+            devBalanceCleared = deleted;
           } else {
             logger.info("No events found in dev balance calendar");
           }
@@ -160,43 +199,12 @@ export const clearCalendars = functions.region(region).https.onRequest(
       if (prodBillsCalendarId) {
         try {
           logger.info("Clearing prod bills calendar events...");
-          const prodBillsEvents = await calendar.events.list({
-            calendarId: prodBillsCalendarId,
-            timeMin: todayCST.toISOString(),
-            timeMax: oneYearFromNow.toISOString(),
-            singleEvents: true,
-            maxResults: 2500 // Google's max
-          });
+          const prodBillsEvents = await getAllEvents(prodBillsCalendarId, "prod bills");
           
-          if (prodBillsEvents.data.items && prodBillsEvents.data.items.length > 0) {
-            logger.info(`Found ${prodBillsEvents.data.items.length} events to delete in prod bills calendar`);
-            
-            // Delete in batches to avoid timeout
-            for (let i = 0; i < prodBillsEvents.data.items.length; i += 10) {
-              const batch = prodBillsEvents.data.items.slice(i, i + 10);
-              const deletePromises = batch.map(event => {
-                if (event.id) {
-                  return calendar.events.delete({
-                    calendarId: prodBillsCalendarId,
-                    eventId: event.id
-                  }).then(() => {
-                    clearedCount++;
-                    prodBillsCleared++;
-                    logger.info(`Deleted prod bills event: ${event.summary} (${event.start?.date})`);
-                  }).catch(err => {
-                    logger.error(`Failed to delete event ${event.id}:`, err);
-                  });
-                }
-                return Promise.resolve();
-              });
-              
-              await Promise.allSettled(deletePromises);
-              
-              // Add small delay between batches
-              if (i + 10 < prodBillsEvents.data.items.length) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            }
+          if (prodBillsEvents.length > 0) {
+            const deleted = await deleteEventsInBatches(prodBillsEvents, prodBillsCalendarId, "prod bills");
+            clearedCount += deleted;
+            prodBillsCleared = deleted;
           } else {
             logger.info("No events found in prod bills calendar");
           }
@@ -209,43 +217,12 @@ export const clearCalendars = functions.region(region).https.onRequest(
       if (prodBalanceCalendarId) {
         try {
           logger.info("Clearing prod balance calendar events...");
-          const prodBalanceEvents = await calendar.events.list({
-            calendarId: prodBalanceCalendarId,
-            timeMin: todayCST.toISOString(),
-            timeMax: oneYearFromNow.toISOString(),
-            singleEvents: true,
-            maxResults: 2500 // Google's max
-          });
+          const prodBalanceEvents = await getAllEvents(prodBalanceCalendarId, "prod balance");
           
-          if (prodBalanceEvents.data.items && prodBalanceEvents.data.items.length > 0) {
-            logger.info(`Found ${prodBalanceEvents.data.items.length} events to delete in prod balance calendar`);
-            
-            // Delete in batches to avoid timeout
-            for (let i = 0; i < prodBalanceEvents.data.items.length; i += 10) {
-              const batch = prodBalanceEvents.data.items.slice(i, i + 10);
-              const deletePromises = batch.map(event => {
-                if (event.id) {
-                  return calendar.events.delete({
-                    calendarId: prodBalanceCalendarId,
-                    eventId: event.id
-                  }).then(() => {
-                    clearedCount++;
-                    prodBalanceCleared++;
-                    logger.info(`Deleted prod balance event: ${event.summary} (${event.start?.date})`);
-                  }).catch(err => {
-                    logger.error(`Failed to delete event ${event.id}:`, err);
-                  });
-                }
-                return Promise.resolve();
-              });
-              
-              await Promise.allSettled(deletePromises);
-              
-              // Add small delay between batches
-              if (i + 10 < prodBalanceEvents.data.items.length) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            }
+          if (prodBalanceEvents.length > 0) {
+            const deleted = await deleteEventsInBatches(prodBalanceEvents, prodBalanceCalendarId, "prod balance");
+            clearedCount += deleted;
+            prodBalanceCleared = deleted;
           } else {
             logger.info("No events found in prod balance calendar");
           }

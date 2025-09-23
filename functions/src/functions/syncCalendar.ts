@@ -20,7 +20,13 @@ async function getCalendarAuth() {
   return auth;
 }
 
-export const syncCalendar = functions.region(region).https.onRequest(
+export const syncCalendar = functions
+  .region(region)
+  .runWith({
+    timeoutSeconds: 540, // 9 minutes max timeout
+    memory: '1GB' // Increased memory for large datasets
+  })
+  .https.onRequest(
   async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -122,141 +128,201 @@ export const syncCalendar = functions.region(region).https.onRequest(
       let eventsUpdated = 0;
       let eventsDeleted = 0;
       
-      // Process each projection date
-      for (const projection of projections) {
-        const projDate = projection.projDate;
+      // Process projections in smaller batches with better error handling
+      const BATCH_SIZE = 5; // Reduced batch size for more reliable processing
+      
+      // Helper function to add delay between API calls to avoid rate limiting
+      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      
+      // Helper function to handle rate limiting specifically
+      async function withRateLimit<T>(operation: () => Promise<T>, maxRetries = 5): Promise<T> {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            return await operation();
+          } catch (error: any) {
+            if (error?.code === 429 || error?.message?.includes('quota') || error?.message?.includes('rate limit')) {
+              const delayMs = Math.min(1000 * Math.pow(2, attempt), 30000); // Exponential backoff, max 30s
+              logger.warn(`Rate limited, retrying in ${delayMs}ms (attempt ${attempt}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+              continue;
+            }
+            throw error; // Re-throw if not a rate limit error
+          }
+        }
+        throw new Error(`Failed after ${maxRetries} attempts due to rate limiting`);
+      }
+      
+      
+      for (let i = 0; i < projections.length; i += BATCH_SIZE) {
+        const batch = projections.slice(i, i + BATCH_SIZE);
+        logger.info(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(projections.length / BATCH_SIZE)} (${batch.length} projections)`);
         
-        // 1. Create/update individual bill events in bills calendar (yellow)
-        if (projection.bills && projection.bills.length > 0) {
-          for (const bill of projection.bills) {
-            const billAmount = Math.round(Math.abs(bill.amount));
-            const billAmountFormatted = billAmount.toLocaleString('en-US');
-            const billSummary = `${bill.name} ${bill.amount < 0 ? '-' : ''}$${billAmountFormatted}`;
-            const billEventKey = `${projDate}-${billSummary}`;
-            const existingBillEvent = existingBillEventsByDateAndName.get(billEventKey);
-            
-            const desiredBillEvent = {
-              summary: billSummary,
-              description: `Amount: ${bill.amount < 0 ? '-' : ''}$${billAmountFormatted}\nCategory: ${bill.category || 'Unknown'}`,
-              start: { date: projDate },
-              end: { date: projDate }
-            };
-            
-            try {
-              if (existingBillEvent) {
-                // Check if bill event needs updating
-                const needsUpdate = 
-                  existingBillEvent.summary !== desiredBillEvent.summary ||
-                  existingBillEvent.description !== desiredBillEvent.description;
-                
-                if (needsUpdate) {
-                  await calendar.events.update({
+        // Process each projection sequentially within the batch to ensure reliability
+        for (const projection of batch) {
+          const projDate = projection.projDate;
+          logger.info(`Processing projection for ${projDate}...`);
+          
+          // 1. Handle bill events
+          if (projection.bills && projection.bills.length > 0) {
+            for (const bill of projection.bills) {
+              const billAmount = Math.round(Math.abs(bill.amount));
+              const billAmountFormatted = billAmount.toLocaleString('en-US');
+              const billSummary = `${bill.name} ${bill.amount < 0 ? '-' : ''}$${billAmountFormatted}`;
+              const billEventKey = `${projDate}-${billSummary}`;
+              const existingBillEvent = existingBillEventsByDateAndName.get(billEventKey);
+              
+              const desiredBillEvent = {
+                summary: billSummary,
+                description: `Amount: ${bill.amount < 0 ? '-' : ''}$${billAmountFormatted}\nCategory: ${bill.category || 'Unknown'}`,
+                start: { date: projDate },
+                end: { date: projDate }
+              };
+              
+              await withRateLimit(async () => {
+                if (existingBillEvent) {
+                  // Check if bill event needs updating
+                  const needsUpdate = 
+                    existingBillEvent.summary !== desiredBillEvent.summary ||
+                    existingBillEvent.description !== desiredBillEvent.description;
+                  
+                  if (needsUpdate) {
+                    await calendar.events.update({
+                      calendarId: billsCalendarId,
+                      eventId: existingBillEvent.id!,
+                      requestBody: desiredBillEvent
+                    });
+                    eventsUpdated++;
+                    logger.info(`Updated bill event: ${billSummary} for ${projDate}`);
+                  }
+                  
+                  // Remove from map so we don't delete it later
+                  existingBillEventsByDateAndName.delete(billEventKey);
+                  
+                } else {
+                  // Create new bill event
+                  await calendar.events.insert({
                     calendarId: billsCalendarId,
-                    eventId: existingBillEvent.id!,
                     requestBody: desiredBillEvent
                   });
-                  eventsUpdated++;
-                  logger.info(`Updated bill event: ${billSummary} for ${projDate}`);
+                  eventsCreated++;
+                  logger.info(`Created bill event: ${billSummary} for ${projDate}`);
                 }
-                
-                // Remove from map so we don't delete it later
-                existingBillEventsByDateAndName.delete(billEventKey);
-                
-              } else {
-                // Create new bill event
-                await calendar.events.insert({
-                  calendarId: billsCalendarId,
-                  requestBody: desiredBillEvent
-                });
-                eventsCreated++;
-                logger.info(`Created bill event: ${billSummary} for ${projDate}`);
-              }
-            } catch (error) {
-              logger.error(`Error processing bill event ${billSummary} for ${projDate}:`, error);
+              });
+              
+              // Small delay between bill operations
+              await delay(50);
             }
           }
-        }
-        
-        // 2. Create/update budget projection event in balance calendar (pink)
-        const existingBalanceEvent = existingBalanceEventsByDate.get(projDate);
-        
-        const balanceAmount = Math.round(projection.projectedBalance || 0);
-        const balanceAmountFormatted = balanceAmount.toLocaleString('en-US');
-        
-        // Check if this is today's projection
-        const today = new Date();
-        const todayCST = new Date(today.getTime() - (6 * 60 * 60 * 1000)); // UTC-6 for CST
-        const todayString = todayCST.toISOString().split('T')[0];
-        const isToday = projDate === todayString;
-        
-        const eventTitle = isToday ? 'Balance:' : 'Budget Projection:';
-        const desiredBalanceEvent = {
-          summary: `${eventTitle} $${balanceAmountFormatted}`,
-          description: `Projected balance: $${balanceAmountFormatted}\nBills due: ${projection.bills?.length || 0}`,
-          start: { date: projDate },
-          end: { date: projDate }
-        };
-        
-        try {
-          if (existingBalanceEvent) {
-            // Check if balance event needs updating
-            const needsUpdate = 
-              existingBalanceEvent.summary !== desiredBalanceEvent.summary ||
-              existingBalanceEvent.description !== desiredBalanceEvent.description;
-            
-            if (needsUpdate) {
-              await calendar.events.update({
+          
+          // 2. Handle balance events
+          const existingBalanceEvent = existingBalanceEventsByDate.get(projDate);
+          
+          const balanceAmount = Math.round(projection.projectedBalance || 0);
+          const balanceAmountFormatted = balanceAmount.toLocaleString('en-US');
+          
+          // Check if this is today's projection
+          const today = new Date();
+          const todayCST = new Date(today.getTime() - (6 * 60 * 60 * 1000)); // UTC-6 for CST
+          const todayString = todayCST.toISOString().split('T')[0];
+          const isToday = projDate === todayString;
+          
+          const eventTitle = isToday ? 'Balance:' : 'Budget Projection:';
+          const desiredBalanceEvent = {
+            summary: `${eventTitle} $${balanceAmountFormatted}`,
+            description: `Projected balance: $${balanceAmountFormatted}\nBills due: ${projection.bills?.length || 0}`,
+            start: { date: projDate },
+            end: { date: projDate }
+          };
+          
+          await withRateLimit(async () => {
+            if (existingBalanceEvent) {
+              // Check if balance event needs updating
+              const needsUpdate = 
+                existingBalanceEvent.summary !== desiredBalanceEvent.summary ||
+                existingBalanceEvent.description !== desiredBalanceEvent.description;
+              
+              if (needsUpdate) {
+                await calendar.events.update({
+                  calendarId: balanceCalendarId,
+                  eventId: existingBalanceEvent.id!,
+                  requestBody: desiredBalanceEvent
+                });
+                eventsUpdated++;
+                logger.info(`Updated balance event for ${projDate}`);
+              }
+              
+              // Remove from map so we don't delete it later
+              existingBalanceEventsByDate.delete(projDate);
+              
+            } else {
+              // Create new balance event
+              await calendar.events.insert({
                 calendarId: balanceCalendarId,
-                eventId: existingBalanceEvent.id!,
                 requestBody: desiredBalanceEvent
               });
-              eventsUpdated++;
-              logger.info(`Updated balance event for ${projDate}`);
+              eventsCreated++;
+              logger.info(`Created balance event for ${projDate}`);
             }
-            
-            // Remove from map so we don't delete it later
-            existingBalanceEventsByDate.delete(projDate);
-            
-          } else {
-            // Create new balance event
-            await calendar.events.insert({
-              calendarId: balanceCalendarId,
-              requestBody: desiredBalanceEvent
-            });
-            eventsCreated++;
-            logger.info(`Created balance event for ${projDate}`);
-          }
-        } catch (error) {
-          logger.error(`Error processing balance event for ${projDate}:`, error);
+          });
+          
+          // Small delay between projections
+          await delay(100);
+        }
+        
+        // Add delay between main batches
+        if (i + BATCH_SIZE < projections.length) {
+          logger.info(`Completed batch ${Math.floor(i / BATCH_SIZE) + 1}, pausing before next batch...`);
+          await delay(500); // Longer delay between batches
         }
       }
       
-      // Delete any remaining outdated events
-      // Delete outdated bill events
+      // Delete any remaining outdated events in batches
+      const deleteOperations: Promise<void>[] = [];
+      
+      // Prepare delete operations for outdated bill events
       for (const [key, event] of existingBillEventsByDateAndName) {
-        try {
-          await calendar.events.delete({
-            calendarId: billsCalendarId,
-            eventId: event.id!
-          });
-          eventsDeleted++;
-          logger.info(`Deleted outdated bill event: ${key}`);
-        } catch (error) {
-          logger.error(`Error deleting bill event ${key}:`, error);
-        }
+        const deleteOp = async () => {
+          try {
+            await calendar.events.delete({
+              calendarId: billsCalendarId,
+              eventId: event.id!
+            });
+            eventsDeleted++;
+            logger.info(`Deleted outdated bill event: ${key}`);
+          } catch (error) {
+            logger.error(`Error deleting bill event ${key}:`, error);
+          }
+        };
+        deleteOperations.push(deleteOp());
       }
       
-      // Delete outdated balance events
+      // Prepare delete operations for outdated balance events
       for (const [date, event] of existingBalanceEventsByDate) {
-        try {
-          await calendar.events.delete({
-            calendarId: balanceCalendarId,
-            eventId: event.id!
-          });
-          eventsDeleted++;
-          logger.info(`Deleted outdated balance event for ${date}`);
-        } catch (error) {
-          logger.error(`Error deleting balance event for ${date}:`, error);
+        const deleteOp = async () => {
+          try {
+            await calendar.events.delete({
+              calendarId: balanceCalendarId,
+              eventId: event.id!
+            });
+            eventsDeleted++;
+            logger.info(`Deleted outdated balance event for ${date}`);
+          } catch (error) {
+            logger.error(`Error deleting balance event for ${date}:`, error);
+          }
+        };
+        deleteOperations.push(deleteOp());
+      }
+      
+      // Execute delete operations with controlled concurrency
+      logger.info(`Deleting ${deleteOperations.length} outdated events...`);
+      const DELETE_CONCURRENT_LIMIT = 3; // Conservative limit for deletes
+      for (let i = 0; i < deleteOperations.length; i += DELETE_CONCURRENT_LIMIT) {
+        const deleteBatch = deleteOperations.slice(i, i + DELETE_CONCURRENT_LIMIT);
+        await Promise.allSettled(deleteBatch);
+        
+        // Add delay between delete batches
+        if (i + DELETE_CONCURRENT_LIMIT < deleteOperations.length) {
+          await delay(150); // 150ms delay
         }
       }
       

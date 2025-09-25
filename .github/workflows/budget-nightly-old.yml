@@ -1,0 +1,44 @@
+name: Budget Nightly Automation
+
+on:
+  schedule:
+    - cron: '30 12 * * *'  # 7:30 AM CT
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  run-all-workflow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # Add job-level timeout
+    steps:
+      - name: Execute Complete Budget Workflow
+        run: |
+          echo "Starting complete budget workflow..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" --location --request POST 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll' \
+          --header 'Content-Type: application/json' \
+          --data '{}' \
+          --max-time 600)  # 10 minute timeout
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response Body: $BODY"
+          
+          # Check if the request was successful (200-299 range)
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Budget workflow completed successfully"
+          else
+            echo "❌ Budget workflow failed with status $HTTP_CODE"
+            echo "Response: $BODY"
+            exit 1
+          fi
+
+  notify-failure:
+    needs: [run-all-workflow]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Failure Alert
+        run: |
+          echo "❌ Budget workflow failed - manual intervention may be required"
+          echo "Check the Firebase Functions logs at: https://console.firebase.google.com/project/budgetcalendar-e6538/functions"

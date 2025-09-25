@@ -8,13 +8,15 @@ on:
 jobs:
   run-all-workflow:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # Add job-level timeout
     steps:
       - name: Execute Complete Budget Workflow
         run: |
           echo "Starting complete budget workflow..."
           RESPONSE=$(curl -s -w "\n%{http_code}" --location --request POST 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll' \
           --header 'Content-Type: application/json' \
-          --data '{}')
+          --data '{}' \
+          --max-time 600)  # 10 minute timeout
           
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | head -n -1)

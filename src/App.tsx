@@ -2,6 +2,7 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { ThemeProvider } from './components/ThemeProvider'
 import { RequireAuth } from './components/Layout/RequireAuth'
 import { Layout } from './components/Layout/Layout'
 import { LoginPage } from './pages/LoginPage'
@@ -14,7 +15,8 @@ import { SettingsPage } from './pages/SettingsPage'
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
+      <ThemeProvider defaultTheme="system" storageKey="theme">
+        <AuthProvider>
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
@@ -58,7 +60,8 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to={window.location.pathname.toLowerCase()} replace />} />
         </Routes>
-      </AuthProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

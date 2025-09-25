@@ -1,23 +1,24 @@
 //src/components/Layout/Navbar.tsx
 
 import { Link, useLocation } from 'react-router-dom';
-import { Moon, Sun, Menu, X } from 'lucide-react';
+import { Moon, Sun, Menu, X, Monitor } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { useBalance } from '../../context/BalanceContext';
+import { useTheme } from '../ThemeProvider';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/DropdownMenu';
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 
 interface NavbarProps {
-  toggleTheme: () => void;
-  isDarkMode: boolean;
   onTransactionsClick?: () => void;
 }
 
-export function Navbar({ toggleTheme, isDarkMode, onTransactionsClick }: NavbarProps) {
+export function Navbar({ onTransactionsClick }: NavbarProps) {
   const { balance, lastSync } = useBalance();
   const { signOut } = useAuth();
   const { pathname } = useLocation();
+  const { setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const formatCurrency = (amt: number) =>
@@ -93,9 +94,28 @@ export function Navbar({ toggleTheme, isDarkMode, onTransactionsClick }: NavbarP
                 )}
               </div>
             )}
-            <Button variant="ghost" size="sm" onClick={toggleTheme} aria-label="Toggle theme">
-              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Button variant="outline" size="sm" aria-label="Toggle theme">
+                  <Sun className="h-[18px] w-[18px] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                  <Moon className="absolute h-[18px] w-[18px] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setTheme('light')}>
+                  <Sun className="mr-2 h-4 w-4" />
+                  Light
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('dark')}>
+                  <Moon className="mr-2 h-4 w-4" />
+                  Dark
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('system')}>
+                  <Monitor className="mr-2 h-4 w-4" />
+                  System
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" size="sm" onClick={signOut}>
               Sign Out
             </Button>
@@ -138,9 +158,28 @@ export function Navbar({ toggleTheme, isDarkMode, onTransactionsClick }: NavbarP
                 </div>
               )}
               <div className="flex items-center px-4 pt-2 space-x-2">
-                <Button variant="ghost" size="sm" onClick={toggleTheme} aria-label="Toggle theme">
-                  {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger>
+                    <Button variant="outline" size="sm" aria-label="Toggle theme">
+                      <Sun className="h-[18px] w-[18px] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                      <Moon className="absolute h-[18px] w-[18px] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setTheme('light')}>
+                      <Sun className="mr-2 h-4 w-4" />
+                      Light
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTheme('dark')}>
+                      <Moon className="mr-2 h-4 w-4" />
+                      Dark
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTheme('system')}>
+                      <Monitor className="mr-2 h-4 w-4" />
+                      System
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button variant="outline" size="sm" onClick={signOut}>
                   Sign Out
                 </Button>

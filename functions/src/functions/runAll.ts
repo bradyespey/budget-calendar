@@ -53,7 +53,7 @@ export const runAll = functions.region(region).https.onRequest(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({})
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 30 seconds')), 30000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 2 minutes')), 120000))
       ]).then(async (response: any) => {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
@@ -69,7 +69,7 @@ export const runAll = functions.region(region).https.onRequest(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({})
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 30 seconds')), 30000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 2 minutes')), 120000))
       ]).then(async (response: any) => {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
@@ -100,7 +100,7 @@ export const runAll = functions.region(region).https.onRequest(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({})
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 30 seconds')), 30000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 2 minutes')), 120000))
       ]).then(async (response: any) => {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
@@ -116,7 +116,7 @@ export const runAll = functions.region(region).https.onRequest(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ env: 'prod' })
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 8 minutes')), 480000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 5 minutes')), 300000))
       ]).then(async (response: any) => {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);

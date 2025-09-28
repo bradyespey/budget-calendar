@@ -20,57 +20,157 @@ export const runAll = functions
       return;
     }
 
-    logger.info("Starting run all workflow - triggering all functions asynchronously");
+    logger.info("Starting run all workflow - sequential execution with timeout handling");
     
-    // Trigger all functions asynchronously without waiting for completion
-    // This avoids the 60-second timeout limit of Firebase Functions v1
+    const results = {
+      refreshAccounts: { success: false, error: null as string | null },
+      updateBalance: { success: false, error: null as string | null },
+      refreshTransactions: { success: false, error: null as string | null },
+      budgetProjection: { success: false, error: null as string | null },
+      syncCalendar: { success: false, error: null as string | null }
+    };
     
-    const functions = [
-      'refreshAccounts',
-      'refreshTransactions', 
-      'updateBalance',
-      'budgetProjection',
-      'syncCalendar'
-    ];
-    
-    const triggerPromises = functions.map(async (functionName) => {
-      try {
-        const url = `https://us-central1-budgetcalendar-e6538.cloudfunctions.net/${functionName}`;
-        const body = functionName === 'syncCalendar' ? JSON.stringify({ env: 'prod' }) : JSON.stringify({});
-        
-        // Fire and forget - don't wait for completion
-        fetch(url, {
+    // Step 1: Refresh accounts (must be first - takes ~1 minute)
+    try {
+      logger.info("🔄 Step 1: Refreshing accounts...");
+      const refreshResponse = await Promise.race([
+        fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshAccounts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: body
-        }).catch(error => {
-          logger.error(`Failed to trigger ${functionName}:`, error);
-        });
-        
-        logger.info(`🚀 Triggered ${functionName}`);
-        return { function: functionName, triggered: true };
-      } catch (error) {
-        logger.error(`Failed to trigger ${functionName}:`, error);
-        return { function: functionName, triggered: false, error: error instanceof Error ? error.message : 'Unknown error' };
+          body: JSON.stringify({})
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 3 minutes')), 180000))
+      ]) as Response;
+      
+      if (!refreshResponse.ok) {
+        throw new Error(`HTTP ${refreshResponse.status}`);
       }
-    });
+      
+      results.refreshAccounts.success = true;
+      logger.info("✅ Account refresh completed");
+      
+    } catch (error) {
+      results.refreshAccounts.error = error instanceof Error ? error.message : 'Unknown error';
+      logger.error("❌ Account refresh failed:", error);
+      // Continue with other steps even if this fails
+    }
     
-    // Wait for all trigger attempts to complete (should be very fast)
-    const triggerResults = await Promise.all(triggerPromises);
+    // Step 2: Update balance (depends on refreshed accounts)
+    try {
+      logger.info("💰 Step 2: Updating balance...");
+      const balanceResponse = await Promise.race([
+        fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/updateBalance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 2 minutes')), 120000))
+      ]) as Response;
+      
+      if (!balanceResponse.ok) {
+        throw new Error(`HTTP ${balanceResponse.status}`);
+      }
+      
+      results.updateBalance.success = true;
+      logger.info("✅ Balance update completed");
+      
+    } catch (error) {
+      results.updateBalance.error = error instanceof Error ? error.message : 'Unknown error';
+      logger.error("❌ Balance update failed:", error);
+    }
     
-    const successfulTriggers = triggerResults.filter(r => r.triggered).length;
-    const totalFunctions = functions.length;
+    // Step 3: Refresh transactions (depends on refreshed accounts)
+    try {
+      logger.info("📊 Step 3: Refreshing transactions...");
+      const transactionsResponse = await Promise.race([
+        fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshTransactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 2 minutes')), 120000))
+      ]) as Response;
+      
+      if (!transactionsResponse.ok) {
+        throw new Error(`HTTP ${transactionsResponse.status}`);
+      }
+      
+      results.refreshTransactions.success = true;
+      logger.info("✅ Transactions refresh completed");
+      
+    } catch (error) {
+      results.refreshTransactions.error = error instanceof Error ? error.message : 'Unknown error';
+      logger.error("❌ Transactions refresh failed:", error);
+    }
     
-    logger.info(`Successfully triggered ${successfulTriggers}/${totalFunctions} functions`);
+    // Step 4: Budget projection (depends on balance and transactions)
+    try {
+      logger.info("📈 Step 4: Running budget projection...");
+      const projectionResponse = await Promise.race([
+        fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/budgetProjection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 2 minutes')), 120000))
+      ]) as Response;
+      
+      if (!projectionResponse.ok) {
+        throw new Error(`HTTP ${projectionResponse.status}`);
+      }
+      
+      results.budgetProjection.success = true;
+      logger.info("✅ Budget projection completed");
+      
+    } catch (error) {
+      results.budgetProjection.error = error instanceof Error ? error.message : 'Unknown error';
+      logger.error("❌ Budget projection failed:", error);
+    }
     
-    res.status(200).json({
-      success: true,
-      message: `Budget workflow triggered: ${successfulTriggers}/${totalFunctions} functions started`,
-      triggeredFunctions: successfulTriggers,
-      totalFunctions,
-      results: triggerResults,
+    // Step 5: Sync calendar (depends on budget projection)
+    try {
+      logger.info("📅 Step 5: Syncing calendar...");
+      const calendarResponse = await Promise.race([
+        fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/syncCalendar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ env: 'prod' })
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 5 minutes')), 300000))
+      ]) as Response;
+      
+      if (!calendarResponse.ok) {
+        throw new Error(`HTTP ${calendarResponse.status}`);
+      }
+      
+      results.syncCalendar.success = true;
+      logger.info("✅ Calendar sync completed");
+      
+    } catch (error) {
+      results.syncCalendar.error = error instanceof Error ? error.message : 'Unknown error';
+      logger.error("❌ Calendar sync failed:", error);
+    }
+    
+    // Calculate overall success
+    const successCount = Object.values(results).filter(r => r.success).length;
+    const totalSteps = Object.keys(results).length;
+    const overallSuccess = successCount === totalSteps;
+    
+    const stepDetails = Object.entries(results).map(([step, result]) => ({
+      step,
+      success: result.success,
+      error: result.error
+    }));
+    
+    logger.info(`Run all workflow completed: ${successCount}/${totalSteps} steps successful`);
+    
+    res.status(overallSuccess ? 200 : 207).json({
+      success: overallSuccess,
+      message: `Run all workflow completed: ${successCount}/${totalSteps} steps successful`,
+      successCount,
+      totalSteps,
+      results: stepDetails,
       timestamp: new Date().toISOString(),
-      note: "Functions are running asynchronously. Check individual function logs for completion status."
     });
   }
 );

@@ -23,12 +23,15 @@ export const refreshAccounts = functions.region(region).https.onRequest(
         return;
       }
       
-      const response = await fetch('https://api.theespeys.com/refresh_accounts', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(apiAuth).toString('base64')}`
-        }
-      });
+      const response = await Promise.race([
+        fetch('https://api.theespeys.com/refresh_accounts?sync=1', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(apiAuth).toString('base64')}`
+          }
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 3 minutes')), 180000))
+      ]) as Response;
       
       if (!response.ok) {
         res.status(500).json({ error: `API error: ${response.status}` });

@@ -18,7 +18,7 @@ import { getSavingsBalance, getSavingsHistory } from '../api/accounts'
 import { Bill, Projection } from '../types'
 import { format, parseISO } from 'date-fns'
 import { useBalance } from '../context/BalanceContext'
-import { getFunctionTimestamps } from '../api/firebase'
+import { getFunctionTimestamps, getSettings } from '../api/firebase'
 
 interface CategoryAverage {
   monthly: number
@@ -57,6 +57,7 @@ export function DashboardPage() {
   const [refreshAccountsTimestamp, setRefreshAccountsTimestamp] = useState<Date | null>(null)
   const [savingsBalance, setSavingsBalance] = useState<number | null>(null)
   const [savingsHistory, setSavingsHistory] = useState<Array<{ balance: number; timestamp: Date }>>([])
+  const [projectionDays, setProjectionDays] = useState<number>(7)
 
   const { balance: checkingBalance, lastSync } = useBalance()
 
@@ -100,16 +101,18 @@ export function DashboardPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const [billsData, highLowData, savings, history] = await Promise.all([
+        const [billsData, highLowData, savings, history, settings] = await Promise.all([
           getBills(),
           getHighLowProjections(),
           getSavingsBalance(),
           getSavingsHistory(),
+          getSettings(),
         ])
         setBills(billsData)
         setHighLow(highLowData)
         setSavingsBalance(savings)
         setSavingsHistory(history)
+        setProjectionDays(settings.projectionDays ?? 7)
         calculateAverages(billsData)
         loadTimestamp()
       } catch (e) {
@@ -265,9 +268,12 @@ export function DashboardPage() {
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {formatCurrency(checkingBalance ?? 0)}
                 </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Your primary spending account balance
+                </p>
                 {lastSync && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    as of {format(lastSync, 'MMM d, yyyy h:mm a')}
+                    as of {format(lastSync, 'MMM d, h:mm a')}
                   </p>
                 )}
                 {refreshAccountsTimestamp && (
@@ -294,9 +300,12 @@ export function DashboardPage() {
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {savingsBalance !== null ? formatCurrency(savingsBalance) : 'Not configured'}
                 </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Your emergency fund and long-term savings
+                </p>
                 {lastSync && savingsBalance !== null && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    as of {format(lastSync, 'MMM d, yyyy h:mm a')}
+                    as of {format(lastSync, 'MMM d, h:mm a')}
                   </p>
                 )}
               </div>
@@ -320,9 +329,12 @@ export function DashboardPage() {
                     ? formatCurrency(highLow.lowest.projected_balance)
                     : formatCurrency(0)}
                 </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Minimum balance over next {projectionDays} days
+                </p>
                 {highLow.lowest && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    on {format(parseISO(highLow.lowest.proj_date), 'MMM d, yyyy')}
+                    on {format(parseISO(highLow.lowest.proj_date), 'MMM d')}
                   </p>
                 )}
               </div>
@@ -346,9 +358,12 @@ export function DashboardPage() {
                     ? formatCurrency(highLow.highest.projected_balance)
                     : formatCurrency(0)}
                 </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Peak balance over next {projectionDays} days
+                </p>
                 {highLow.highest && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    on {format(parseISO(highLow.highest.proj_date), 'MMM d, yyyy')}
+                    on {format(parseISO(highLow.highest.proj_date), 'MMM d')}
                   </p>
                 )}
               </div>
@@ -370,6 +385,9 @@ export function DashboardPage() {
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {formatCurrency(monthlyTotals.income)}
                 </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Expected recurring income from all sources
+                </p>
               </div>
             </div>
           </CardContent>
@@ -389,6 +407,9 @@ export function DashboardPage() {
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {formatCurrency(monthlyTotals.bills)}
                 </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Expected recurring expenses and payments
+                </p>
               </div>
             </div>
           </CardContent>
@@ -409,7 +430,7 @@ export function DashboardPage() {
                   {formatCurrency(monthlyTotals.leftover)}
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Income minus bills
+                  Available for savings and discretionary spending
                 </p>
               </div>
             </div>
@@ -421,7 +442,10 @@ export function DashboardPage() {
       {savingsBalance !== null && (
         <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Savings Trend</h3>
+            <h3 className="text-lg font-semibold mb-2">Savings Trend</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Track your savings growth over time. Updates when you click "Update Balances" or during nightly automation.
+            </p>
             <SavingsChart data={savingsHistory} />
           </CardContent>
         </Card>

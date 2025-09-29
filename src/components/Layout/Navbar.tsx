@@ -1,12 +1,10 @@
 //src/components/Layout/Navbar.tsx
 
 import { Link, useLocation } from 'react-router-dom';
-import { Moon, Sun, Menu, X, Monitor, AlertTriangle } from 'lucide-react';
+import { Menu, X, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { useBalance } from '../../context/BalanceContext';
-import { useTheme } from '../ThemeProvider';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/DropdownMenu';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 import { useState, useEffect } from 'react';
 import { getHighLowProjections } from '../../api/projections';
@@ -19,7 +17,6 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
   const { balance, lastSync } = useBalance();
   const { signOut } = useAuth();
   const { pathname } = useLocation();
-  const { setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [thresholdBreach, setThresholdBreach] = useState<{ date: string; balance: number } | null>(null);
 
@@ -103,21 +100,21 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
             </button>
           </div>
           {/* Balance, theme, sign out (always visible) */}
-          <div className="hidden md:flex items-center space-x-4 h-16">
+          <div className="hidden md:flex items-baseline space-x-4">
             {balance != null && (
-              <div className="text-right">
+              <div className="text-right self-center">
                 <div className="font-medium text-gray-900 dark:text-white">
                   {formatCurrency(balance)}
                 </div>
                 {lastSync && (
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Last synced {formatDistanceToNow(lastSync, { addSuffix: true })}
+                    As of {formatDistanceToNow(lastSync, { addSuffix: false }).replace('about ', '').replace(' hour', ' hr').replace(' hours', ' hrs').replace(' minute', ' min').replace(' minutes', ' mins')} ago
                   </div>
                 )}
               </div>
             )}
             {thresholdBreach && (
-              <div className="text-right">
+              <div className="text-right self-center">
                 <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
                   <AlertTriangle size={14} />
                   <span className="text-sm font-medium">
@@ -129,29 +126,11 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
                 </div>
               </div>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 w-10" aria-label="Toggle theme">
-                <Sun className="h-[18px] w-[18px] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-[18px] w-[18px] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTheme('light')}>
-                  <Sun className="mr-2 h-4 w-4" />
-                  Light
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme('dark')}>
-                  <Moon className="mr-2 h-4 w-4" />
-                  Dark
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme('system')}>
-                  <Monitor className="mr-2 h-4 w-4" />
-                  System
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" size="sm" onClick={signOut}>
-              Sign Out
-            </Button>
+            <div className="pt-1">
+              <Button variant="outline" size="sm" onClick={signOut}>
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
         {/* Mobile Dropdown Menu */}

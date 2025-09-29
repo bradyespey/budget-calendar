@@ -10,10 +10,11 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   Calculator,
+  AlertTriangle,
 } from 'lucide-react'
 import { Card, CardContent } from '../components/ui/Card'
 import { SavingsChart } from '../components/SavingsChart'
-import { getHighLowProjections } from '../api/projections'
+import { getHighLowProjections, getProjections } from '../api/projections'
 import { getBills } from '../api/bills'
 import { getSavingsBalance, getSavingsHistory, getCreditCardDebt } from '../api/accounts'
 import { Bill, Projection } from '../types'
@@ -60,6 +61,8 @@ export function DashboardPage() {
   const [savingsHistory, setSavingsHistory] = useState<Array<{ balance: number; timestamp: Date }>>([])
   const [creditCardDebt, setCreditCardDebt] = useState<number | null>(null)
   const [projectionDays, setProjectionDays] = useState<number>(7)
+  const [thresholdBreach, setThresholdBreach] = useState<{ date: string; balance: number } | null>(null)
+  const [settings, setSettings] = useState<any>(null)
 
   const { balance: checkingBalance, lastSync } = useBalance()
 
@@ -103,13 +106,14 @@ export function DashboardPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const [billsData, highLowData, savings, history, creditCards, settings] = await Promise.all([
+        const [billsData, highLowData, savings, history, creditCards, settings, allProjections] = await Promise.all([
           getBills(),
           getHighLowProjections(),
           getSavingsBalance(),
           getSavingsHistory(),
           getCreditCardDebt(),
           getSettings(),
+          getProjections(),
         ])
         setBills(billsData)
         setHighLow(highLowData)
@@ -117,6 +121,16 @@ export function DashboardPage() {
         setSavingsHistory(history)
         setCreditCardDebt(creditCards)
         setProjectionDays(settings.projectionDays ?? 7)
+        setSettings(settings)
+        
+        // Find when balance first drops below threshold
+        const threshold = settings.balanceThreshold ?? 1000
+        const breach = allProjections.find(proj => proj.projectedBalance < threshold)
+        if (breach) {
+          setThresholdBreach({ date: breach.projDate, balance: breach.projectedBalance })
+        } else {
+          setThresholdBreach(null)
+        }
         calculateAverages(billsData)
         loadTimestamp()
       } catch (e) {
@@ -351,7 +365,37 @@ export function DashboardPage() {
       {/* Row 2: Projected Balances */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Projected Balances</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Threshold Breach Alert */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center text-orange-600 dark:text-orange-400 mr-4">
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Low Balance Alert
+                  </p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {thresholdBreach 
+                      ? format(parseISO(thresholdBreach.date), 'MMM d')
+                      : 'No breach'
+                    }
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    First date below ${(settings?.balanceThreshold ?? 1000).toLocaleString()} threshold
+                  </p>
+                  {thresholdBreach && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Balance: {formatCurrency(thresholdBreach.balance)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Lowest Projected Balance */}
           <Card>
             <CardContent className="pt-6">

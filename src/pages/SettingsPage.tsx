@@ -1,7 +1,7 @@
 //src/pages/SettingsPage.tsx
 
 import { useState, useRef, useEffect } from 'react'
-import { Loader, Settings, Save } from 'lucide-react'
+import { Loader, Settings, Save, AlertTriangle, Sun, Moon, Monitor } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import {
   Card,
@@ -18,7 +18,10 @@ import {
 } from '../api/accounts'
 import { triggerManualRecalculation } from '../api/projections'
 import { syncCalendar, getSettings, updateSettings, getFunctionTimestamps, saveFunctionTimestamp } from '../api/firebase'
+import { getHighLowProjections } from '../api/projections'
+import { format, parseISO } from 'date-fns'
 import { useBalance } from '../context/BalanceContext'
+import { useTheme } from '../components/ThemeProvider'
 import { useLocation } from 'react-router-dom'
 import { CategoryManagement } from '../components/CategoryManagement'
 import { getIconBackupInfo } from '../api/icons'
@@ -60,6 +63,7 @@ export function SettingsPage() {
   const [backupInfo, setBackupInfo] = useState<{ hasBackup: boolean; backupCount?: number; timestamp?: string; message: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { setBalance, setLastSync } = useBalance()
+  const { theme, setTheme } = useTheme()
   const [localProjectionDays, setLocalProjectionDays] = useState<number | null>(null)
   const [localBalanceThreshold, setLocalBalanceThreshold] = useState<number>(1000)
   const [saveMessage] = useState('')
@@ -74,6 +78,7 @@ export function SettingsPage() {
   const [balanceThresholdInput, setBalanceThresholdInput] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [runAllStep, setRunAllStep] = useState<string | null>(null);
+  const [thresholdBreach, setThresholdBreach] = useState<{ date: string; balance: number } | null>(null);
 
   // State for function last run timestamps
   const [functionTimestamps, setFunctionTimestamps] = useState<{
@@ -709,6 +714,44 @@ export function SettingsPage() {
 
       {/* Category Management Card - spans full width */}
       <CategoryManagement showNotification={showNotification} />
+      
+      {/* Theme Settings */}
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Theme Settings</CardTitle>
+          <CardDescription>
+            Choose your preferred appearance theme for the application.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-4">
+            <Button
+              variant={theme === 'light' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setTheme('light')}
+            >
+              <Sun className="mr-2 h-4 w-4" />
+              Light
+            </Button>
+            <Button
+              variant={theme === 'dark' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setTheme('dark')}
+            >
+              <Moon className="mr-2 h-4 w-4" />
+              Dark
+            </Button>
+            <Button
+              variant={theme === 'system' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setTheme('system')}
+            >
+              <Monitor className="mr-2 h-4 w-4" />
+              System
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
       
       {/* Hidden file input for CSV import */}
       <input

@@ -168,10 +168,11 @@ async function computeProjections(settings: any) {
   const holidays = await fetchUSHolidays(cstTime, endDate);
   logger.info(`Fetched ${holidays.size} holidays for projection period`);
   
-  // First pass: Calculate all projections and find true highest/lowest
+  // First pass: Calculate all projections and find true highest/lowest/threshold breach
   const projectionDataList = [];
   let lowest = { balance: currentBalance, date: todayCST };
   let highest = { balance: currentBalance, date: todayCST };
+  let thresholdBreach: { balance: number, date: string } | null = null;
   
   // Pre-compute all bill occurrences with adjustments for the entire projection period
   const billOccurrences = new Map<string, any[]>(); // dateStr -> bills[]
@@ -244,6 +245,11 @@ async function computeProjections(settings: any) {
       highest = { balance: balanceToStore, date: dateStr };
     }
     
+    // Track first threshold breach
+    if (!thresholdBreach && balanceToStore < settings.balanceThreshold) {
+      thresholdBreach = { balance: balanceToStore, date: dateStr };
+    }
+    
     // Store projection data for second pass
     projectionDataList.push({
       projDate: dateStr,
@@ -253,25 +259,122 @@ async function computeProjections(settings: any) {
     });
   }
   
-  // Second pass: Save projections with correct highest/lowest flags
+  // Second pass: Save projections with correct highest/lowest/threshold breach flags
   for (const projData of projectionDataList) {
     const projectionData = {
       projDate: projData.projDate,
       projectedBalance: projData.projectedBalance,
       bills: projData.bills,
       lowest: projData.dateStr === lowest.date,
-      highest: projData.dateStr === highest.date
+      highest: projData.dateStr === highest.date,
+      thresholdBreach: thresholdBreach && projData.dateStr === thresholdBreach.date
     };
     
     await db.collection('projections').doc(projData.dateStr).set(projectionData);
-    logger.info(`Created projection for ${projData.dateStr} with balance ${projData.projectedBalance} (lowest: ${projectionData.lowest}, highest: ${projectionData.highest})`);
+    logger.info(`Created projection for ${projData.dateStr} with balance ${projData.projectedBalance} (lowest: ${projectionData.lowest}, highest: ${projectionData.highest}, thresholdBreach: ${projectionData.thresholdBreach})`);
   }
   
-  logger.info(`Completed projections for ${projectionDays} days`);
+  // Calculate Monthly Cash Flow summaries
+  const monthlyCashFlow = calculateMonthlyCashFlow(bills);
+  
+  // Store Monthly Cash Flow in Firestore
+  await db.collection('monthlyCashFlow').doc('current').set({
+    ...monthlyCashFlow,
+    lastUpdated: new Date(),
+    projectionDays: projectionDays
+  });
+  
+  logger.info(`Completed projections for ${projectionDays} days and Monthly Cash Flow calculation`);
   } catch (error) {
     logger.error("Error in computeProjections:", error);
     throw error;
   }
+}
+
+// Monthly Cash Flow calculation function
+function calculateMonthlyCashFlow(bills: any[]) {
+  const categories: Record<string, { monthly: number; yearly: number }> = {};
+  const summary = {
+    oneTime: { bills: 0, income: 0 },
+    daily: { bills: 0, income: 0 },
+    weekly: { bills: 0, income: 0 },
+    monthly: { bills: 0, income: 0 },
+    yearly: { bills: 0, income: 0 },
+  };
+  let totalMonthlyIncome = 0;
+  let totalMonthlyBills = 0;
+
+  bills.forEach(raw => {
+    // Normalize bill fields defensively
+    const amount = Number(raw.amount) || 0;
+    const frequency = (raw.frequency || 'monthly') as string;
+    const repeatsEvery = Number(raw.repeats_every ?? raw.repeatsEvery ?? 1) || 1;
+    const category = (raw.category || 'uncategorized').toLowerCase();
+
+    if (!categories[category]) {
+      categories[category] = { monthly: 0, yearly: 0 };
+    }
+
+    let monthlyAmount = 0;
+    let yearlyAmount = 0;
+    switch (frequency) {
+      case 'daily':
+        monthlyAmount = (amount * 30.44) / repeatsEvery;
+        yearlyAmount = (amount * 365.25) / repeatsEvery;
+        summary.daily[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+        break;
+      case 'weekly':
+        // Special handling for unemployment (weekly) vs biweekly pay
+        if (category === 'unemployment' || category === 'unemployment benefits') {
+          monthlyAmount = (amount * 4.35) / repeatsEvery;  // ~4.35 weeks per month
+        } else if (category === 'paycheck' || category === 'salary') {
+          // Semi-monthly pay (15th & last day) = 24 payments/year = 2.0 per month
+          monthlyAmount = (amount * 2.0) / repeatsEvery;
+        } else {
+          monthlyAmount = (amount * 4.35) / repeatsEvery;  // Biweekly = every 2 weeks
+        }
+        yearlyAmount = (amount * 52.18) / repeatsEvery;
+        summary.weekly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+        break;
+      case 'monthly':
+        monthlyAmount = amount / repeatsEvery;
+        yearlyAmount = (amount * 12) / repeatsEvery;
+        summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+        break;
+      case 'yearly':
+        monthlyAmount = amount / (12 * repeatsEvery);
+        yearlyAmount = amount / repeatsEvery;
+        summary.yearly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+        break;
+      case 'one-time':
+        summary.oneTime[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+        break;
+      default:
+        // Treat unknown frequency as monthly
+        monthlyAmount = amount / repeatsEvery;
+        yearlyAmount = (amount * 12) / repeatsEvery;
+        summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+    }
+
+    categories[category].monthly += monthlyAmount;
+    categories[category].yearly += yearlyAmount;
+
+    if (amount >= 0) {
+      totalMonthlyIncome += monthlyAmount;
+    } else {
+      totalMonthlyBills += Math.abs(monthlyAmount);
+    }
+  });
+
+  return {
+    categories,
+    summary,
+    monthlyTotals: {
+      income: totalMonthlyIncome,
+      bills: totalMonthlyBills,
+      leftover: totalMonthlyIncome - totalMonthlyBills,
+    }
+  };
 }
 
 export const budgetProjection = functions.region(region).https.onRequest(

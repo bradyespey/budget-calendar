@@ -414,3 +414,30 @@ export async function validateProjections(): Promise<{ isValid: boolean; errors:
     };
   }
 }
+
+// MONTHLY CASH FLOW API
+export async function getMonthlyCashFlow(): Promise<any> {
+  try {
+    const monthlyCashFlowRef = doc(db, 'monthlyCashFlow', 'current');
+    const monthlyCashFlowDoc = await getDoc(monthlyCashFlowRef);
+    
+    if (!monthlyCashFlowDoc.exists()) {
+      return {
+        categories: {},
+        summary: {
+          oneTime: { bills: 0, income: 0 },
+          daily: { bills: 0, income: 0 },
+          weekly: { bills: 0, income: 0 },
+          monthly: { bills: 0, income: 0 },
+          yearly: { bills: 0, income: 0 },
+        },
+        monthlyTotals: { income: 0, bills: 0, leftover: 0 }
+      };
+    }
+    
+    return monthlyCashFlowDoc.data();
+  } catch (error) {
+    console.error('Error fetching monthly cash flow:', error);
+    throw error;
+  }
+}

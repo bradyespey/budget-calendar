@@ -62,6 +62,7 @@ export async function getHighLowProjections() {
 
     let highest: any | undefined;
     let lowest: any | undefined;
+    let thresholdBreach: any | undefined;
 
     // Try fast path using flags. If it fails (index), continue to fallback.
     try {
@@ -79,14 +80,22 @@ export async function getHighLowProjections() {
       );
       const lowestSnapshot = await getDocs(lowestQuery);
 
+      const thresholdBreachQuery = query(
+        projectionsRef,
+        where('thresholdBreach', '==', true),
+        orderBy('projDate')
+      );
+      const thresholdBreachSnapshot = await getDocs(thresholdBreachQuery);
+
       highest = highestSnapshot.docs[0]?.data();
       lowest = lowestSnapshot.docs[0]?.data();
+      thresholdBreach = thresholdBreachSnapshot.docs[0]?.data();
     } catch {
       // Ignore and compute below
     }
 
     // Fallback: compute from future projections if flags missing or query failed
-    if (!highest || !lowest) {
+    if (!highest || !lowest || !thresholdBreach) {
       // Try indexed query; if it fails, read all and filter
       let all: any[] = [];
       try {
@@ -110,8 +119,10 @@ export async function getHighLowProjections() {
         const min = all.reduce((acc: any, cur: any) =>
           acc && acc.projectedBalance <= cur.projectedBalance ? acc : cur,
         null as any);
+        const breach = all.find((d: any) => d.thresholdBreach === true);
         highest = highest || max;
         lowest = lowest || min;
+        thresholdBreach = thresholdBreach || breach;
       }
     }
     
@@ -129,6 +140,12 @@ export async function getHighLowProjections() {
         lowest: lowest.lowest,
         highest: lowest.highest,
         bills: lowest.bills || [],
+      } : undefined,
+      thresholdBreach: thresholdBreach ? {
+        projDate: thresholdBreach.projDate,
+        projectedBalance: thresholdBreach.projectedBalance,
+        thresholdBreach: thresholdBreach.thresholdBreach,
+        bills: thresholdBreach.bills || [],
       } : undefined,
     };
   } catch (error) {

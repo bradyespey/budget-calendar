@@ -107,11 +107,42 @@ export const updateBalance = functions.region(region).https.onRequest(
           lastSynced: timestamp
         });
         
-        // Track savings history for trend chart
-        await db.collection('savingsHistory').add({
-          balance: savingsAccount.displayBalance,
-          timestamp: now
-        });
+        // Track savings history for trend chart - only add if balance changed
+        const lastSavingsHistory = await db.collection('savingsHistory')
+          .orderBy('timestamp', 'desc')
+          .limit(1)
+          .get();
+        
+        const shouldAddHistoryPoint = lastSavingsHistory.empty || 
+          lastSavingsHistory.docs[0].data().balance !== savingsAccount.displayBalance;
+        
+        if (shouldAddHistoryPoint) {
+          await db.collection('savingsHistory').add({
+            balance: savingsAccount.displayBalance,
+            timestamp: now
+          });
+          
+          // Clean up duplicate data points on the same day with same balance
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          
+          const todayHistory = await db.collection('savingsHistory')
+            .where('timestamp', '>=', today)
+            .where('timestamp', '<', tomorrow)
+            .where('balance', '==', savingsAccount.displayBalance)
+            .orderBy('timestamp', 'desc')
+            .get();
+          
+          // Keep only the latest entry for each day with the same balance
+          if (todayHistory.docs.length > 1) {
+            const docsToDelete = todayHistory.docs.slice(1); // Keep first (latest), delete rest
+            const batch = db.batch();
+            docsToDelete.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+          }
+        }
         
         responseData.savings = {
           balance: savingsAccount.displayBalance,

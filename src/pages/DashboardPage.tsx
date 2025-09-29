@@ -283,9 +283,6 @@ export function DashboardPage() {
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {formatCurrency(checkingBalance ?? 0)}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Your primary spending account balance
-                  </p>
                   {lastSync && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       as of {format(lastSync, 'MMM d, h:mm a')}
@@ -315,9 +312,6 @@ export function DashboardPage() {
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {savingsBalance !== null ? formatCurrency(savingsBalance) : 'Not configured'}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Your emergency fund and long-term savings
-                  </p>
                   {lastSync && savingsBalance !== null && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       as of {format(lastSync, 'MMM d, h:mm a')}
@@ -342,9 +336,6 @@ export function DashboardPage() {
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {creditCardDebt !== null ? formatCurrency(creditCardDebt) : 'Not available'}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Total outstanding credit card balances
-                  </p>
                   {lastSync && creditCardDebt !== null && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       as of {format(lastSync, 'MMM d, h:mm a')}
@@ -484,7 +475,7 @@ export function DashboardPage() {
                     {formatCurrency(monthlyTotals.leftover)}
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Available for savings and discretionary spending
+                    Remaining balance left for spending after bills and food/drinks
                   </p>
                 </div>
               </div>

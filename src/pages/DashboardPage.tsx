@@ -14,13 +14,13 @@ import {
 } from 'lucide-react'
 import { Card, CardContent } from '../components/ui/Card'
 import { SavingsChart } from '../components/SavingsChart'
-import { getHighLowProjections, getProjections } from '../api/projections'
+import { getHighLowProjections } from '../api/projections'
 import { getBills } from '../api/bills'
 import { getSavingsBalance, getSavingsHistory, getCreditCardDebt } from '../api/accounts'
 import { Bill, Projection } from '../types'
 import { format, parseISO } from 'date-fns'
 import { useBalance } from '../context/BalanceContext'
-import { getFunctionTimestamps, getSettings } from '../api/firebase'
+import { getFunctionTimestamps, getSettings, getMonthlyCashFlow } from '../api/firebase'
 
 interface CategoryAverage {
   monthly: number
@@ -106,14 +106,14 @@ export function DashboardPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const [billsData, highLowData, savings, history, creditCards, settings, allProjections] = await Promise.all([
+        const [billsData, highLowData, savings, history, creditCards, settings, monthlyCashFlow] = await Promise.all([
           getBills(),
           getHighLowProjections(),
           getSavingsBalance(),
           getSavingsHistory(),
           getCreditCardDebt(),
           getSettings(),
-          getProjections(),
+          getMonthlyCashFlow(),
         ])
         setBills(billsData)
         setHighLow(highLowData)
@@ -123,15 +123,23 @@ export function DashboardPage() {
         setProjectionDays(settings.projectionDays ?? 7)
         setSettings(settings)
         
-        // Find when balance first drops below threshold
-        const threshold = settings.balanceThreshold ?? 1000
-        const breach = allProjections.find(proj => proj.projectedBalance < threshold)
-        if (breach) {
-          setThresholdBreach({ date: breach.projDate, balance: breach.projectedBalance })
+        // Get threshold breach from projections (set by budgetProjection function)
+        if (highLowData.thresholdBreach) {
+          setThresholdBreach({ date: highLowData.thresholdBreach.projDate, balance: highLowData.thresholdBreach.projectedBalance })
         } else {
           setThresholdBreach(null)
         }
-        calculateAverages(billsData)
+        
+        // Set Monthly Cash Flow from API (calculated by budgetProjection function)
+        setCategoryAverages(monthlyCashFlow.categories || {})
+        setBillsSummary(monthlyCashFlow.summary || {
+          oneTime: { bills: 0, income: 0 },
+          daily: { bills: 0, income: 0 },
+          weekly: { bills: 0, income: 0 },
+          monthly: { bills: 0, income: 0 },
+          yearly: { bills: 0, income: 0 },
+        })
+        setMonthlyTotals(monthlyCashFlow.monthlyTotals || { income: 0, bills: 0, leftover: 0 })
         loadTimestamp()
       } catch (e) {
         console.error('Error fetching dashboard data:', e)
@@ -152,89 +160,6 @@ export function DashboardPage() {
     fetchData()
   }, [])
 
-  // ── Compute summaries ──────────────────────────────────────────────────
-  function calculateAverages(bills: Bill[]) {
-    const categories: Record<string, CategoryAverage> = {}
-    const summary: BillsSummary = {
-      oneTime: { bills: 0, income: 0 },
-      daily: { bills: 0, income: 0 },
-      weekly: { bills: 0, income: 0 },
-      monthly: { bills: 0, income: 0 },
-      yearly: { bills: 0, income: 0 },
-    }
-    let totalMonthlyIncome = 0
-    let totalMonthlyBills = 0
-
-    bills.forEach(raw => {
-      // Normalize bill fields defensively
-      const amount = Number(raw.amount) || 0
-      const frequency = (raw.frequency || 'monthly') as Bill['frequency']
-      const repeatsEvery = Number((raw as any).repeats_every ?? (raw as any).repeatsEvery ?? 1) || 1
-      const category = (raw.category || 'uncategorized').toLowerCase()
-
-      if (!categories[category]) {
-        categories[category] = { monthly: 0, yearly: 0 }
-      }
-
-      let monthlyAmount = 0
-      let yearlyAmount = 0
-      switch (frequency) {
-        case 'daily':
-          monthlyAmount = (amount * 30.44) / repeatsEvery
-          yearlyAmount = (amount * 365.25) / repeatsEvery
-          summary.daily[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
-          break
-        case 'weekly':
-          // Special handling for unemployment (weekly) vs biweekly pay
-          if (category === 'unemployment' || category === 'unemployment benefits') {
-            monthlyAmount = (amount * 4.35) / repeatsEvery  // ~4.35 weeks per month
-          } else if (category === 'paycheck' || category === 'salary') {
-            // Semi-monthly pay (15th & last day) = 24 payments/year = 2.0 per month
-            monthlyAmount = (amount * 2.0) / repeatsEvery
-          } else {
-            monthlyAmount = (amount * 4.35) / repeatsEvery  // Biweekly = every 2 weeks
-          }
-          yearlyAmount = (amount * 52.18) / repeatsEvery
-          summary.weekly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
-          break
-        case 'monthly':
-          monthlyAmount = amount / repeatsEvery
-          yearlyAmount = (amount * 12) / repeatsEvery
-          summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
-          break
-        case 'yearly':
-          monthlyAmount = amount / (12 * repeatsEvery)
-          yearlyAmount = amount / repeatsEvery
-          summary.yearly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
-          break
-        case 'one-time':
-          summary.oneTime[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
-          break
-        default:
-          // Treat unknown frequency as monthly
-          monthlyAmount = amount / repeatsEvery
-          yearlyAmount = (amount * 12) / repeatsEvery
-          summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
-      }
-
-      categories[category].monthly += monthlyAmount
-      categories[category].yearly += yearlyAmount
-
-      if (amount >= 0) {
-        totalMonthlyIncome += monthlyAmount
-      } else {
-        totalMonthlyBills += Math.abs(monthlyAmount)
-      }
-    })
-
-    setCategoryAverages(categories)
-    setBillsSummary(summary)
-    setMonthlyTotals({
-      income: totalMonthlyIncome,
-      bills: totalMonthlyBills,
-      leftover: totalMonthlyIncome - totalMonthlyBills,
-    })
-  }
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', {

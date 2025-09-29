@@ -152,7 +152,7 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Category Management</CardTitle>
+          <CardTitle>Category Management - Manual Transactions</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
@@ -169,9 +169,9 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle>Category Management</CardTitle>
+              <CardTitle>Manual Transaction Categories</CardTitle>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Manage your transaction categories. Categories in use cannot be deleted.
+                Manage your manual transaction categories. Categories in use cannot be deleted. Recurring transaction categories pull from Monarch.
               </p>
             </div>
             {!isAdding && (
@@ -179,7 +179,7 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                 onClick={() => setIsAdding(true)}
                 leftIcon={<Plus size={16} />}
               >
-                Add Category
+                Add
               </Button>
             )}
           </div>

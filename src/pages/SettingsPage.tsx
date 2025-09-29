@@ -1,7 +1,7 @@
 //src/pages/SettingsPage.tsx
 
 import { useState, useRef, useEffect } from 'react'
-import { Loader, Settings } from 'lucide-react'
+import { Loader, Settings, Save } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import {
   Card,
@@ -237,9 +237,9 @@ export function SettingsPage() {
       if (freshSync) setLastSync(freshSync);
       await setBalance(bal);
       await saveFunctionTimestampLocal('updateBalance');
-      showNotification(`Chase balance updated: $${bal.toLocaleString()}`, 'success');
+      showNotification(`All account balances updated successfully`, 'success');
     } catch (e: any) {
-      showNotification(`Error updating balance: ${e.message}`, 'error');
+      showNotification(`Error updating account balances: ${e.message}`, 'error');
     } finally {
       setBusy(false);
       setActiveAction(null);
@@ -530,7 +530,7 @@ export function SettingsPage() {
           className="inline-flex items-center gap-2 px-6 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[100px] w-auto"
           disabled={busy}
         >
-          {busy && activeAction === 'save' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="save">💾</span>}
+          {busy && activeAction === 'save' ? <Loader className="animate-spin" size={18} /> : <Save size={18} />}
           Save
         </Button>
       </div>

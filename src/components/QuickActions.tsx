@@ -1,5 +1,5 @@
 import { Button } from './ui/Button'
-import { Loader, Settings } from 'lucide-react'
+import { Loader, Settings, RefreshCw, DollarSign, Database, TrendingUp, Calendar, Zap } from 'lucide-react'
 
 interface QuickActionsProps {
   busy: boolean
@@ -93,8 +93,8 @@ export function QuickActionButtons({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={onRefreshAccounts} disabled={busy}>
-          {busy && activeAction === 'refresh' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="refresh">🔄</span>}
+        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onRefreshAccounts} disabled={busy}>
+          {busy && activeAction === 'refresh' ? <Loader className="animate-spin" size={18} /> : <RefreshCw size={18} />}
           Refresh Accounts
         </Button>
         <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Forces an accounts refresh in Monarch so latest bank balances can be obtained</p>
@@ -103,8 +103,8 @@ export function QuickActionButtons({
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={onUpdateBalance} disabled={busy}>
-          {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="balance">💰</span>}
+        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onUpdateBalance} disabled={busy}>
+          {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <DollarSign size={18} />}
           Update Balances
         </Button>
         <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Grabs the latest checking and savings balances from Monarch</p>
@@ -113,8 +113,8 @@ export function QuickActionButtons({
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-green-600 hover:bg-green-700 text-white rounded-full shadow" onClick={onRefreshTransactions} disabled={busy}>
-          {busy && activeAction === 'transactions' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="transactions">🔄</span>}
+        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onRefreshTransactions} disabled={busy}>
+          {busy && activeAction === 'transactions' ? <Loader className="animate-spin" size={18} /> : <Database size={18} />}
           Refresh Transactions
         </Button>
         <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Refreshes recurring transactions data from Monarch API with accurate amounts</p>
@@ -123,8 +123,8 @@ export function QuickActionButtons({
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={onRecalculate} disabled={busy}>
-          {busy && activeAction === 'projection' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="projection">📊</span>}
+        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onRecalculate} disabled={busy}>
+          {busy && activeAction === 'projection' ? <Loader className="animate-spin" size={18} /> : <TrendingUp size={18} />}
           Budget Projection
         </Button>
         <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Projects future budget in the Upcoming tab based on Budget Projection Settings</p>
@@ -133,8 +133,8 @@ export function QuickActionButtons({
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={onSyncCalendar} disabled={busy}>
-          {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="calendar">📅</span>}
+        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onSyncCalendar} disabled={busy}>
+          {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <Calendar size={18} />}
           Sync Calendar
         </Button>
         <div className="px-2 space-y-1">
@@ -169,8 +169,8 @@ export function QuickActionButtons({
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-full shadow" onClick={onAllActions} disabled={busy}>
-          {busy && activeAction === 'all' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="run-all">🚀</span>}
+        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-sm transition-all" onClick={onAllActions} disabled={busy}>
+          {busy && activeAction === 'all' ? <Loader className="animate-spin" size={18} /> : <Zap size={18} />}
           {busy && activeAction === 'all' && runAllStep ? 'Running...' : 'Run All'}
         </Button>
         <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Runs all Quick Actions in sequence automatically</p>

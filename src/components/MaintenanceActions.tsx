@@ -1,5 +1,5 @@
 import { Button } from './ui/Button'
-import { Loader } from 'lucide-react'
+import { Loader, CheckCircle2, Trash2, Sparkles, RotateCcw, Save, Download, Upload, FileText, FileSpreadsheet } from 'lucide-react'
 
 interface MaintenanceActionsProps {
   busy: boolean
@@ -39,14 +39,14 @@ export function MaintenanceActions({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Button onClick={onValidateProjections} variant="outline" className="w-full" disabled={busy}>
-            {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : '💾'} Validate Projections
+          <Button onClick={onValidateProjections} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
+            {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : <CheckCircle2 size={18} />} Validate Projections
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Ensures all Transactions match up with what's expected for the Upcoming page and shows missing bills that need to be fixed</p>
         </div>
         <div className="space-y-2">
-          <Button onClick={onClearCalendars} variant="outline" className="w-full" disabled={busy}>
-            {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : '🧹'} Clear Calendars
+          <Button onClick={onClearCalendars} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
+            {busy && activeAction === 'clear' ? <Loader className="animate-spin" size={18} /> : <Trash2 size={18} />} Clear Calendars
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes all budget calendar events from today onwards in both main and test calendars</p>
           {showTimestamps && (
@@ -54,8 +54,8 @@ export function MaintenanceActions({
           )}
         </div>
         <div className="space-y-2">
-          <Button onClick={onGenerateIcons} variant="outline" className="w-full" disabled={busy}>
-            {busy && activeAction === 'icons' ? <Loader className="animate-spin" size={18} /> : '🎨'} Generate Icons
+          <Button onClick={onGenerateIcons} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
+            {busy && activeAction === 'icons' ? <Loader className="animate-spin" size={18} /> : <Sparkles size={18} />} Generate Icons
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Generates icons for transactions using AI and brand mapping</p>
           {showTimestamps && (
@@ -63,8 +63,8 @@ export function MaintenanceActions({
           )}
         </div>
         <div className="space-y-2">
-          <Button onClick={onResetAllIcons} variant="outline" className="w-full" disabled={busy}>
-            {busy && activeAction === 'reset-icons' ? <Loader className="animate-spin" size={18} /> : '🔄'} Reset All Icons
+          <Button onClick={onResetAllIcons} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
+            {busy && activeAction === 'reset-icons' ? <Loader className="animate-spin" size={18} /> : <RotateCcw size={18} />} Reset All Icons
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes all generated and custom icons, keeps brand icons</p>
           {showTimestamps && (
@@ -72,8 +72,8 @@ export function MaintenanceActions({
           )}
         </div>
         <div className="space-y-2">
-          <Button onClick={onBackupIcons} variant="outline" className="w-full" disabled={busy}>
-            {busy && activeAction === 'backup-icons' ? <Loader className="animate-spin" size={18} /> : '💾'} Backup Icons
+          <Button onClick={onBackupIcons} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
+            {busy && activeAction === 'backup-icons' ? <Loader className="animate-spin" size={18} /> : <Save size={18} />} Backup Icons
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Saves all custom icons to Firebase storage</p>
           {showTimestamps && (
@@ -81,8 +81,8 @@ export function MaintenanceActions({
           )}
         </div>
         <div className="space-y-2">
-          <Button onClick={onRestoreIcons} variant="outline" className="w-full" disabled={busy || !backupInfo?.hasBackup}>
-            {busy && activeAction === 'restore-icons' ? <Loader className="animate-spin" size={18} /> : '📥'} Restore Icons
+          <Button onClick={onRestoreIcons} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy || !backupInfo?.hasBackup}>
+            {busy && activeAction === 'restore-icons' ? <Loader className="animate-spin" size={18} /> : <Download size={18} />} Restore Icons
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">
             {backupInfo?.hasBackup 
@@ -95,20 +95,20 @@ export function MaintenanceActions({
           )}
         </div>
         <div className="space-y-2">
-          <Button onClick={onImportCSV} variant="outline" className="w-full" disabled={busy}>
-            {busy && activeAction === 'import' ? <Loader className="animate-spin" size={18} /> : '📤'} Import CSV
+          <Button onClick={onImportCSV} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
+            {busy && activeAction === 'import' ? <Loader className="animate-spin" size={18} /> : <Upload size={18} />} Import CSV
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Upload bills from CSV file</p>
         </div>
         <div className="space-y-2">
-          <Button onClick={onExportCSV} variant="outline" className="w-full" disabled={busy}>
-            📥 Export CSV
+          <Button onClick={onExportCSV} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
+            <FileSpreadsheet size={18} /> Export CSV
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Download current bills data</p>
         </div>
         <div className="space-y-2">
-          <Button onClick={onSampleCSV} variant="outline" className="w-full" disabled={busy}>
-            📋 Sample CSV
+          <Button onClick={onSampleCSV} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
+            <FileText size={18} /> Sample CSV
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Download template with examples</p>
         </div>

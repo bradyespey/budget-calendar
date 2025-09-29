@@ -19,7 +19,7 @@ export function SavingsChart({ data }: SavingsChartProps) {
   // Format data for recharts
   const chartData = data.map(item => ({
     date: format(item.timestamp, 'MMM d'),
-    fullDate: format(item.timestamp, 'MMM d, yyyy h:mm a'),
+    fullDate: format(item.timestamp, 'MMM d, h:mm a'),
     balance: item.balance
   }))
 

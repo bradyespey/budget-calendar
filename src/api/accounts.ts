@@ -56,6 +56,17 @@ export async function getSavingsBalance(): Promise<number | null> {
   return accountDoc.data().lastBalance;
 }
 
+export async function getCreditCardDebt(): Promise<number | null> {
+  const accountRef = doc(db, 'accounts', 'creditCards');
+  const accountDoc = await getDoc(accountRef);
+  
+  if (!accountDoc.exists()) {
+    return null;
+  }
+  
+  return accountDoc.data().lastBalance;
+}
+
 export async function getSavingsHistory(): Promise<Array<{ balance: number; timestamp: Date }>> {
   const historyRef = collection(db, 'savingsHistory');
   const q = query(historyRef, orderBy('timestamp', 'asc'));
@@ -103,7 +114,7 @@ export async function refreshAccountsViaFlask(): Promise<void> {
  * 💰 Refresh account balances (Firebase Cloud Function)
  *    Now calls the function and returns persisted balances.
  */
-export async function refreshBalancesInDb(): Promise<{ checking: number; savings?: number }> {
+export async function refreshBalancesInDb(): Promise<{ checking: number; savings?: number; creditCards?: number }> {
   const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/updateBalance', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -117,7 +128,8 @@ export async function refreshBalancesInDb(): Promise<{ checking: number; savings
   const result = await response.json();
   return {
     checking: result.data.checking.balance,
-    savings: result.data.savings?.balance
+    savings: result.data.savings?.balance,
+    creditCards: result.data.creditCards?.balance
   };
 }
 

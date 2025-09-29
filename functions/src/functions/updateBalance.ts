@@ -19,6 +19,7 @@ export const updateBalance = functions.region(region).https.onRequest(
     try {
       const monarchToken = functions.config().monarch?.token;
       const checkingId = functions.config().monarch?.checking_id;
+      const savingsId = functions.config().monarch?.savings_id;
       
       if (!monarchToken || !checkingId) {
         res.status(500).json({ error: 'Monarch credentials not configured' });
@@ -52,10 +53,11 @@ export const updateBalance = functions.region(region).https.onRequest(
       const result = await response.json();
       logger.info("Monarch API response:", result);
       
-      // Find the checking account
+      // Find the checking and savings accounts
       const accountTypeSummaries = result.data?.accountTypeSummaries || [];
       const allAccounts = accountTypeSummaries.flatMap((summary: any) => summary.accounts || []);
       const checkingAccount = allAccounts.find((acc: any) => String(acc.id) === String(checkingId));
+      const savingsAccount = savingsId ? allAccounts.find((acc: any) => String(acc.id) === String(savingsId)) : null;
       
       if (!checkingAccount) {
         logger.error("Chase checking account not found. Available accounts:", allAccounts.map((acc: any) => `${acc.displayName} (${acc.id})`));
@@ -66,27 +68,56 @@ export const updateBalance = functions.region(region).https.onRequest(
         return;
       }
       
-      // Update account in Firestore
+      const now = new Date();
+      const timestamp = now.toISOString();
+      
+      // Update checking account in Firestore
       await db.collection('accounts').doc('checking').set({
         id: 'checking',
         display_name: 'Chase Checking',
         lastBalance: checkingAccount.displayBalance,
-        lastSynced: new Date().toISOString()
+        lastSynced: timestamp
       });
       
+      const responseData: any = {
+        checking: {
+          balance: checkingAccount.displayBalance,
+          accountName: checkingAccount.displayName,
+          lastSynced: timestamp
+        }
+      };
+      
+      // Update savings account if configured
+      if (savingsAccount) {
+        await db.collection('accounts').doc('savings').set({
+          id: 'savings',
+          display_name: savingsAccount.displayName,
+          lastBalance: savingsAccount.displayBalance,
+          lastSynced: timestamp
+        });
+        
+        // Track savings history for trend chart
+        await db.collection('savingsHistory').add({
+          balance: savingsAccount.displayBalance,
+          timestamp: now
+        });
+        
+        responseData.savings = {
+          balance: savingsAccount.displayBalance,
+          accountName: savingsAccount.displayName,
+          lastSynced: timestamp
+        };
+      }
+      
       await db.collection('admin').doc('functionTimestamps').set({
-        updateBalance: new Date()
+        updateBalance: now
       }, { merge: true });
       
       res.status(200).json({ 
         success: true, 
-        message: "Balance updated successfully",
-        data: { 
-          balance: checkingAccount.displayBalance,
-          accountName: checkingAccount.displayName,
-          lastSynced: new Date().toISOString()
-        },
-        timestamp: new Date().toISOString()
+        message: savingsAccount ? "Balances updated successfully" : "Checking balance updated successfully",
+        data: responseData,
+        timestamp: timestamp
       });
       
     } catch (error) {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import {
   Wallet,
+  PiggyBank,
   TrendingDown,
   TrendingUp,
   ArrowUpCircle,
@@ -10,8 +11,10 @@ import {
   Calculator,
 } from 'lucide-react'
 import { Card, CardContent } from '../components/ui/Card'
+import { SavingsChart } from '../components/SavingsChart'
 import { getHighLowProjections } from '../api/projections'
 import { getBills } from '../api/bills'
+import { getSavingsBalance, getSavingsHistory } from '../api/accounts'
 import { Bill, Projection } from '../types'
 import { format, parseISO } from 'date-fns'
 import { useBalance } from '../context/BalanceContext'
@@ -52,8 +55,10 @@ export function DashboardPage() {
   const [sortField, setSortField] = useState<'category' | 'monthly' | 'yearly'>('category')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [refreshAccountsTimestamp, setRefreshAccountsTimestamp] = useState<Date | null>(null)
+  const [savingsBalance, setSavingsBalance] = useState<number | null>(null)
+  const [savingsHistory, setSavingsHistory] = useState<Array<{ balance: number; timestamp: Date }>>([])
 
-  const { balance: totalBalance, lastSync } = useBalance()
+  const { balance: checkingBalance, lastSync } = useBalance()
 
   // Load refresh accounts timestamp
   const loadTimestamp = async () => {
@@ -95,12 +100,16 @@ export function DashboardPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const [billsData, highLowData] = await Promise.all([
+        const [billsData, highLowData, savings, history] = await Promise.all([
           getBills(),
           getHighLowProjections(),
+          getSavingsBalance(),
+          getSavingsHistory(),
         ])
         setBills(billsData)
         setHighLow(highLowData)
+        setSavingsBalance(savings)
+        setSavingsHistory(history)
         calculateAverages(billsData)
         loadTimestamp()
       } catch (e) {
@@ -242,7 +251,7 @@ export function DashboardPage() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Current Balance */}
+        {/* Checking Balance */}
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center">
@@ -251,10 +260,10 @@ export function DashboardPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Current Balance
+                  Checking Balance
                 </p>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(totalBalance ?? 0)}
+                  {formatCurrency(checkingBalance ?? 0)}
                 </h3>
                 {lastSync && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -264,6 +273,30 @@ export function DashboardPage() {
                 {refreshAccountsTimestamp && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Refresh: {formatTimestamp(refreshAccountsTimestamp)}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Savings Balance */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center">
+              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mr-4">
+                <PiggyBank size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  Savings Balance
+                </p>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {savingsBalance !== null ? formatCurrency(savingsBalance) : 'Not configured'}
+                </h3>
+                {lastSync && savingsBalance !== null && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    as of {format(lastSync, 'MMM d, yyyy h:mm a')}
                   </p>
                 )}
               </div>
@@ -383,6 +416,16 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Savings Trend Chart */}
+      {savingsBalance !== null && (
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Savings Trend</h3>
+            <SavingsChart data={savingsHistory} />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Averages */}

@@ -45,6 +45,28 @@ export async function getCheckingBalance(): Promise<number> {
   return accountDoc.data().lastBalance;
 }
 
+export async function getSavingsBalance(): Promise<number | null> {
+  const accountRef = doc(db, 'accounts', 'savings');
+  const accountDoc = await getDoc(accountRef);
+  
+  if (!accountDoc.exists()) {
+    return null;
+  }
+  
+  return accountDoc.data().lastBalance;
+}
+
+export async function getSavingsHistory(): Promise<Array<{ balance: number; timestamp: Date }>> {
+  const historyRef = collection(db, 'savingsHistory');
+  const q = query(historyRef, orderBy('timestamp', 'asc'));
+  const snapshot = await getDocs(q);
+  
+  return snapshot.docs.map(doc => ({
+    balance: doc.data().balance,
+    timestamp: timestampToDate(doc.data().timestamp)
+  }));
+}
+
 export async function getLastSyncTime(): Promise<Date | null> {
   const accountRef = doc(db, 'accounts', 'checking');
   const accountDoc = await getDoc(accountRef);
@@ -78,10 +100,10 @@ export async function refreshAccountsViaFlask(): Promise<void> {
 
 // ── Firebase Cloud Functions ──────────────────────────────────────────────
 /**
- * 💰 Refresh Chase balance only (Firebase Cloud Function)
- *    Now calls the function and returns persisted balance.
+ * 💰 Refresh account balances (Firebase Cloud Function)
+ *    Now calls the function and returns persisted balances.
  */
-export async function refreshChaseBalanceInDb(): Promise<number> {
+export async function refreshBalancesInDb(): Promise<{ checking: number; savings?: number }> {
   const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/updateBalance', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -89,9 +111,18 @@ export async function refreshChaseBalanceInDb(): Promise<number> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update balance: ${response.status}`);
+    throw new Error(`Failed to update balances: ${response.status}`);
   }
 
   const result = await response.json();
-  return result.data.balance;
+  return {
+    checking: result.data.checking.balance,
+    savings: result.data.savings?.balance
+  };
+}
+
+// Legacy function name for backwards compatibility
+export async function refreshChaseBalanceInDb(): Promise<number> {
+  const balances = await refreshBalancesInDb();
+  return balances.checking;
 }

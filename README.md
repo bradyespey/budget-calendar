@@ -92,7 +92,7 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 **Quick Actions:**
 - **refreshAccounts**: Triggers Monarch account refresh via Flask API
 - **refreshTransactions**: Intelligent refresh of Monarch transactions with smart comparison (create/update/delete only when needed)
-- **updateBalance**: Updates Chase balance from external API
+- **updateBalance**: Updates checking and savings balances from Monarch API with historical tracking
 - **budgetProjection**: Complete projection calculation with complex scheduling logic
 - **syncCalendar**: Google Calendar integration with separate bills/balance calendars, intelligent change detection, and comma-formatted amounts
 - **runAll**: Orchestrates full nightly workflow automation
@@ -124,7 +124,7 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 - **Build Monitoring**: `npm run deploy:watch` (pushes + watches build completion)
 
 ## App Pages / Routes
-- **Dashboard**: Current balance and financial status overview with low balance alerts
+- **Dashboard**: Checking and savings balances with historical trend chart, projected future balances, spending patterns, and comprehensive financial overview
 - **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling, optimized form performance, category icons, merchant logos, and manual icon input
 - **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality
 - **Upcoming**: Calendar view of upcoming bills, income, projected balances

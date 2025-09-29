@@ -105,9 +105,9 @@ export function QuickActionButtons({
       <div className="space-y-1">
         <Button className="w-full inline-flex items-center gap-2 px-4 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow" onClick={onUpdateBalance} disabled={busy}>
           {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <span role="img" aria-label="balance">💰</span>}
-          Update Balance
+          Update Balances
         </Button>
-        <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Grabs the latest balance from Monarch</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Grabs the latest checking and savings balances from Monarch</p>
         {showTimestamps && (
           <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.updateBalance)}</p>
         )}

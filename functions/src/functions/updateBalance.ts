@@ -122,25 +122,19 @@ export const updateBalance = functions.region(region).https.onRequest(
             timestamp: now
           });
           
-          // Clean up duplicate data points on the same day with same balance
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          
-          const todayHistory = await db.collection('savingsHistory')
-            .where('timestamp', '>=', today)
-            .where('timestamp', '<', tomorrow)
+          // Clean up ALL duplicate data points with same balance (one-time cleanup)
+          const allHistory = await db.collection('savingsHistory')
             .where('balance', '==', savingsAccount.displayBalance)
             .orderBy('timestamp', 'desc')
             .get();
           
-          // Keep only the latest entry for each day with the same balance
-          if (todayHistory.docs.length > 1) {
-            const docsToDelete = todayHistory.docs.slice(1); // Keep first (latest), delete rest
+          // Keep only the latest entry for each unique balance
+          if (allHistory.docs.length > 1) {
+            const docsToDelete = allHistory.docs.slice(1); // Keep first (latest), delete rest
             const batch = db.batch();
             docsToDelete.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
+            logger.info(`Cleaned up ${docsToDelete.length} duplicate savings history entries for balance ${savingsAccount.displayBalance}`);
           }
         }
         

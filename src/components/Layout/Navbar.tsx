@@ -1,14 +1,15 @@
 //src/components/Layout/Navbar.tsx
 
 import { Link, useLocation } from 'react-router-dom';
-import { Moon, Sun, Menu, X, Monitor } from 'lucide-react';
+import { Moon, Sun, Menu, X, Monitor, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { useBalance } from '../../context/BalanceContext';
 import { useTheme } from '../ThemeProvider';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/DropdownMenu';
-import { formatDistanceToNow } from 'date-fns';
-import { useState } from 'react';
+import { formatDistanceToNow, format, parseISO } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { getHighLowProjections } from '../../api/projections';
 
 interface NavbarProps {
   onTransactionsClick?: () => void;
@@ -20,6 +21,27 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
   const { pathname } = useLocation();
   const { setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [thresholdBreach, setThresholdBreach] = useState<{ date: string; balance: number } | null>(null);
+
+  // Fetch threshold breach data
+  useEffect(() => {
+    async function fetchThresholdBreach() {
+      try {
+        const highLowData = await getHighLowProjections();
+        if (highLowData.thresholdBreach) {
+          setThresholdBreach({ 
+            date: highLowData.thresholdBreach.projDate, 
+            balance: highLowData.thresholdBreach.projectedBalance 
+          });
+        } else {
+          setThresholdBreach(null);
+        }
+      } catch (error) {
+        console.error('Error fetching threshold breach:', error);
+      }
+    }
+    fetchThresholdBreach();
+  }, []);
 
   const formatCurrency = (amt: number) =>
     new Intl.NumberFormat('en-US', {
@@ -92,6 +114,19 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
                     Last synced {formatDistanceToNow(lastSync, { addSuffix: true })}
                   </div>
                 )}
+              </div>
+            )}
+            {thresholdBreach && (
+              <div className="text-right">
+                <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                  <AlertTriangle size={14} />
+                  <span className="text-sm font-medium">
+                    Low: {format(parseISO(thresholdBreach.date), 'MMM d')}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {formatCurrency(thresholdBreach.balance)}
+                </div>
               </div>
             )}
             <DropdownMenu>

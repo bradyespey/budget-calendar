@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   Wallet,
   PiggyBank,
+  CreditCard,
   TrendingDown,
   TrendingUp,
   ArrowUpCircle,
@@ -14,7 +15,7 @@ import { Card, CardContent } from '../components/ui/Card'
 import { SavingsChart } from '../components/SavingsChart'
 import { getHighLowProjections } from '../api/projections'
 import { getBills } from '../api/bills'
-import { getSavingsBalance, getSavingsHistory } from '../api/accounts'
+import { getSavingsBalance, getSavingsHistory, getCreditCardDebt } from '../api/accounts'
 import { Bill, Projection } from '../types'
 import { format, parseISO } from 'date-fns'
 import { useBalance } from '../context/BalanceContext'
@@ -57,6 +58,7 @@ export function DashboardPage() {
   const [refreshAccountsTimestamp, setRefreshAccountsTimestamp] = useState<Date | null>(null)
   const [savingsBalance, setSavingsBalance] = useState<number | null>(null)
   const [savingsHistory, setSavingsHistory] = useState<Array<{ balance: number; timestamp: Date }>>([])
+  const [creditCardDebt, setCreditCardDebt] = useState<number | null>(null)
   const [projectionDays, setProjectionDays] = useState<number>(7)
 
   const { balance: checkingBalance, lastSync } = useBalance()
@@ -101,17 +103,19 @@ export function DashboardPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const [billsData, highLowData, savings, history, settings] = await Promise.all([
+        const [billsData, highLowData, savings, history, creditCards, settings] = await Promise.all([
           getBills(),
           getHighLowProjections(),
           getSavingsBalance(),
           getSavingsHistory(),
+          getCreditCardDebt(),
           getSettings(),
         ])
         setBills(billsData)
         setHighLow(highLowData)
         setSavingsBalance(savings)
         setSavingsHistory(history)
+        setCreditCardDebt(creditCards)
         setProjectionDays(settings.projectionDays ?? 7)
         calculateAverages(billsData)
         loadTimestamp()
@@ -167,7 +171,15 @@ export function DashboardPage() {
           summary.daily[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
           break
         case 'weekly':
-          monthlyAmount = (amount * 4.35) / repeatsEvery
+          // Special handling for unemployment (weekly) vs biweekly pay
+          if (category === 'unemployment' || category === 'unemployment benefits') {
+            monthlyAmount = (amount * 4.35) / repeatsEvery  // ~4.35 weeks per month
+          } else if (category === 'paycheck' || category === 'salary') {
+            // Semi-monthly pay (15th & last day) = 24 payments/year = 2.0 per month
+            monthlyAmount = (amount * 2.0) / repeatsEvery
+          } else {
+            monthlyAmount = (amount * 4.35) / repeatsEvery  // Biweekly = every 2 weeks
+          }
           yearlyAmount = (amount * 52.18) / repeatsEvery
           summary.weekly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount)
           break
@@ -253,189 +265,232 @@ export function DashboardPage() {
         </p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Checking Balance */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 mr-4">
-                <Wallet size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Checking Balance
-                </p>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(checkingBalance ?? 0)}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Your primary spending account balance
-                </p>
-                {lastSync && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    as of {format(lastSync, 'MMM d, h:mm a')}
+      {/* Row 1: Account Balances */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Account Balances</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Checking Balance */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 mr-4">
+                  <Wallet size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Checking Balance
                   </p>
-                )}
-                {refreshAccountsTimestamp && (
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {formatCurrency(checkingBalance ?? 0)}
+                  </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Refresh: {formatTimestamp(refreshAccountsTimestamp)}
+                    Your primary spending account balance
                   </p>
-                )}
+                  {lastSync && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      as of {format(lastSync, 'MMM d, h:mm a')}
+                    </p>
+                  )}
+                  {refreshAccountsTimestamp && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Refresh: {formatTimestamp(refreshAccountsTimestamp)}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Savings Balance */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mr-4">
-                <PiggyBank size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Savings Balance
-                </p>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {savingsBalance !== null ? formatCurrency(savingsBalance) : 'Not configured'}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Your emergency fund and long-term savings
-                </p>
-                {lastSync && savingsBalance !== null && (
+          {/* Savings Balance */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mr-4">
+                  <PiggyBank size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Savings Balance
+                  </p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {savingsBalance !== null ? formatCurrency(savingsBalance) : 'Not configured'}
+                  </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    as of {format(lastSync, 'MMM d, h:mm a')}
+                    Your emergency fund and long-term savings
                   </p>
-                )}
+                  {lastSync && savingsBalance !== null && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      as of {format(lastSync, 'MMM d, h:mm a')}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Lowest Projected Balance */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 dark:text-red-400 mr-4">
-                <TrendingDown size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Lowest Projected Balance
-                </p>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {highLow.lowest
-                    ? formatCurrency(highLow.lowest.projected_balance)
-                    : formatCurrency(0)}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Minimum balance over next {projectionDays} days
-                </p>
-                {highLow.lowest && (
+          {/* Credit Card Debt */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 dark:text-red-400 mr-4">
+                  <CreditCard size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Credit Card Debt
+                  </p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {creditCardDebt !== null ? formatCurrency(creditCardDebt) : 'Not available'}
+                  </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    on {format(parseISO(highLow.lowest.proj_date), 'MMM d')}
+                    Total outstanding credit card balances
                   </p>
-                )}
+                  {lastSync && creditCardDebt !== null && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      as of {format(lastSync, 'MMM d, h:mm a')}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-        {/* Highest Projected Balance */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 mr-4">
-                <TrendingUp size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Highest Projected Balance
-                </p>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {highLow.highest
-                    ? formatCurrency(highLow.highest.projected_balance)
-                    : formatCurrency(0)}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Peak balance over next {projectionDays} days
-                </p>
-                {highLow.highest && (
+      {/* Row 2: Projected Balances */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Projected Balances</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Lowest Projected Balance */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 dark:text-red-400 mr-4">
+                  <TrendingDown size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Lowest Projected Balance
+                  </p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {highLow.lowest
+                      ? formatCurrency(highLow.lowest.projected_balance)
+                      : formatCurrency(0)}
+                  </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    on {format(parseISO(highLow.highest.proj_date), 'MMM d')}
+                    Minimum balance over next {projectionDays} days
                   </p>
-                )}
+                  {highLow.lowest && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      on {format(parseISO(highLow.lowest.proj_date), 'MMM d')}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Total Monthly Income */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mr-4">
-                <ArrowUpCircle size={24} />
+          {/* Highest Projected Balance */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 mr-4">
+                  <TrendingUp size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Highest Projected Balance
+                  </p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {highLow.highest
+                      ? formatCurrency(highLow.highest.projected_balance)
+                      : formatCurrency(0)}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Peak balance over next {projectionDays} days
+                  </p>
+                  {highLow.highest && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      on {format(parseISO(highLow.highest.proj_date), 'MMM d')}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Monthly Income
-                </p>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(monthlyTotals.income)}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Expected recurring income from all sources
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-        {/* Total Monthly Bills */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-rose-100 dark:bg-rose-900 rounded-full flex items-center justify-center text-rose-600 dark:text-rose-400 mr-4">
-                <ArrowDownCircle size={24} />
+      {/* Row 3: Monthly Cash Flow */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Monthly Cash Flow</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Total Monthly Income */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mr-4">
+                  <ArrowUpCircle size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Total Monthly Income
+                  </p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {formatCurrency(monthlyTotals.income)}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Expected recurring income from all sources
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Monthly Bills
-                </p>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(monthlyTotals.bills)}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Expected recurring expenses and payments
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Monthly Leftover */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-400 mr-4">
-                <Calculator size={24} />
+          {/* Total Monthly Bills */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-rose-100 dark:bg-rose-900 rounded-full flex items-center justify-center text-rose-600 dark:text-rose-400 mr-4">
+                  <ArrowDownCircle size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Total Monthly Bills
+                  </p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {formatCurrency(monthlyTotals.bills)}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Expected recurring expenses and payments
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Monthly Leftover
-                </p>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(monthlyTotals.leftover)}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Available for savings and discretionary spending
-                </p>
+            </CardContent>
+          </Card>
+
+          {/* Monthly Leftover */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-400 mr-4">
+                  <Calculator size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Monthly Leftover
+                  </p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {formatCurrency(monthlyTotals.leftover)}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Available for savings and discretionary spending
+                  </p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Savings Trend Chart */}

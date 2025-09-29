@@ -53,11 +53,22 @@ export const updateBalance = functions.region(region).https.onRequest(
       const result = await response.json();
       logger.info("Monarch API response:", result);
       
-      // Find the checking and savings accounts
+      // Find the checking, savings, and credit card accounts
       const accountTypeSummaries = result.data?.accountTypeSummaries || [];
       const allAccounts = accountTypeSummaries.flatMap((summary: any) => summary.accounts || []);
       const checkingAccount = allAccounts.find((acc: any) => String(acc.id) === String(checkingId));
       const savingsAccount = savingsId ? allAccounts.find((acc: any) => String(acc.id) === String(savingsId)) : null;
+      
+      // Calculate total credit card debt
+      // Credit cards are in the first accountTypeSummaries array
+      const creditCardSummary = accountTypeSummaries[0];
+      const creditCardAccounts = creditCardSummary?.accounts || [];
+      logger.info("Credit card accounts found:", creditCardAccounts.length);
+      logger.info("Credit card accounts:", creditCardAccounts.map((acc: any) => `${acc.displayName}: ${acc.displayBalance}`));
+      const totalCreditCardDebt = creditCardAccounts.reduce((sum: number, acc: any) => 
+        sum + Math.abs(acc.displayBalance), 0
+      );
+      logger.info("Total credit card debt calculated:", totalCreditCardDebt);
       
       if (!checkingAccount) {
         logger.error("Chase checking account not found. Available accounts:", allAccounts.map((acc: any) => `${acc.displayName} (${acc.id})`));
@@ -108,6 +119,22 @@ export const updateBalance = functions.region(region).https.onRequest(
           lastSynced: timestamp
         };
       }
+      
+      // Update credit card debt
+      await db.collection('accounts').doc('creditCards').set({
+        id: 'creditCards',
+        display_name: 'Total Credit Card Debt',
+        lastBalance: totalCreditCardDebt,
+        lastSynced: timestamp,
+        accountCount: creditCardAccounts.length
+      });
+      
+      responseData.creditCards = {
+        balance: totalCreditCardDebt,
+        accountName: 'Total Credit Card Debt',
+        accountCount: creditCardAccounts.length,
+        lastSynced: timestamp
+      };
       
       await db.collection('admin').doc('functionTimestamps').set({
         updateBalance: now

@@ -1,4 +1,4 @@
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
 
@@ -162,7 +162,7 @@ export const updateBalance = functions.region(region).https.onRequest(
       };
       
       await db.collection('admin').doc('functionTimestamps').set({
-        updateBalance: now
+        updateBalance: Timestamp.now()
       }, { merge: true });
       
       res.status(200).json({ 

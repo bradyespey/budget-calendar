@@ -312,6 +312,16 @@ export const refreshTransactions = functions.region(region).https.onRequest(
         await deleteBatch.commit();
       }
 
+      // Update function timestamp
+      try {
+        await admin.firestore().doc('admin/functionTimestamps').set({
+          refreshTransactions: admin.firestore.Timestamp.now()
+        }, { merge: true });
+        logger.info('Updated refreshTransactions timestamp');
+      } catch (timestampError) {
+        logger.warn('Failed to update timestamp:', timestampError);
+      }
+
       res.status(200).json({
         success: true,
         message: 'Recurring transactions refreshed successfully',

@@ -46,10 +46,12 @@ export async function getCategories(): Promise<Category[]> {
     const counted = await Promise.all(
       base.map(async (cat) => {
         try {
-          const countSnap = await getCountFromServer(query(billsRef, where('category', '==', cat.name)));
+          // Use normalized name for matching transactions
+          const normalizedName = cat.name.toLowerCase();
+          const countSnap = await getCountFromServer(query(billsRef, where('normalizedCategory', '==', normalizedName)));
           return { ...cat, transaction_count: countSnap.data().count } as Category;
         } catch (err) {
-          console.warn('Count failed for category', cat.name, err);
+          // Count failed for category - continue with 0
           return cat; // leave count as 0 on failure
         }
       })
@@ -66,31 +68,33 @@ export async function getCategories(): Promise<Category[]> {
 export async function createCategory(name: string): Promise<Category> {
   try {
     // Clean and validate the category name
-    const cleanName = name.trim().toLowerCase();
+    const cleanName = name.trim();
+    const normalizedName = cleanName.toLowerCase();
 
     
     if (!cleanName) {
       throw new Error('Category name cannot be empty');
     }
     
-    // Check if category already exists
+    // Check if category already exists (using normalized name for comparison)
     const categoriesRef = collection(db, 'categories');
-    const q = query(categoriesRef, where('name', '==', cleanName));
+    const q = query(categoriesRef, where('normalizedName', '==', normalizedName));
     const existingSnapshot = await getDocs(q);
     
     if (!existingSnapshot.empty) {
       throw new Error('Category already exists');
     }
     
-    // Create new category
+    // Create new category with both original and normalized names
     const docRef = await addDoc(categoriesRef, {
-      name: cleanName,
+      name: cleanName, // Original casing
+      normalizedName: normalizedName, // Lowercase for comparisons
       createdAt: Timestamp.now(),
     });
     
     const newCategory: Category = {
       id: docRef.id,
-      name: cleanName,
+      name: cleanName, // Return original casing
       created_at: new Date().toISOString(),
       transaction_count: 0,
     };
@@ -106,7 +110,8 @@ export async function createCategory(name: string): Promise<Category> {
 export async function updateCategory(id: string, name: string): Promise<Category> {
   try {
     // Clean and validate the category name
-    const cleanName = name.trim().toLowerCase();
+    const cleanName = name.trim();
+    const normalizedName = cleanName.toLowerCase();
     
     if (!cleanName) {
       throw new Error('Category name cannot be empty');
@@ -114,7 +119,7 @@ export async function updateCategory(id: string, name: string): Promise<Category
     
     // Check if category already exists (excluding current category)
     const categoriesRef = collection(db, 'categories');
-    const q = query(categoriesRef, where('name', '==', cleanName));
+    const q = query(categoriesRef, where('normalizedName', '==', normalizedName));
     const existingSnapshot = await getDocs(q);
     
     const existingWithDifferentId = existingSnapshot.docs.find(doc => doc.id !== id);
@@ -125,7 +130,8 @@ export async function updateCategory(id: string, name: string): Promise<Category
     // Update category
     const categoryRef = doc(db, 'categories', id);
     await updateDoc(categoryRef, {
-      name: cleanName,
+      name: cleanName, // Original casing
+      normalizedName: normalizedName, // Lowercase for comparisons
     });
     
     // Get updated category

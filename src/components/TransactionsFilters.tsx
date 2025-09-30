@@ -12,12 +12,15 @@ interface TransactionsFiltersProps {
   setFrequencyFilter: (value: string) => void;
   accountFilter: string;
   setAccountFilter: (value: string) => void;
+  accountTypeFilter: string;
+  setAccountTypeFilter: (value: string) => void;
   categoryFilter: string;
   setCategoryFilter: (value: string) => void;
   sourceFilter: string;
   setSourceFilter: (value: string) => void;
   uniqueFrequencies: string[];
   uniqueAccounts: string[];
+  uniqueAccountTypes: string[];
   uniqueCategories: string[];
   resetFilters: () => void;
 }
@@ -29,12 +32,15 @@ export function TransactionsFilters({
   setFrequencyFilter,
   accountFilter,
   setAccountFilter,
+  accountTypeFilter,
+  setAccountTypeFilter,
   categoryFilter,
   setCategoryFilter,
   sourceFilter,
   setSourceFilter,
   uniqueFrequencies,
   uniqueAccounts,
+  uniqueAccountTypes,
   uniqueCategories,
   resetFilters
 }: TransactionsFiltersProps) {
@@ -68,6 +74,18 @@ export function TransactionsFilters({
             ...(uniqueAccounts?.map(account => ({
               value: account,
               label: account
+            })) || [])
+          ]}
+        />
+        <Select
+          className="w-full sm:w-40"
+          value={accountTypeFilter}
+          onChange={(e) => setAccountTypeFilter(e.target.value)}
+          options={[
+            { value: '', label: 'All Account Types' },
+            ...(uniqueAccountTypes?.map(accountType => ({
+              value: accountType,
+              label: capitalize(accountType)
             })) || [])
           ]}
         />

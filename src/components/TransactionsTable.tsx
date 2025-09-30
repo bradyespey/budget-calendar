@@ -61,6 +61,12 @@ export function TransactionsTable({
                 </th>
                 <th 
                   className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
+                  onClick={() => onSort('accountType')}
+                >
+                  Account Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th 
+                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
                   onClick={() => onSort('category')}
                 >
                   Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -123,6 +129,15 @@ export function TransactionsTable({
                       title={`Filter by ${transaction.account}`}
                     >
                       {shortenAccountName(transaction.account)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                    <span 
+                      className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                      onClick={() => onFilterClick('accountType', transaction.accountType || '')}
+                      title={`Filter by ${transaction.accountType || 'Unknown'}`}
+                    >
+                      {transaction.accountType || 'Unknown'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">

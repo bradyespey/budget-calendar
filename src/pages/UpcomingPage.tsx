@@ -20,10 +20,29 @@ interface DayData {
     name: string;
     amount: number;
     category: string;
+    accountType?: string;
+    source?: string;
+    isActive?: boolean;
   }[];
   isHighest: boolean;
   isLowest: boolean;
 }
+
+// Helper function to determine if a transaction affects balance calculations
+const affectsBalance = (transaction: DayData['transactions'][0]): boolean => {
+  // Skip inactive bills (past credit card payments, etc.)
+  if (transaction.isActive === false) return false;
+  
+  // Skip bills from credit card accounts (they're already in the CC payment)
+  // This applies to both manual and Monarch transactions
+  if (transaction.accountType === 'Credit Card') return false;
+  
+  // Credit card payment transactions affect balance (they hit checking)
+  if (transaction.category && transaction.category.toLowerCase().includes('credit card payment')) return true;
+  
+  // Everything else affects balance (manual budgets, checking account bills, income, etc.)
+  return true;
+};
 
 export function UpcomingPage() {
   const [upcomingDays, setUpcomingDays] = useState<DayData[]>([]);
@@ -115,7 +134,10 @@ export function UpcomingPage() {
           id: bill.id,
           name: bill.name,
           amount: bill.amount,
-          category: bill.category
+          category: bill.category,
+          accountType: bill.accountType,
+          source: bill.source,
+          isActive: bill.isActive
         })),
         isHighest: proj.highest,
         isLowest: proj.lowest
@@ -189,8 +211,29 @@ export function UpcomingPage() {
           Upcoming Bills: {searchTerm ? `${filteredDays.length} of ${upcomingDays.length}` : upcomingDays.length}-Day Projection
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Preview upcoming bills and projected balance with Google Calendar sync. Bills move to next business day on weekends/holidays, paychecks move to previous business day.
+          Preview upcoming bills and projected balance with Google Calendar sync.
         </p>
+        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          <div className="mb-1"><strong>Display:</strong></div>
+          <div className="ml-2 space-y-1">
+            <div>• ALL transactions appear here (for awareness/cancellation)</div>
+            <div>• Credit card charges, payments, utilities, income, etc.</div>
+          </div>
+          <div className="mt-2 mb-1"><strong>Balance Calculation:</strong></div>
+          <div className="ml-2 space-y-1">
+            <div>• Recurring bills that hit checking directly (utilities, rent)</div>
+            <div>• Credit card payments (one-time bills, auto-update with Monarch)</div>
+            <div>• Manual budgets (food, custom estimates)</div>
+            <div>• Income (paychecks, deposits)</div>
+          </div>
+          <div className="mt-2 mb-1"><strong>Excluded from Balance:</strong></div>
+          <div className="ml-2 space-y-1">
+            <div>• Individual credit card charges (prevents double-counting)</div>
+          </div>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Bills move to next business day on weekends/holidays, paychecks move to previous business day.
+          </div>
+        </div>
         <div className="flex flex-col sm:flex-row gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
           {budgetProjectionTimestamp && (
             <span>Projections: {formatTimestamp(budgetProjectionTimestamp)}</span>
@@ -302,6 +345,11 @@ export function UpcomingPage() {
                         <span className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400">
                           {transaction.category}
                         </span>
+                        {!affectsBalance(transaction) && (
+                          <span className="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900 rounded text-xs text-blue-600 dark:text-blue-400">
+                            Excluded from Balance
+                          </span>
+                        )}
                       </div>
                       <span className={`font-medium ${
                         transaction.amount >= 0 

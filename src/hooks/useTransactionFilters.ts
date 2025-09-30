@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { CombinedTransaction } from './useTransactions';
 
-export type SortField = 'name' | 'dueDate' | 'frequency' | 'account' | 'category' | 'amount' | 'source' | 'note';
+export type SortField = 'name' | 'dueDate' | 'frequency' | 'account' | 'accountType' | 'category' | 'amount' | 'source' | 'note';
 export type SortDirection = 'asc' | 'desc';
 
 export function useTransactionFilters(transactions: CombinedTransaction[]) {
@@ -11,6 +11,7 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
   const [searchTerm, setSearchTerm] = useState('');
   const [frequencyFilter, setFrequencyFilter] = useState('');
   const [accountFilter, setAccountFilter] = useState('');
+  const [accountTypeFilter, setAccountTypeFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
@@ -24,10 +25,11 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
                            (transaction.note && transaction.note.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesFrequency = !frequencyFilter || transaction.frequency.toLowerCase().includes(frequencyFilter.toLowerCase());
       const matchesAccount = !accountFilter || transaction.account.toLowerCase().includes(accountFilter.toLowerCase());
+      const matchesAccountType = !accountTypeFilter || (transaction.accountType && transaction.accountType.toLowerCase().includes(accountTypeFilter.toLowerCase()));
       const matchesCategory = !categoryFilter || transaction.category.toLowerCase().includes(categoryFilter.toLowerCase());
       const matchesSource = !sourceFilter || transaction.source === sourceFilter;
 
-      return matchesSearch && matchesFrequency && matchesAccount && matchesCategory && matchesSource;
+      return matchesSearch && matchesFrequency && matchesAccount && matchesAccountType && matchesCategory && matchesSource;
     });
 
     // Sort
@@ -52,11 +54,12 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
     });
 
     return filtered;
-  }, [transactions, searchTerm, frequencyFilter, accountFilter, categoryFilter, sourceFilter, sortField, sortDirection]);
+  }, [transactions, searchTerm, frequencyFilter, accountFilter, accountTypeFilter, categoryFilter, sourceFilter, sortField, sortDirection]);
 
   // Get unique values for filters
   const uniqueFrequencies = [...new Set(transactions.map(t => t.frequency))].sort();
   const uniqueAccounts = [...new Set(transactions.map(t => t.account).filter(a => a !== '—'))].sort();
+  const uniqueAccountTypes = [...new Set(transactions.map(t => t.accountType).filter(a => a && a !== '—'))].sort();
   const uniqueCategories = [...new Set(transactions.map(t => t.category))].sort();
 
   // Reset filters
@@ -64,6 +67,7 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
     setSearchTerm('');
     setFrequencyFilter('');
     setAccountFilter('');
+    setAccountTypeFilter('');
     setCategoryFilter('');
     setSourceFilter('');
     setSortField('name');
@@ -81,13 +85,16 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
   };
 
   // Handle filter clicks
-  const handleFilterClick = (type: 'frequency' | 'account' | 'category' | 'source', value: string) => {
+  const handleFilterClick = (type: 'frequency' | 'account' | 'accountType' | 'category' | 'source', value: string) => {
     switch (type) {
       case 'frequency':
         setFrequencyFilter(value);
         break;
       case 'account':
         setAccountFilter(value);
+        break;
+      case 'accountType':
+        setAccountTypeFilter(value);
         break;
       case 'category':
         setCategoryFilter(value);
@@ -106,6 +113,8 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
     setFrequencyFilter,
     accountFilter,
     setAccountFilter,
+    accountTypeFilter,
+    setAccountTypeFilter,
     categoryFilter,
     setCategoryFilter,
     sourceFilter,
@@ -117,6 +126,7 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
     filteredTransactions,
     uniqueFrequencies,
     uniqueAccounts,
+    uniqueAccountTypes,
     uniqueCategories,
     
     // Actions

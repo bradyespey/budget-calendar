@@ -165,7 +165,8 @@ export async function validateProjections(): Promise<ValidationResult> {
 
   const projectionDays = settings.projectionDays || 30
   const today = formatInTimeZone(new Date(), TIMEZONE, 'yyyy-MM-dd')
-  const endDate = formatInTimeZone(addDays(new Date(), projectionDays), TIMEZONE, 'yyyy-MM-dd')
+  // End date is projectionDays-1 to match budgetProjection's range (days 0 to projectionDays-1)
+  const endDate = formatInTimeZone(addDays(new Date(), projectionDays - 1), TIMEZONE, 'yyyy-MM-dd')
 
   // Get all bills
   const bills = await getBills()
@@ -210,19 +211,19 @@ export async function validateProjections(): Promise<ValidationResult> {
     }
   }
 
+  // Track bills that are pushed beyond projection range due to weekend/holiday adjustment
+  const billsBeyondRange = new Set<string>();
+
   // For each projection date, check which bills should occur (with adjustment)
   for (const proj of projections) {
     const projDate = parseISO(proj.projDate)
+    
     // Check each bill to see if it should occur on this date
     for (const bill of bills) {
-      // Determine intended date
-      let intendedDate: Date | null = null;
+      // Determine if bill should occur on this date
       if (shouldBillOccurOnDate(bill, projDate)) {
-        intendedDate = new Date(projDate);
-      }
-      if (intendedDate) {
         // Adjust for weekends/holidays (skip for daily)
-        let adjustedDate = new Date(intendedDate);
+        let adjustedDate = new Date(projDate);
         const isPaycheck = bill.category && bill.category.toLowerCase() === 'paycheck';
         if (bill.frequency !== 'daily') {
           adjustedDate = adjustTransactionDate(adjustedDate, isPaycheck, holidays);
@@ -235,6 +236,9 @@ export async function validateProjections(): Promise<ValidationResult> {
             expectedBills.set(adjustedDateStr, new Set());
           }
           expectedBills.get(adjustedDateStr)!.add(billKey(bill));
+        } else {
+          // Track bills pushed beyond projection range due to weekend/holiday adjustment
+          billsBeyondRange.add(billKey(bill));
         }
       }
     }
@@ -253,16 +257,19 @@ export async function validateProjections(): Promise<ValidationResult> {
         const [name, amount, category] = billKey.split('|')
         const bill = bills.find(b => b.name === name && b.amount === Number(amount) && b.category === category)
         if (bill) {
-          missingInProjections.push({
-            bill: {
-              name: bill.name,
-              amount: bill.amount,
-              frequency: bill.frequency,
-              start_date: bill.startDate,
-              category: bill.category
-            },
-            expectedDate: date
-          })
+          // Don't flag as missing if this bill is pushed beyond projection range due to weekend/holiday adjustment
+          if (!billsBeyondRange.has(billKey)) {
+            missingInProjections.push({
+              bill: {
+                name: bill.name,
+                amount: bill.amount,
+                frequency: bill.frequency,
+                start_date: bill.startDate,
+                category: bill.category
+              },
+              expectedDate: date
+            })
+          }
         }
       }
     }

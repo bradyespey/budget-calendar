@@ -16,7 +16,7 @@ export async function fetchUSHolidays(start: Date, end: Date): Promise<Set<strin
         data.forEach((h: { date: string }) => holidays.add(h.date));
       }
     } catch (error) {
-      console.warn(`Failed to fetch holidays for ${year}:`, error);
+      // Failed to fetch holidays - continue without holiday data
     }
   }
   return holidays;

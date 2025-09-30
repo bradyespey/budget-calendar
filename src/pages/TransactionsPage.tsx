@@ -26,7 +26,6 @@ export function TransactionsPage() {
     error,
     setError,
     fetchData,
-    combineTransactions,
     handleRefresh,
     createTransaction,
     updateTransaction,
@@ -145,15 +144,12 @@ export function TransactionsPage() {
     })}`;
   };
 
-  // Effects
+  // Effects - Load data on mount only
   useEffect(() => {
     fetchData();
     loadTimestamp();
-  }, [fetchData]);
-
-  useEffect(() => {
-    combineTransactions();
-  }, [combineTransactions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle URL navigation
   useEffect(() => {

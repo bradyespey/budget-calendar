@@ -37,6 +37,7 @@ interface ValidationResult {
 function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   const billStart = parseISO(bill.startDate)
   const billEnd = bill.endDate ? parseISO(bill.endDate) : null
+  const repeatsEvery = Number(bill.repeats_every ?? bill.repeatsEvery ?? 1) || 1
 
   // Check if date is within bill's active period
   if (date < billStart || (billEnd && date > billEnd)) {
@@ -51,29 +52,104 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   // For daily bills
   if (bill.frequency === 'daily') {
     const daysSinceStart = Math.floor((date.getTime() - billStart.getTime()) / (1000 * 60 * 60 * 24))
-    return daysSinceStart % bill.repeatsEvery === 0
+    return daysSinceStart >= 0 && daysSinceStart % repeatsEvery === 0
   }
 
   // For weekly bills
   if (bill.frequency === 'weekly') {
     const daysSinceStart = Math.floor((date.getTime() - billStart.getTime()) / (1000 * 60 * 60 * 24))
-    return daysSinceStart % (7 * bill.repeatsEvery) === 0
+    return daysSinceStart >= 0 && daysSinceStart % (7 * repeatsEvery) === 0
+  }
+
+  // Handle "Every X weeks" frequencies
+  if (bill.frequency.startsWith('every_') && bill.frequency.includes('_weeks')) {
+    const weeksMatch = bill.frequency.match(/every_(\d+)_weeks/)
+    if (weeksMatch) {
+      const weekInterval = parseInt(weeksMatch[1])
+      const daysSinceStart = Math.floor((date.getTime() - billStart.getTime()) / (1000 * 60 * 60 * 24))
+      return daysSinceStart >= 0 && daysSinceStart % (7 * weekInterval) === 0
+    }
+  }
+
+  // For biweekly bills
+  if (bill.frequency === 'biweekly') {
+    const daysSinceStart = Math.floor((date.getTime() - billStart.getTime()) / (1000 * 60 * 60 * 24))
+    return daysSinceStart >= 0 && daysSinceStart % (14 * repeatsEvery) === 0
   }
 
   // For monthly bills
   if (bill.frequency === 'monthly') {
     const monthsSinceStart = (date.getFullYear() - billStart.getFullYear()) * 12 + 
                             (date.getMonth() - billStart.getMonth())
-    return monthsSinceStart % bill.repeatsEvery === 0 && 
-           date.getDate() === billStart.getDate()
+    const billDay = billStart.getDate()
+    const checkDay = date.getDate()
+    
+    // Handle end-of-month scenarios
+    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+    
+    if (monthsSinceStart >= 0 && monthsSinceStart % repeatsEvery === 0) {
+      if (billDay > lastDayOfMonth) {
+        return checkDay === lastDayOfMonth
+      } else {
+        return checkDay === billDay
+      }
+    }
+  }
+
+  // Handle "Every X months" frequencies
+  if (bill.frequency.startsWith('every_') && bill.frequency.includes('_months')) {
+    const monthsMatch = bill.frequency.match(/every_(\d+)_months/)
+    if (monthsMatch) {
+      const monthInterval = parseInt(monthsMatch[1])
+      const monthsSinceStart = (date.getFullYear() - billStart.getFullYear()) * 12 + 
+                              (date.getMonth() - billStart.getMonth())
+      const billDay = billStart.getDate()
+      const checkDay = date.getDate()
+      
+      if (monthsSinceStart >= 0 && monthsSinceStart % monthInterval === 0) {
+        // Handle end-of-month scenarios
+        const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+        
+        if (billDay > lastDayOfMonth) {
+          return checkDay === lastDayOfMonth
+        } else {
+          return checkDay === billDay
+        }
+      }
+    }
+  }
+
+  // For semimonthly bills (1st & 15th)
+  if (bill.frequency === 'semimonthly') {
+    const checkDay = date.getDate()
+    return checkDay === 1 || checkDay === 15
+  }
+
+  // For semimonthly mid-end bills (15th & last day)
+  if (bill.frequency === 'Semimonthly_mid_end' || bill.frequency === 'semimonthly_mid_end') {
+    const checkDay = date.getDate()
+    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+    return checkDay === 15 || checkDay === lastDayOfMonth
   }
 
   // For yearly bills
   if (bill.frequency === 'yearly') {
     const yearsSinceStart = date.getFullYear() - billStart.getFullYear()
-    return yearsSinceStart % bill.repeatsEvery === 0 && 
-           date.getMonth() === billStart.getMonth() && 
-           date.getDate() === billStart.getDate()
+    const billDay = billStart.getDate()
+    const checkDay = date.getDate()
+    
+    if (yearsSinceStart >= 0 && yearsSinceStart % repeatsEvery === 0) {
+      // Handle end-of-month scenarios for yearly bills too (e.g., Feb 29th)
+      if (billStart.getMonth() === date.getMonth()) {
+        const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+        
+        if (billDay > lastDayOfMonth) {
+          return checkDay === lastDayOfMonth
+        } else {
+          return checkDay === billDay
+        }
+      }
+    }
   }
 
   return false
@@ -152,10 +228,14 @@ export async function validateProjections(): Promise<ValidationResult> {
           adjustedDate = adjustTransactionDate(adjustedDate, isPaycheck, holidays);
         }
         const adjustedDateStr = formatInTimeZone(adjustedDate, TIMEZONE, 'yyyy-MM-dd');
-        if (!expectedBills.has(adjustedDateStr)) {
-          expectedBills.set(adjustedDateStr, new Set());
+        
+        // Only add to expected if this adjusted date is within our projection range
+        if (adjustedDateStr >= today && adjustedDateStr <= endDate) {
+          if (!expectedBills.has(adjustedDateStr)) {
+            expectedBills.set(adjustedDateStr, new Set());
+          }
+          expectedBills.get(adjustedDateStr)!.add(billKey(bill));
         }
-        expectedBills.get(adjustedDateStr)!.add(billKey(bill));
       }
     }
   }

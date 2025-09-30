@@ -561,11 +561,12 @@ export function SettingsPage() {
             <CardDescription className="text-gray-600 dark:text-gray-200">Manual triggers for account updates and calculations.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 dark:text-gray-400">Show timestamps</span>
             <Button
               onClick={toggleTimestamps}
               className="px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg shadow-sm"
               variant="outline"
-              title={showTimestamps ? "Hide technical info" : "Show technical info"}
+              title={showTimestamps ? "Hide timestamps" : "Show timestamps"}
               disabled={busy}
             >
               <Settings size={16} className={showTimestamps ? "text-blue-600 dark:text-blue-400" : ""} />

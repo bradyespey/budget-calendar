@@ -57,7 +57,7 @@ function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<st
 }
 
 function shouldBillOccurOnDate(bill: any, date: Date): boolean {
-  const billDate = new Date(bill.startDate);
+  const billDate = new Date(bill.start_date || bill.startDate);
   const repeatsEvery = Number(bill.repeats_every ?? bill.repeatsEvery ?? 1) || 1;
   
   // Check if the date is before the start date
@@ -66,8 +66,8 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   }
   
   // Check if the date is after the end date (if end_date exists)
-  if (bill.end_date) {
-    const endDate = new Date(bill.end_date);
+  if (bill.end_date || bill.endDate) {
+    const endDate = new Date(bill.end_date || bill.endDate);
     // Set to end of day for end_date to include the end date itself
     endDate.setHours(23, 59, 59, 999);
     if (date > endDate) {

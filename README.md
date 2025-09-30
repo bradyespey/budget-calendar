@@ -93,17 +93,17 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 - **refreshAccounts**: Triggers Monarch account refresh via Flask API
 - **refreshTransactions**: Intelligent refresh of Monarch transactions with smart comparison (create/update/delete only when needed)
 - **updateBalance**: Updates checking, savings, and credit card balances from Monarch API with historical tracking
-- **budgetProjection**: Complete projection calculation with complex scheduling logic
+- **budgetProjection**: Complete projection calculation with complex scheduling logic and end date support for manual transactions
 - **syncCalendar**: Google Calendar integration with separate bills/balance calendars, intelligent change detection, and comma-formatted amounts
-- **runAll**: Orchestrates full nightly workflow automation
+- **runAll**: Orchestrates full nightly workflow automation with automatic timestamp updates
 
 **Maintenance:**
 - **validateProjections**: Cross-references Transactions with Upcoming projections to find missing bills, supports all frequency types
 - **clearCalendars**: Clears all events from both dev and prod calendars (bills and balance)
 - **generateIcons**: Creates icons for transactions using brand mapping and AI fallback
 - **resetAllIcons**: Bulk removal of generated icons while preserving custom ones (supports preserveCustom option)
-- **backupIcons**: Saves all custom icons to Firebase storage for backup
-- **restoreIcons**: Restores icons from Firebase backup
+- **backupIcons**: Saves all custom icons to Firebase storage for backup with proper field mapping
+- **restoreIcons**: Restores icons from Firebase backup with error handling and count reporting
 - **getIconBackupInfo**: Returns backup status and timestamp information
 
 ### Flask API Endpoints (api.theespeys.com)
@@ -188,7 +188,7 @@ Budget/
 - **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes, optimized form state management
 - **Loading States**: Fixed infinite loading on Transactions page when using cached data
 - **Monarch Status**: Added reverse matching (bills → Monarch) with visual indicators and status filtering
-- **Data Management**: Unified `bills` table as single source of truth, intelligent refresh logic prevents unnecessary updates, removed legacy transaction tables, enhanced with merchant logos, category icons, and credit card payment mapping
+- **End Date Support**: Fixed field name mapping between frontend (`end_date`) and database (`endDate`) for proper projection filtering
 
 ## Supported Transaction Frequencies
 

@@ -17,17 +17,20 @@ export const restoreIcons = functions.region(region).https.onCall(
       const backup = backupDoc.data();
       const icons = backup?.icons || [];
       
-      let iconsRestored = 0;
+      let restoredCount = 0;
+      let errorCount = 0;
       
       for (const iconData of icons) {
         try {
           await db.collection('bills').doc(iconData.id).update({
-            icon: iconData.icon
+            iconUrl: iconData.iconUrl,
+            iconType: iconData.iconType
           });
-          iconsRestored++;
+          restoredCount++;
           
         } catch (error) {
           logger.error(`Error restoring icon for bill ${iconData.id}:`, error);
+          errorCount++;
         }
       }
       
@@ -37,8 +40,9 @@ export const restoreIcons = functions.region(region).https.onCall(
       
       return {
         success: true,
-        message: `Restored ${iconsRestored} icons.`,
-        iconsRestored,
+        message: `Restored ${restoredCount} icons.`,
+        restoredCount,
+        errorCount,
         timestamp: new Date().toISOString()
       };
       

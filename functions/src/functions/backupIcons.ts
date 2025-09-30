@@ -8,10 +8,11 @@ const region = 'us-central1';
 export const backupIcons = functions.region(region).https.onCall(
   async (data, context) => {
     try {
-      const billsSnapshot = await db.collection('bills').where('icon', '!=', null).get();
+      const billsSnapshot = await db.collection('bills').where('iconUrl', '!=', null).get();
       const bills = billsSnapshot.docs.map(doc => ({
         id: doc.id,
-        icon: doc.data().icon,
+        iconUrl: doc.data().iconUrl,
+        iconType: doc.data().iconType,
         name: doc.data().name
       }));
       
@@ -30,7 +31,7 @@ export const backupIcons = functions.region(region).https.onCall(
       return {
         success: true,
         message: `Backed up ${bills.length} icons.`,
-        iconsBackedUp: bills.length,
+        backupCount: bills.length,
         timestamp: new Date().toISOString()
       };
       

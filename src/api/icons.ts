@@ -87,7 +87,7 @@ export async function resetAllTransactionIcons(
   try {
     const resetIcons = httpsCallable<ResetAllIconsRequest, ResetAllIconsResponse>(
       functions,
-      'resetAllTransactionIcons'
+      'resetAllIcons'
     );
     
     const result = await resetIcons(request);
@@ -112,7 +112,7 @@ export async function backupTransactionIcons(): Promise<BackupIconsResponse> {
   try {
     const backupIcons = httpsCallable<{}, BackupIconsResponse>(
       functions,
-      'backupTransactionIcons'
+      'backupIcons'
     );
     
     const result = await backupIcons();
@@ -138,7 +138,7 @@ export async function restoreTransactionIcons(): Promise<RestoreIconsResponse> {
   try {
     const restoreIcons = httpsCallable<{}, RestoreIconsResponse>(
       functions,
-      'restoreTransactionIcons'
+      'restoreIcons'
     );
     
     const result = await restoreIcons();

@@ -216,7 +216,7 @@ export function UpcomingPage() {
         <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           <div className="mb-1"><strong>Display:</strong></div>
           <div className="ml-2 space-y-1">
-            <div>• ALL transactions appear here (for awareness/cancellation)</div>
+            <div>• All transactions appear here (for awareness/cancellation)</div>
             <div>• Credit card charges, payments, utilities, income, etc.</div>
           </div>
           <div className="mt-2 mb-1"><strong>Balance Calculation:</strong></div>

@@ -47,6 +47,9 @@ export function TransactionsTable({
                 >
                   Date {sortField === 'dueDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
+                <th className="text-left px-4 py-3 font-medium">
+                  End Date
+                </th>
                 <th 
                   className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
                   onClick={() => onSort('frequency')}
@@ -113,6 +116,9 @@ export function TransactionsTable({
                   <td className="px-4 py-3 whitespace-nowrap">
                     {transaction.dueDate ? format(parseISO(transaction.dueDate), 'MMM d') : '—'}
                   </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">
+                    {transaction.end_date ? format(parseISO(transaction.end_date), 'MMM d, yyyy') : '—'}
+                  </td>
                   <td className="px-4 py-3">
                     <span 
                       className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
@@ -171,8 +177,8 @@ export function TransactionsTable({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs">
-                    <div className="truncate" title={transaction.note || ''}>
-                      {transaction.note || '—'}
+                    <div className="truncate" title={transaction.notes || ''}>
+                      {transaction.notes || '—'}
                     </div>
                   </td>
                   <td className="px-4 py-3">

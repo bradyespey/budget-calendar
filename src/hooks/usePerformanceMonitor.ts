@@ -54,7 +54,8 @@ export function usePerformanceMonitor(componentName: string) {
     
     // Log metrics in development
     if (process.env.NODE_ENV === 'development') {
-      console.log(`📊 ${componentName} metrics:`, metrics);
+      // Performance monitoring disabled in production
+      // console.log(`📊 ${componentName} metrics:`, metrics);
     }
     
     return () => {

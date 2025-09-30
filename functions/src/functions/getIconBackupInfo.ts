@@ -8,23 +8,16 @@ const region = 'us-central1';
 export const getIconBackupInfo = functions.region(region).https.onCall(
   async (data, context) => {
     try {
-      // Check if user is authenticated
-      if (!context.auth) {
-        throw new functions.https.HttpsError(
-          'unauthenticated',
-          'User must be authenticated to access backup info'
-        );
-      }
-
       logger.info('Getting icon backup info');
 
       // Get the latest backup info from Firestore
-      const backupRef = db.collection('iconBackups').doc('latest');
+      const backupRef = db.collection('admin').doc('iconBackup');
       const backupDoc = await backupRef.get();
 
       if (!backupDoc.exists) {
         return {
-          exists: false,
+          success: true,
+          hasBackup: false,
           message: 'No backup found'
         };
       }
@@ -32,10 +25,11 @@ export const getIconBackupInfo = functions.region(region).https.onCall(
       const backupData = backupDoc.data();
       
       return {
-        exists: true,
-        timestamp: backupData?.timestamp || null,
-        count: backupData?.count || 0,
-        message: `Backup from ${backupData?.timestamp ? new Date(backupData.timestamp.seconds * 1000).toLocaleString() : 'unknown time'} with ${backupData?.count || 0} icons`
+        success: true,
+        hasBackup: true,
+        backupCount: backupData?.count || 0,
+        timestamp: backupData?.createdAt?.toDate?.()?.toISOString() || null,
+        message: `Backup from ${backupData?.createdAt ? backupData.createdAt.toDate().toLocaleString() : 'unknown time'} with ${backupData?.count || 0} icons`
       };
 
     } catch (error: any) {

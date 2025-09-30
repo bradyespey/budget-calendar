@@ -169,7 +169,7 @@ export function QuickActionButtons({
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-sm transition-all" onClick={onAllActions} disabled={busy}>
+        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-700 text-white rounded-lg shadow-sm transition-all" onClick={onAllActions} disabled={busy}>
           {busy && activeAction === 'all' ? <Loader className="animate-spin" size={18} /> : <Zap size={18} />}
           {busy && activeAction === 'all' && runAllStep ? 'Running...' : 'Run All'}
         </Button>

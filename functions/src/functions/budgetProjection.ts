@@ -60,6 +60,21 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   const billDate = new Date(bill.startDate);
   const repeatsEvery = Number(bill.repeats_every ?? bill.repeatsEvery ?? 1) || 1;
   
+  // Check if the date is before the start date
+  if (date < billDate) {
+    return false;
+  }
+  
+  // Check if the date is after the end date (if end_date exists)
+  if (bill.end_date) {
+    const endDate = new Date(bill.end_date);
+    // Set to end of day for end_date to include the end date itself
+    endDate.setHours(23, 59, 59, 999);
+    if (date > endDate) {
+      return false;
+    }
+  }
+  
   // One-time bills only occur on their exact start date
   if (bill.frequency === 'one-time') {
     return billDate.toISOString().split('T')[0] === date.toISOString().split('T')[0];

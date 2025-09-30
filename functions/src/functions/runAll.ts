@@ -1,6 +1,8 @@
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
+import { getFirestore } from "firebase-admin/firestore";
 
+const db = getFirestore();
 const region = 'us-central1';
 
 export const runAll = functions
@@ -163,6 +165,16 @@ export const runAll = functions
     }));
     
     logger.info(`Run all workflow completed: ${successCount}/${totalSteps} steps successful`);
+    
+    // Update function timestamp
+    try {
+      await db.collection('admin').doc('functionTimestamps').set({
+        runAll: new Date()
+      }, { merge: true });
+      logger.info('Updated runAll timestamp');
+    } catch (timestampError) {
+      logger.warn('Failed to update timestamp:', timestampError);
+    }
     
     res.status(overallSuccess ? 200 : 207).json({
       success: overallSuccess,

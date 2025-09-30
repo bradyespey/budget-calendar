@@ -18,6 +18,8 @@ export const FREQUENCY_OPTIONS = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
+  { value: 'semimonthly', label: 'Twice a month (1st & 15th)' },
+  { value: 'semimonthly_mid_end', label: 'Twice a month (15th & last day)' },
   { value: 'yearly', label: 'Yearly' },
   { value: 'one-time', label: 'One-time' },
 ];

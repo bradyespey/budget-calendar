@@ -23,6 +23,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white',
           'focus:border-blue-500 focus:ring-1 focus:ring-blue-500',
           'disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-70',
+          // Custom styling for date inputs to make calendar icon white in dark mode
+          props.type === 'date' ? 'dark:[color-scheme:dark]' : '',
           error
             ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
             : '',

@@ -227,5 +227,33 @@ All frequencies support custom "repeats every" multipliers:
 - **Cash Flow Calculations**: Accurate monthly/yearly financial summaries for all frequency types
 - **Dynamic Pattern Matching**: Supports unlimited "Every X" intervals using regex pattern matching
 
+#### Transaction Filtering for Projections
+The projection system displays ALL transactions for visibility while intelligently filtering which ones affect balance calculations:
+
+**Display vs Balance Calculation:**
+- **ALL transactions appear in Upcoming and Calendar** (for awareness/cancellation)
+- **Only certain transactions affect balance projections** (to prevent double-counting)
+
+**Transactions That Affect Balance:**
+- ✅ **Manual bills** (food budgets, custom estimates) - all occurrences
+- ✅ **Direct checking transactions** (utilities, rent, etc.) - all occurrences
+- ✅ **Monarch credit card payments** - one-time bills (auto-updates with each Monarch refresh)
+- ✅ **Income** (paychecks, deposits) - all occurrences
+
+**Transactions That DON'T Affect Balance:**
+- ❌ **Individual credit card charges** (Spotify, Netflix, etc.) - shown for awareness, but excluded from balance to prevent double-counting
+
+**Account Type Mapping:**
+- `depository` → "Checking" (all depository accounts)
+- `credit` → "Credit Card" (all credit accounts)
+- `Unknown Account` + `Credit Card Payment` → "Checking" (payments come from checking)
+- `Unknown Account` + other categories → "Unknown"
+
+**Credit Card Strategy:**
+- **Display**: All credit card charges appear in Upcoming/Calendar so you can see and cancel/adjust them
+- **Balance**: Only credit card payments affect balance (individual charges don't)
+- **Automation**: Monarch credit card payments are imported as one-time bills; each Monarch refresh creates a new one-time bill for the next statement
+- **No Manual Work**: You see all transactions but balance calculations prevent double-counting automatically
+
 ## AI Handoff
 Read this README, scan the repo, prioritize core functions and env-safe areas, keep env and rules aligned with this file

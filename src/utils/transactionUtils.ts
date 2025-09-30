@@ -17,9 +17,6 @@ export function capitalize(str: string) {
 export const FREQUENCY_OPTIONS = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
-  { value: 'biweekly', label: 'Every 2 weeks' },
-  { value: 'semimonthly', label: 'Twice a month (1st & 15th)' },
-  { value: 'semimonthly_mid_end', label: 'Twice a month (15th & last day)' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' },
   { value: 'one-time', label: 'One-time' },

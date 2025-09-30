@@ -47,18 +47,9 @@ export async function importBillsFromCSV(csvData: string): Promise<{ total: numb
     // ── Parse dates ──────────────────────────────────────────────────────
     let start_date = new Date().toISOString()
     try {
-      start_date = parse(data['Start Date'], 'M/d/yyyy', new Date()).toISOString()
+      start_date = parse(data.Date, 'M/d/yyyy', new Date()).toISOString()
     } catch {
-      console.warn(`Invalid start date for "${data.Name}", using today`)
-    }
-
-    let end_date: string | undefined
-    if (data['End Date']) {
-      try {
-        end_date = parse(data['End Date'], 'M/d/yyyy', new Date()).toISOString()
-      } catch {
-        console.warn(`Invalid end date for "${data.Name}", skipping`)
-      }
+      // Invalid date - using today as fallback
     }
 
     // ── Normalize frequency & category ────────────────────────────────────
@@ -76,10 +67,13 @@ export async function importBillsFromCSV(csvData: string): Promise<{ total: numb
       category,
       amount,
       frequency:   frequency as Bill['frequency'],
-      repeats_every: parseInt(data['Repeats Every'] || '1', 10) || 1,
+      repeats_every: 1, // Default to 1 since we removed this column
       start_date,
-      end_date,
-      notes:       data.Note
+      end_date: undefined, // No end date in new format
+      notes:       data.Notes || '',
+      source:      data.Source === 'monarch' ? 'monarch' : 'manual',
+      accountName: data.Account || '',
+      accountType: data['Account Type'] || ''
     })
   }
 

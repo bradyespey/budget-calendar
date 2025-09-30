@@ -59,6 +59,11 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   const billDate = new Date(bill.startDate);
   const repeatsEvery = Number(bill.repeats_every ?? bill.repeatsEvery ?? 1) || 1;
   
+  // One-time bills only occur on their exact start date
+  if (bill.frequency === 'one-time') {
+    return billDate.toISOString().split('T')[0] === date.toISOString().split('T')[0];
+  }
+  
   if (bill.frequency === 'daily') return true;
   
   if (bill.frequency === 'weekly') {
@@ -235,7 +240,25 @@ async function computeProjections(settings: any) {
     billOccurrences.set(dateStr, []);
   }
   
+  // Helper function to determine if a bill should affect balance calculations
+  const shouldAffectBalance = (bill: any) => {
+    // Skip inactive bills (past credit card payments, etc.)
+    if (bill.isActive === false) return false;
+    
+    // Skip bills from credit card accounts (they're already in the CC payment)
+    // This applies to both manual and Monarch transactions
+    if (bill.accountType === 'Credit Card') return false;
+    
+    // Credit card payment transactions affect balance (they hit checking)
+    // Note: These are now 'one-time' bills, so they naturally only appear once
+    if (bill.category && bill.category.toLowerCase().includes('credit card payment')) return true;
+    
+    // Everything else affects balance (manual budgets, checking account bills, income, etc.)
+    return true;
+  };
+  
   // For each bill, find all its occurrences in the projection period and adjust them
+  // NOTE: We process ALL bills for display, but only some affect balance
   for (const bill of bills) {
     for (let i = 0; i < projectionDays; i++) {
       const checkDate = new Date(cstTime);
@@ -278,13 +301,16 @@ async function computeProjections(settings: any) {
     
     if (i > 0) {
       // Apply bills to running balance starting from tomorrow
-      // Bills now preserve their original sign from Monarch:
+      // Only count bills that should affect balance (excludes credit card charges, etc.)
+      // Bills preserve their original sign from Monarch:
       // - Negative amounts = expenses (subtract from balance)
       // - Positive amounts = income (add to balance)
-      const totalBillsToday = billsToProcess.reduce((sum, bill) => sum + bill.amount, 0);
+      const billsAffectingBalance = billsToProcess.filter(bill => shouldAffectBalance(bill));
+      
+      const totalBillsToday = billsAffectingBalance.reduce((sum, bill) => sum + bill.amount, 0);
       runningBalance += totalBillsToday; // Add amounts directly (negative = expense, positive = income)
       balanceToStore = runningBalance;
-      logger.info(`Day ${i} (${dateStr}): ${billsToProcess.length} bills totaling $${totalBillsToday}, new balance: $${balanceToStore}`);
+      logger.info(`Day ${i} (${dateStr}): ${billsToProcess.length} bills (${billsAffectingBalance.length} affect balance) totaling $${totalBillsToday}, new balance: $${balanceToStore}`);
     }
     
     // Track true highest and lowest
@@ -324,8 +350,9 @@ async function computeProjections(settings: any) {
     logger.info(`Created projection for ${projData.dateStr} with balance ${projData.projectedBalance} (lowest: ${projectionData.lowest}, highest: ${projectionData.highest}, thresholdBreach: ${projectionData.thresholdBreach})`);
   }
   
-  // Calculate Monthly Cash Flow summaries
-  const monthlyCashFlow = calculateMonthlyCashFlow(bills);
+  // Calculate Monthly Cash Flow summaries (only use bills that affect balance)
+  const billsForCashFlow = bills.filter(bill => shouldAffectBalance(bill));
+  const monthlyCashFlow = calculateMonthlyCashFlow(billsForCashFlow);
   
   // Store Monthly Cash Flow in Firestore
   await db.collection('monthlyCashFlow').doc('current').set({

@@ -4,6 +4,47 @@ import * as functions from "firebase-functions/v1";
 
 const region = 'us-central1';
 
+// Helper function to determine account type from account icon and category
+function mapAccountType(accountType: string | null, accountName: string, category: string, accountIcon: string | null): string {
+  // If Monarch provides a type, use that as base
+  if (accountType) {
+    // Map "depository" to "Checking"
+    if (accountType.toLowerCase() === 'depository') {
+      return 'Checking';
+    }
+    
+    // Map "credit" to "Credit Card"
+    if (accountType.toLowerCase() === 'credit') {
+      return 'Credit Card';
+    }
+    
+    // Return the Monarch type if we don't have a special mapping
+    return accountType;
+  }
+  
+  // If no type from Monarch, check for Unknown Account cases
+  if (accountName === 'Unknown Account') {
+    // If category is Credit Card Payment, it comes from checking
+    if (category.toLowerCase().includes('credit card payment')) {
+      return 'Checking';
+    }
+    // Otherwise, it's truly unknown
+    return 'Unknown';
+  }
+  
+  // Fall back to icon-based detection
+  if (accountIcon === 'credit-card') {
+    return 'Credit Card';
+  }
+  
+  if (accountIcon === 'dollar-sign') {
+    return 'Checking';
+  }
+  
+  // Default to Unknown if we can't determine
+  return 'Unknown';
+}
+
 // Helper function to map Monarch categories to our categories
 function mapMonarchCategory(monarchCategory: string, merchantName?: string): string {
   // Credit card payment mapping - check merchant name first
@@ -165,11 +206,26 @@ export const refreshTransactions = functions.region(region).https.onRequest(
         const nextTransaction = item.nextForecastedTransaction;
 
         // Convert to bills format with enhanced data
+        const accountName = item.account?.displayName || 'Unknown Account';
+        const accountIcon = item.account?.icon || 'dollar-sign';
+        const category = mapMonarchCategory(item.category?.name || 'Other', stream.name);
+        const rawAccountType = item.account?.type?.name || null;
+        
+        // For credit card payments, use 'one-time' frequency since each statement is unique
+        // When Monarch refreshes, it will create a new one-time bill for the next statement
+        const isCreditCardPayment = category.toLowerCase().includes('credit card payment');
+        const frequency = isCreditCardPayment ? 'one-time' : (stream.frequency || 'monthly');
+        
+        // For past credit card payments, mark as inactive but keep them for historical view
+        const billDate = nextTransaction.date || new Date().toISOString().split('T')[0];
+        const today = new Date().toISOString().split('T')[0];
+        const isPastPayment = isCreditCardPayment && billDate < today;
+        
         const billData = {
           name: stream.name || 'Unknown',
           amount: nextTransaction.amount || 0, // Preserve original sign from Monarch
-          category: mapMonarchCategory(item.category?.name || 'Other', stream.name),
-          frequency: stream.frequency || 'monthly',
+          category,
+          frequency,
           startDate: nextTransaction.date || new Date().toISOString().split('T')[0], // Use nextForecastedTransaction date
           endDate: null,
           repeatsEvery: 1,
@@ -177,9 +233,9 @@ export const refreshTransactions = functions.region(region).https.onRequest(
           source: 'monarch',
           streamId: stream.id,
           // Account data
-          accountName: item.account?.displayName || 'Unknown Account',
-          accountIcon: item.account?.icon || 'dollar-sign',
-          accountType: item.account?.type?.name || null,
+          accountName,
+          accountIcon,
+          accountType: mapAccountType(rawAccountType, accountName, category, accountIcon),
           accountSubtype: item.account?.subtype?.name || null,
           institutionName: item.account?.institution?.name || null,
           institutionId: item.account?.institution?.id || null,
@@ -188,14 +244,17 @@ export const refreshTransactions = functions.region(region).https.onRequest(
           merchantName: stream.merchant?.name || null,
           merchantId: stream.merchant?.id || null,
           // Category data
-          categoryIcon: mapMonarchCategory(item.category?.name || 'Other', stream.name) === 'Credit Card Payment' ? '💳' : (item.category?.icon || '📄'),
+          categoryIcon: category === 'Credit Card Payment' ? '💳' : (item.category?.icon || '📄'),
           categoryGroup: item.category?.group?.name || null,
           categoryGroupId: item.category?.group?.id || null,
           // Metadata
-          isActive: stream.isActive !== false,
+          isActive: isPastPayment ? false : (stream.isActive !== false),
           isApproximate: stream.isApproximate || false,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
+
+        // Debug logging for account type determination
+        logger.info(`Bill: ${stream.name}, AccountIcon: ${item.account?.icon}, AccountType: ${billData.accountType}`);
 
         // Check if this bill already exists and needs updating
         const existingBill = existingBills.get(stream.id);
@@ -209,6 +268,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
             existingBill.frequency !== billData.frequency ||
             existingBill.startDate !== billData.startDate ||
             existingBill.accountName !== billData.accountName ||
+            existingBill.accountType !== billData.accountType ||
             existingBill.isActive !== billData.isActive
           );
           

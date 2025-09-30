@@ -39,6 +39,8 @@ export function TransactionsPage() {
     setFrequencyFilter,
     accountFilter,
     setAccountFilter,
+    accountTypeFilter,
+    setAccountTypeFilter,
     categoryFilter,
     setCategoryFilter,
     sourceFilter,
@@ -48,6 +50,7 @@ export function TransactionsPage() {
     filteredTransactions,
     uniqueFrequencies,
     uniqueAccounts,
+    uniqueAccountTypes,
     uniqueCategories,
     resetFilters,
     handleSort,
@@ -80,7 +83,10 @@ export function TransactionsPage() {
         frequency: formData.frequency,
         repeats_every: formData.repeats_every,
         start_date: formData.start_date,
-        note: formData.note,
+        notes: formData.notes,
+        accountType: formData.accountType,
+        iconUrl: formData.iconUrl,
+        iconType: formData.iconType,
       };
 
       if (formMode === 'create') {
@@ -226,12 +232,15 @@ export function TransactionsPage() {
           setFrequencyFilter={setFrequencyFilter}
           accountFilter={accountFilter}
           setAccountFilter={setAccountFilter}
+          accountTypeFilter={accountTypeFilter}
+          setAccountTypeFilter={setAccountTypeFilter}
           categoryFilter={categoryFilter}
           setCategoryFilter={setCategoryFilter}
           sourceFilter={sourceFilter}
           setSourceFilter={setSourceFilter}
           uniqueFrequencies={uniqueFrequencies}
           uniqueAccounts={uniqueAccounts}
+          uniqueAccountTypes={uniqueAccountTypes}
           uniqueCategories={uniqueCategories}
           resetFilters={resetFilters}
         />

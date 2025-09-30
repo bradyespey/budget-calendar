@@ -79,6 +79,7 @@ export async function getBill(id: string) {
       note: d.note,
       iconUrl: d.iconUrl,
       iconType: d.iconType,
+      accountType: d.accountType,
     } as Bill;
   } catch (error) {
     console.error(`Error fetching bill ${id}:`, error);
@@ -92,6 +93,7 @@ export async function createBill(bill: Omit<Bill, 'id'>) {
     const payload: any = {
       name: bill.name,
       category: bill.category,
+      normalizedCategory: bill.category.toLowerCase(), // Store normalized for matching
       amount: bill.amount,
       frequency: bill.frequency,
       repeatsEvery: bill.repeats_every,
@@ -102,6 +104,7 @@ export async function createBill(bill: Omit<Bill, 'id'>) {
     if (bill.notes) payload.notes = bill.notes;
     if (bill.iconUrl) payload.iconUrl = bill.iconUrl;
     if (bill.iconType) payload.iconType = bill.iconType;
+    if (bill.accountType) payload.accountType = bill.accountType;
 
     const docRef = await addDoc(billsRef, payload);
     
@@ -121,7 +124,10 @@ export async function updateBill(id: string, updates: Partial<Omit<Bill, 'id'>>)
     
     const firestoreUpdates: any = {};
     if (updates.name !== undefined) firestoreUpdates.name = updates.name;
-    if (updates.category !== undefined) firestoreUpdates.category = updates.category;
+    if (updates.category !== undefined) {
+      firestoreUpdates.category = updates.category;
+      firestoreUpdates.normalizedCategory = updates.category.toLowerCase();
+    }
     if (updates.amount !== undefined) firestoreUpdates.amount = updates.amount;
     if (updates.frequency !== undefined) firestoreUpdates.frequency = updates.frequency;
     if (updates.repeats_every !== undefined) firestoreUpdates.repeatsEvery = updates.repeats_every;
@@ -130,6 +136,7 @@ export async function updateBill(id: string, updates: Partial<Omit<Bill, 'id'>>)
     if (updates.notes !== undefined) firestoreUpdates.notes = updates.notes;
     if (updates.iconUrl !== undefined) firestoreUpdates.iconUrl = updates.iconUrl;
     if (updates.iconType !== undefined) firestoreUpdates.iconType = updates.iconType;
+    if (updates.accountType !== undefined) firestoreUpdates.accountType = updates.accountType;
     
     await updateDoc(billRef, firestoreUpdates);
     

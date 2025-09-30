@@ -57,29 +57,71 @@ function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<st
 
 function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   const billDate = new Date(bill.startDate);
+  const repeatsEvery = Number(bill.repeats_every ?? bill.repeatsEvery ?? 1) || 1;
   
   if (bill.frequency === 'daily') return true;
+  
   if (bill.frequency === 'weekly') {
     const daysDiff = Math.floor((date.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
-    return daysDiff >= 0 && daysDiff % 7 === 0;
+    return daysDiff >= 0 && daysDiff % (7 * repeatsEvery) === 0;
   }
+  
+  // Handle "Every X weeks" frequencies (e.g., every 2 weeks, every 3 weeks, etc.)
+  if (bill.frequency.startsWith('every_') && bill.frequency.includes('_weeks')) {
+    const weeksMatch = bill.frequency.match(/every_(\d+)_weeks/);
+    if (weeksMatch) {
+      const weekInterval = parseInt(weeksMatch[1]);
+      const daysDiff = Math.floor((date.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff >= 0 && daysDiff % (7 * weekInterval) === 0;
+    }
+  }
+  
+  if (bill.frequency === 'biweekly') {
+    // Bi-weekly occurs every 14 days (every 2 weeks)
+    const daysDiff = Math.floor((date.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
+    return daysDiff >= 0 && daysDiff % (14 * repeatsEvery) === 0;
+  }
+  
   if (bill.frequency === 'monthly') {
     const billDay = billDate.getDate();
     const checkDay = date.getDate();
     
     // Handle end-of-month scenarios
-    // If the bill is scheduled for the 29th, 30th, or 31st, but the current month doesn't have that many days,
-    // schedule it on the last day of the month
     const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
     
     if (billDay > lastDayOfMonth) {
-      // Bill day doesn't exist in this month, so use the last day of the month
       return checkDay === lastDayOfMonth;
     } else {
-      // Normal case: bill day exists in this month
       return billDay === checkDay;
     }
   }
+  
+  // Handle "Every X months" frequencies (e.g., every 2 months, every 3 months, etc.)
+  if (bill.frequency.startsWith('every_') && bill.frequency.includes('_months')) {
+    const monthsMatch = bill.frequency.match(/every_(\d+)_months/);
+    if (monthsMatch) {
+      const monthInterval = parseInt(monthsMatch[1]);
+      const billDay = billDate.getDate();
+      const checkDay = date.getDate();
+      
+      // Calculate months difference
+      const monthsDiff = (date.getFullYear() - billDate.getFullYear()) * 12 + 
+                        (date.getMonth() - billDate.getMonth());
+      
+      // Check if we're on the right month interval and day
+      if (monthsDiff >= 0 && monthsDiff % monthInterval === 0) {
+        // Handle end-of-month scenarios
+        const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+        
+        if (billDay > lastDayOfMonth) {
+          return checkDay === lastDayOfMonth;
+        } else {
+          return billDay === checkDay;
+        }
+      }
+    }
+  }
+  
   if (bill.frequency === 'Semimonthly_mid_end' || bill.frequency === 'semimonthly_mid_end') {
     const checkDay = date.getDate();
     const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -87,6 +129,14 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
     // Semimonthly_mid_end occurs on the 15th and last day of each month
     return checkDay === 15 || checkDay === lastDayOfMonth;
   }
+  
+  if (bill.frequency === 'semimonthly') {
+    const checkDay = date.getDate();
+    
+    // Semimonthly occurs on the 1st and 15th of each month
+    return checkDay === 1 || checkDay === 15;
+  }
+  
   if (bill.frequency === 'yearly') {
     const billDay = billDate.getDate();
     const checkDay = date.getDate();
@@ -298,6 +348,8 @@ function calculateMonthlyCashFlow(bills: any[]) {
     oneTime: { bills: 0, income: 0 },
     daily: { bills: 0, income: 0 },
     weekly: { bills: 0, income: 0 },
+    biweekly: { bills: 0, income: 0 },
+    semimonthly: { bills: 0, income: 0 },
     monthly: { bills: 0, income: 0 },
     yearly: { bills: 0, income: 0 },
   };
@@ -324,17 +376,29 @@ function calculateMonthlyCashFlow(bills: any[]) {
         summary.daily[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
         break;
       case 'weekly':
-        // Special handling for unemployment (weekly) vs biweekly pay
-        if (category === 'unemployment' || category === 'unemployment benefits') {
-          monthlyAmount = (amount * 4.35) / repeatsEvery;  // ~4.35 weeks per month
-        } else if (category === 'paycheck' || category === 'salary') {
-          // Semi-monthly pay (15th & last day) = 24 payments/year = 2.0 per month
-          monthlyAmount = (amount * 2.0) / repeatsEvery;
-        } else {
-          monthlyAmount = (amount * 4.35) / repeatsEvery;  // Biweekly = every 2 weeks
-        }
+        // Weekly = 52.18 times per year
+        monthlyAmount = (amount * 4.35) / repeatsEvery;  // ~4.35 weeks per month
         yearlyAmount = (amount * 52.18) / repeatsEvery;
         summary.weekly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+        break;
+      case 'biweekly':
+        // Biweekly = every 2 weeks = 26 times per year = 2.167 times per month
+        monthlyAmount = (amount * 26 / 12) / repeatsEvery;
+        yearlyAmount = (amount * 26) / repeatsEvery;
+        summary.biweekly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+        break;
+      case 'semimonthly':
+        // Semimonthly = twice per month = 24 times per year = 2.0 times per month
+        monthlyAmount = (amount * 2.0) / repeatsEvery;
+        yearlyAmount = (amount * 24) / repeatsEvery;
+        summary.semimonthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+        break;
+      case 'Semimonthly_mid_end':
+      case 'semimonthly_mid_end':
+        // Semimonthly mid-end = twice per month = 24 times per year = 2.0 times per month
+        monthlyAmount = (amount * 2.0) / repeatsEvery;
+        yearlyAmount = (amount * 24) / repeatsEvery;
+        summary.semimonthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
         break;
       case 'monthly':
         monthlyAmount = amount / repeatsEvery;
@@ -346,14 +410,44 @@ function calculateMonthlyCashFlow(bills: any[]) {
         yearlyAmount = amount / repeatsEvery;
         summary.yearly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
         break;
+      default:
+        // Handle "Every X months" and "Every X weeks" patterns
+        if (frequency.startsWith('every_') && frequency.includes('_months')) {
+          const monthsMatch = frequency.match(/every_(\d+)_months/);
+          if (monthsMatch) {
+            const monthInterval = parseInt(monthsMatch[1]);
+            monthlyAmount = (amount * 12) / (monthInterval * repeatsEvery);
+            yearlyAmount = amount / (monthInterval * repeatsEvery);
+            summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+          } else {
+            // Fallback to monthly
+            monthlyAmount = amount / repeatsEvery;
+            yearlyAmount = (amount * 12) / repeatsEvery;
+            summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+          }
+        } else if (frequency.startsWith('every_') && frequency.includes('_weeks')) {
+          const weeksMatch = frequency.match(/every_(\d+)_weeks/);
+          if (weeksMatch) {
+            const weekInterval = parseInt(weeksMatch[1]);
+            monthlyAmount = (amount * 52.18) / (weekInterval * 12 * repeatsEvery);
+            yearlyAmount = (amount * 52.18) / (weekInterval * repeatsEvery);
+            summary.weekly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+          } else {
+            // Fallback to weekly
+            monthlyAmount = (amount * 4.35) / repeatsEvery;
+            yearlyAmount = (amount * 52.18) / repeatsEvery;
+            summary.weekly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+          }
+        } else {
+          // Treat unknown frequency as monthly
+          monthlyAmount = amount / repeatsEvery;
+          yearlyAmount = (amount * 12) / repeatsEvery;
+          summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
+        }
+        break;
       case 'one-time':
         summary.oneTime[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
         break;
-      default:
-        // Treat unknown frequency as monthly
-        monthlyAmount = amount / repeatsEvery;
-        yearlyAmount = (amount * 12) / repeatsEvery;
-        summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
     }
 
     categories[category].monthly += monthlyAmount;

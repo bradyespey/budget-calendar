@@ -98,7 +98,7 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 - **runAll**: Orchestrates full nightly workflow automation
 
 **Maintenance:**
-- **validateProjections**: Validates projection data in Firestore
+- **validateProjections**: Cross-references Transactions with Upcoming projections to find missing bills, supports all frequency types
 - **clearCalendars**: Clears all events from both dev and prod calendars (bills and balance)
 - **generateIcons**: Creates icons for transactions using brand mapping and AI fallback
 - **resetAllIcons**: Bulk removal of generated icons while preserving custom ones
@@ -127,7 +127,7 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 - **Dashboard**: Checking, savings, and credit card balances with historical trend chart, projected future balances, low balance alerts, spending patterns, and comprehensive financial overview
 - **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling, optimized form performance, category icons, merchant logos, and manual icon input
 - **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality
-- **Upcoming**: Calendar view of upcoming bills, income, projected balances
+- **Upcoming**: Calendar view of upcoming bills, income, projected balances with real-time search filtering by transaction name and category
 - **Settings**: Projection settings, theme selection, manual triggers, import/export, maintenance functions with admin timestamps
 
 ## Directory Map
@@ -188,6 +188,44 @@ Budget/
 - **Loading States**: Fixed infinite loading on Transactions page when using cached data
 - **Monarch Status**: Added reverse matching (bills → Monarch) with visual indicators and status filtering
 - **Data Management**: Unified `bills` table as single source of truth, intelligent refresh logic prevents unnecessary updates, removed legacy transaction tables, enhanced with merchant logos, category icons, and credit card payment mapping
+
+## Supported Transaction Frequencies
+
+The system supports comprehensive frequency types for both manual transactions and Monarch Money imports:
+
+### Core Frequencies
+- **Daily** - Every day
+- **Weekly** - Every week  
+- **Monthly** - Every month
+- **Yearly** - Every year
+- **One-time** - Single occurrence
+
+### Monarch Money Frequencies
+- **Every week** - Weekly recurring
+- **Every 2 weeks** - Bi-weekly recurring
+- **Every 3 weeks** - Every 3 weeks
+- **Every 4 weeks** - Every 4 weeks
+- **Twice a month (1st & 15th)** - Semimonthly
+- **Twice a month (15th & last day)** - Semimonthly mid-end
+- **Every month** - Monthly recurring
+- **Every 2 months** - Every 2 months
+- **Every 3 months** - Every 3 months
+- **Every 4 months** - Every 4 months
+- **Every 6 months** - Every 6 months
+- **Every year** - Yearly recurring
+
+### Custom Intervals
+All frequencies support custom "repeats every" multipliers:
+- **Every 4 months** (monthly × 4)
+- **Every 17 weeks** (weekly × 17)
+- **Every 3 years** (yearly × 3)
+- **Every 2 days** (daily × 2)
+
+### Projection Logic
+- **Date Calculations**: Proper handling of end-of-month scenarios (Feb 29th, 30th/31st days)
+- **Weekend/Holiday Adjustment**: Bills move to next business day, paychecks move to previous business day
+- **Cash Flow Calculations**: Accurate monthly/yearly financial summaries for all frequency types
+- **Dynamic Pattern Matching**: Supports unlimited "Every X" intervals using regex pattern matching
 
 ## AI Handoff
 Read this README, scan the repo, prioritize core functions and env-safe areas, keep env and rules aligned with this file

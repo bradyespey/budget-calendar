@@ -1,6 +1,6 @@
 //src/hooks/useTransactions.ts
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getBills, createBill, updateBill, deleteBill } from '../api/bills';
 import { getCategories, Category } from '../api/categories';
 import { getRecurringTransactions, RecurringTransaction, refreshRecurringTransactions } from '../api/firebase';
@@ -43,6 +43,8 @@ function capitalize(str: string) {
 function pluralize(frequency: string) {
   if (frequency === 'daily') return 'days';
   if (frequency === 'weekly') return 'weeks';
+  if (frequency === 'biweekly') return 'weeks';
+  if (frequency === 'semimonthly') return 'months';
   if (frequency === 'monthly') return 'months';
   if (frequency === 'yearly') return 'years';
   return frequency;
@@ -55,7 +57,7 @@ function formatFrequency(frequency: string, repeatsEvery: number = 1): string {
   const frequencyMap: { [key: string]: string } = {
     'Semimonthly_mid_end': 'Twice a month (15th & last day)',
     'semimonthly_mid_end': 'Twice a month (15th & last day)',
-    'semimonthly': 'Twice a month',
+    'semimonthly': 'Twice a month (1st & 15th)',
     'biweekly': 'Every 2 weeks',
     'bi-monthly': 'Every 2 months'
   };
@@ -105,7 +107,8 @@ export function useTransactions() {
   }, []);
 
   // Combine manual and Monarch transactions (now all from bills collection)
-  const combineTransactions = useCallback(() => {
+  // This runs automatically whenever bills change
+  useEffect(() => {
     const combined: CombinedTransaction[] = [];
 
     // Add all bills (both manual and Monarch sources)
@@ -191,7 +194,6 @@ export function useTransactions() {
     
     // Operations
     fetchData,
-    combineTransactions,
     handleRefresh,
     createTransaction,
     updateTransaction,

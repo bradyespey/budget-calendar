@@ -1,11 +1,12 @@
 //src/pages/UpcomingPage.tsx
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
 import { format, parseISO } from 'date-fns';
 import { getProjections } from '../api/projections';
 import { Projection } from '../types';
-import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown, Search, X } from 'lucide-react';
 import { getSettings, getFunctionTimestamps } from '../api/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { useLocation } from 'react-router-dom';
@@ -30,6 +31,7 @@ export function UpcomingPage() {
   const [lastProjected, setLastProjected] = useState<Date | null>(null);
   const [budgetProjectionTimestamp, setBudgetProjectionTimestamp] = useState<Date | null>(null);
   const [syncCalendarTimestamp, setSyncCalendarTimestamp] = useState<Date | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const location = useLocation();
 
   // Load function timestamps
@@ -121,6 +123,37 @@ export function UpcomingPage() {
     });
   };
 
+  // Filter and search logic
+  const filteredDays = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return upcomingDays;
+    }
+
+    const searchLower = searchTerm.toLowerCase();
+    return upcomingDays
+      .map(day => ({
+        ...day,
+        transactions: day.transactions.filter(transaction =>
+          transaction.name.toLowerCase().includes(searchLower) ||
+          transaction.category.toLowerCase().includes(searchLower)
+        )
+      }))
+      .filter(day => day.transactions.length > 0);
+  }, [upcomingDays, searchTerm]);
+
+  // Calculate total occurrences of search term
+  const totalOccurrences = useMemo(() => {
+    if (!searchTerm.trim()) return 0;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return upcomingDays.reduce((total, day) => {
+      return total + day.transactions.filter(transaction =>
+        transaction.name.toLowerCase().includes(searchLower) ||
+        transaction.category.toLowerCase().includes(searchLower)
+      ).length;
+    }, 0);
+  }, [upcomingDays, searchTerm]);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -133,7 +166,7 @@ export function UpcomingPage() {
   const getBalanceChange = (day: DayData, index: number): number => {
     if (index === 0) return 0;
     // Calculate the change in balance (negative means money went out, positive means money came in)
-    return day.balance - upcomingDays[index - 1].balance;
+    return day.balance - filteredDays[index - 1].balance;
   };
 
   const formatDate = (dateStr: string) => {
@@ -153,7 +186,7 @@ export function UpcomingPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Upcoming Bills: {upcomingDays.length}-Day Projection
+          Upcoming Bills: {searchTerm ? `${filteredDays.length} of ${upcomingDays.length}` : upcomingDays.length}-Day Projection
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
           Preview upcoming bills and projected balance with Google Calendar sync. Bills move to next business day on weekends/holidays, paychecks move to previous business day.
@@ -167,10 +200,44 @@ export function UpcomingPage() {
           )}
         </div>
       </div>
+
+      {/* Search Filter */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              type="text"
+              placeholder="Search transactions or categories (e.g., Factor, Netflix, Paycheck, Food & Drinks)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-10"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {searchTerm && (
+            <div className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+              {totalOccurrences} occurrence{totalOccurrences !== 1 ? 's' : ''} found
+            </div>
+          )}
+        </div>
+        {searchTerm && (
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Showing {filteredDays.length} day{filteredDays.length !== 1 ? 's' : ''} with matching transactions
+          </div>
+        )}
+      </div>
       
       <div className="flex justify-center">
         <div className="w-full max-w-2xl space-y-4">
-        {upcomingDays.map((day, index) => (
+        {filteredDays.map((day, index) => (
           <Card 
             key={day.date}
             className={`w-full transition-all border-l-4

@@ -1,4 +1,4 @@
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
 
@@ -40,9 +40,15 @@ export const refreshAccounts = functions.region(region).https.onRequest(
       
       const result = await response.json();
       
-      await db.collection('admin').doc('functionTimestamps').set({
-        refreshAccounts: new Date()
-      }, { merge: true });
+      // Update function timestamp
+      try {
+        await db.doc('admin/functionTimestamps').set({
+          refreshAccounts: Timestamp.now()
+        }, { merge: true });
+        logger.info('Updated refreshAccounts timestamp');
+      } catch (timestampError) {
+        logger.warn('Failed to update timestamp:', timestampError);
+      }
       
       res.status(200).json({ 
         success: true, 

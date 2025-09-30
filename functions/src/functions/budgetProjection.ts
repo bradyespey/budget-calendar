@@ -1,3 +1,4 @@
+import * as admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
@@ -540,9 +541,15 @@ export const budgetProjection = functions.region(region).https.onRequest(
         lastProjectedAt: new Date()
       });
       
-      await db.collection('admin').doc('functionTimestamps').set({
-        budgetProjection: new Date()
-      }, { merge: true });
+      // Update function timestamp
+      try {
+        await admin.firestore().doc('admin/functionTimestamps').set({
+          budgetProjection: admin.firestore.Timestamp.now()
+        }, { merge: true });
+        logger.info('Updated budgetProjection timestamp');
+      } catch (timestampError) {
+        logger.warn('Failed to update timestamp:', timestampError);
+      }
       
       res.status(200).json({ 
         success: true, 

@@ -1,4 +1,4 @@
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
 import { google } from "googleapis";
@@ -327,7 +327,7 @@ export const syncCalendar = functions
       }
       
       await db.collection('admin').doc('functionTimestamps').set({
-        syncCalendar: new Date()
+        syncCalendar: Timestamp.now()
       }, { merge: true });
       
       res.status(200).json({

@@ -1,7 +1,7 @@
 //src/pages/SettingsPage.tsx
 
 import { useState, useRef, useEffect } from 'react'
-import { Loader, Settings, Save, AlertTriangle, Sun, Moon, Monitor } from 'lucide-react'
+import { Loader, Settings, Save, AlertTriangle, Sun, Moon, Monitor, Calendar } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import {
   Card,
@@ -716,43 +716,86 @@ export function SettingsPage() {
       {/* Category Management Card - spans full width */}
       <CategoryManagement showNotification={showNotification} />
       
-      {/* Theme Settings */}
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Theme Settings</CardTitle>
-          <CardDescription>
-            Choose your preferred appearance theme for the application.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center space-x-4">
-            <Button
-              variant={theme === 'light' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setTheme('light')}
-            >
-              <Sun className="mr-2 h-4 w-4" />
-              Light
-            </Button>
-            <Button
-              variant={theme === 'dark' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setTheme('dark')}
-            >
-              <Moon className="mr-2 h-4 w-4" />
-              Dark
-            </Button>
-            <Button
-              variant={theme === 'system' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setTheme('system')}
-            >
-              <Monitor className="mr-2 h-4 w-4" />
-              System
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Theme Settings and Calendar Links - side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Theme Settings</CardTitle>
+            <CardDescription>
+              Choose your preferred appearance theme for the application.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-4">
+              <Button
+                variant={theme === 'light' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTheme('light')}
+              >
+                <Sun className="mr-2 h-4 w-4" />
+                Light
+              </Button>
+              <Button
+                variant={theme === 'dark' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTheme('dark')}
+              >
+                <Moon className="mr-2 h-4 w-4" />
+                Dark
+              </Button>
+              <Button
+                variant={theme === 'system' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTheme('system')}
+              >
+                <Monitor className="mr-2 h-4 w-4" />
+                System
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Calendar Links</CardTitle>
+            <CardDescription>
+              Quick access to your Google Calendars for budget tracking.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div>
+                <a
+                  href="https://calendar.google.com/calendar/u/0/r/agenda"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Test Calendar
+                </a>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Development/testing calendar for budget events
+                </p>
+              </div>
+              <div>
+                <a
+                  href="https://calendar.google.com/calendar/u/1/r/agenda"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Main Calendar
+                </a>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Production calendar for live budget tracking
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
       
       {/* Hidden file input for CSV import */}
       <input

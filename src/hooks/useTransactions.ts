@@ -21,6 +21,7 @@ export interface CombinedTransaction {
   notes?: string;
   iconUrl?: string | null;
   iconType?: 'brand' | 'generated' | 'category' | 'custom' | null;
+  end_date?: string;
   // Monarch transaction fields
   merchantLogoUrl?: string;
   merchantName?: string;
@@ -125,6 +126,7 @@ export function useTransactions() {
           notes: bill.notes,
           iconUrl: bill.iconUrl,
           iconType: bill.iconType,
+          end_date: bill.end_date,
           merchantLogoUrl: bill.logoUrl,
           merchantName: bill.merchantName,
           categoryIcon: bill.categoryIcon,

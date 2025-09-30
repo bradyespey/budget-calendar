@@ -115,7 +115,7 @@ export function CategorySelect({
       setTimeout(() => {
         e.target.value = value || '';
       }, 0);
-    } else {
+    } else if (selectedValue !== '') {
       onChange(selectedValue);
     }
   };

@@ -83,6 +83,7 @@ export function TransactionsPage() {
         frequency: formData.frequency,
         repeats_every: formData.repeats_every,
         start_date: formData.start_date,
+        end_date: formData.end_date,
         notes: formData.notes,
         accountType: formData.accountType,
         iconUrl: formData.iconUrl,
@@ -175,7 +176,11 @@ export function TransactionsPage() {
         frequency: selectedTransaction.rawFrequency || 'monthly',
         repeats_every: selectedTransaction.repeats_every || 1,
         start_date: selectedTransaction.dueDate,
+        end_date: selectedTransaction.end_date || '',
         notes: selectedTransaction.notes || '',
+        iconUrl: selectedTransaction.iconUrl || '',
+        iconType: selectedTransaction.iconType || null,
+        accountType: selectedTransaction.accountType || 'Checking',
       };
       return billData;
     }

@@ -101,9 +101,10 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 - **validateProjections**: Cross-references Transactions with Upcoming projections to find missing bills, supports all frequency types
 - **clearCalendars**: Clears all events from both dev and prod calendars (bills and balance)
 - **generateIcons**: Creates icons for transactions using brand mapping and AI fallback
-- **resetAllIcons**: Bulk removal of generated icons while preserving custom ones
+- **resetAllIcons**: Bulk removal of generated icons while preserving custom ones (supports preserveCustom option)
 - **backupIcons**: Saves all custom icons to Firebase storage for backup
 - **restoreIcons**: Restores icons from Firebase backup
+- **getIconBackupInfo**: Returns backup status and timestamp information
 
 ### Flask API Endpoints (api.theespeys.com)
 - **refresh_accounts**: Triggers Monarch account refresh via Selenium
@@ -125,10 +126,10 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 
 ## App Pages / Routes
 - **Dashboard**: Checking, savings, and credit card balances with historical trend chart, projected future balances, low balance alerts, spending patterns, and comprehensive financial overview
-- **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling, optimized form performance, category icons, merchant logos, and manual icon input
+- **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling, optimized form performance, category icons, merchant logos, manual icon input, and end date support for manual transactions
 - **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality
 - **Upcoming**: Calendar view of upcoming bills, income, projected balances with real-time search filtering by transaction name and category
-- **Settings**: Projection settings, theme selection, manual triggers, import/export, maintenance functions with admin timestamps
+- **Settings**: Projection settings, theme selection, manual triggers, import/export, maintenance functions with admin timestamps, calendar links, and icon management
 
 ## Directory Map
 ```
@@ -220,6 +221,13 @@ All frequencies support custom "repeats every" multipliers:
 - **Every 17 weeks** (weekly × 17)
 - **Every 3 years** (yearly × 3)
 - **Every 2 days** (daily × 2)
+
+### Manual Transaction Features
+- **End Date Support**: Manual transactions can have optional end dates to limit recurring occurrences
+- **Semimonthly Frequencies**: Support for "Twice a month (1st & 15th)" and "Twice a month (15th & last day)" options
+- **Custom Icons**: Manual icon URL input with preview functionality
+- **Form Validation**: Required field validation with proper error handling
+- **Edit Mode**: Full transaction editing with all fields including end dates and custom icons
 
 ### Projection Logic
 - **Date Calculations**: Proper handling of end-of-month scenarios (Feb 29th, 30th/31st days)

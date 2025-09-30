@@ -19,6 +19,7 @@ interface TransactionFormProps {
     frequency: string;
     repeats_every: number | string;
     start_date: string;
+    end_date?: string;
     notes: string;
     iconUrl?: string;
     iconType?: 'brand' | 'generated' | 'category' | 'custom' | null;
@@ -49,6 +50,7 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
     frequency: 'monthly',
     repeats_every: 1,
     start_date: getCSTDate(),
+    end_date: '',
     notes: '',
     iconUrl: '',
     iconType: null as 'brand' | 'generated' | 'category' | 'custom' | null,
@@ -64,6 +66,7 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
     if (initialData && mode === 'edit') {
       setFormData({
         ...initialData,
+        end_date: initialData.end_date || '',
         iconUrl: initialData.iconUrl || '',
         iconType: initialData.iconType || null,
         accountType: initialData.accountType || 'Checking',
@@ -84,7 +87,7 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
       }
       return;
     }
-    if (!formData.category.trim()) {
+    if (!formData.category || !formData.category.trim()) {
       const categorySelect = e.currentTarget.querySelector('select[name="category"]') as HTMLSelectElement;
       if (categorySelect) {
         categorySelect.setCustomValidity('Category is required');
@@ -134,7 +137,8 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
         amount: finalAmount,
         repeats_every: typeof formData.repeats_every === 'string' ? parseInt(formData.repeats_every) || 1 : formData.repeats_every,
         iconUrl: formData.iconUrl || null,
-        iconType: formData.iconType || null
+        iconType: formData.iconType || null,
+        end_date: formData.end_date || null
       };
       await onSubmit(submitData);
     } catch (error) {
@@ -249,25 +253,35 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
                 />
                 
                 {formData.frequency !== 'one-time' && (
-                  <Input
-                    name="repeats_every"
-                    label="Repeats Every"
-                    type="number"
-                    min="1"
-                    value={formData.repeats_every}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '') {
-                        setFormData(prev => ({ ...prev, repeats_every: '' }));
-                      } else {
-                        const numValue = parseInt(value);
-                        if (!isNaN(numValue) && numValue > 0) {
-                          setFormData(prev => ({ ...prev, repeats_every: numValue }));
+                  <>
+                    <Input
+                      name="repeats_every"
+                      label="Repeats Every"
+                      type="number"
+                      min="1"
+                      value={formData.repeats_every}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          setFormData(prev => ({ ...prev, repeats_every: '' }));
+                        } else {
+                          const numValue = parseInt(value);
+                          if (!isNaN(numValue) && numValue > 0) {
+                            setFormData(prev => ({ ...prev, repeats_every: numValue }));
+                          }
                         }
-                      }
-                    }}
-                    required
-                  />
+                      }}
+                      required
+                    />
+                    
+                    <Input
+                      name="end_date"
+                      label="End Date (Optional)"
+                      type="date"
+                      value={formData.end_date || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                    />
+                  </>
                 )}
                 
                 <Select
@@ -283,7 +297,7 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
                 />
                 
                 <Input
-                  label="Notes"
+                  label="Notes (Optional)"
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   placeholder="Add a note..."

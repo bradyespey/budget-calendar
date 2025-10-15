@@ -341,22 +341,22 @@ export function UpcomingPage() {
               {day.transactions.length > 0 ? (
                 <ul className="space-y-2">
                   {day.transactions.map(transaction => (
-                    <li key={`${day.date}-${transaction.id}`} className="flex justify-between items-center py-1 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <div className="flex items-center">
-                        <span className={`w-2 h-2 rounded-full mr-2 ${
+                    <li key={`${day.date}-${transaction.id}`} className="flex justify-between items-start gap-3 py-1 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <div className="flex items-center flex-wrap gap-2 min-w-0 flex-1">
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                           transaction.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
                         }`}></span>
-                        <span className="font-medium text-gray-900 dark:text-white">{transaction.name}</span>
-                        <span className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400">
+                        <span className="font-medium text-gray-900 dark:text-white break-words">{transaction.name}</span>
+                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                           {transaction.category}
                         </span>
                         {!affectsBalance(transaction) && (
-                          <span className="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900 rounded text-xs text-blue-600 dark:text-blue-400">
-                            Excluded from Balance
+                          <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 rounded text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                            Excluded
                           </span>
                         )}
                       </div>
-                      <span className={`font-medium ${
+                      <span className={`font-medium whitespace-nowrap flex-shrink-0 ${
                         transaction.amount >= 0 
                           ? 'text-green-600 dark:text-green-400' 
                           : 'text-red-600 dark:text-red-400'

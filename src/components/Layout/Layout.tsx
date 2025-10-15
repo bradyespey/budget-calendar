@@ -10,11 +10,11 @@ interface LayoutProps {
 
 export function Layout({ children, onTransactionsClick }: LayoutProps) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-150">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-150">
       {/* Navbar with theme toggle */}
       <Navbar onTransactionsClick={onTransactionsClick} />
       {/* Main content area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {children}
       </main>
     </div>

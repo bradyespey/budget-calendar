@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Layout } from '../components/Layout/Layout';
 import { Plus } from 'lucide-react';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { TransactionsFilters } from '../components/TransactionsFilters';
@@ -189,39 +190,36 @@ export function TransactionsPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg">Loading transactions...</div>
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading transactions...</div>
+      </div>
     );
   }
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto p-4 space-y-6">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Transactions
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Manage manual transactions and view Monarch recurring data
-            </p>
-            {refreshTransactionsTimestamp && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {formatTimestamp(refreshTransactionsTimestamp)}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2">
+        <PageHeader
+          title="Transactions"
+          subtitle={refreshTransactionsTimestamp ? formatTimestamp(refreshTransactionsTimestamp) : undefined}
+          helpSections={[
+            {
+              title: 'Quick Tips',
+              items: [
+                'View recurring transactions (Monarch + Manual)',
+                'Create and edit manual transactions',
+                'Filter by frequency, account, category, or source',
+              ],
+            },
+          ]}
+          actions={
             <Button onClick={handleCreateTransaction} size="sm">
               <Plus className="h-4 w-4 mr-2" />
-            Add Transaction
-          </Button>
-                </div>
-              </div>
+              Add Transaction
+            </Button>
+          }
+        />
               
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
@@ -262,29 +260,29 @@ export function TransactionsPage() {
         />
 
         {/* Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+          <Card className="border-t-4 border-t-blue-500">
+            <CardContent className="p-5 sm:p-6">
+              <div className="text-3xl sm:text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">
                 {combinedTransactions.filter(t => t.source === 'monarch').length}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Monarch Transactions</div>
+              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Monarch Transactions</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+          <Card className="border-t-4 border-t-green-500">
+            <CardContent className="p-5 sm:p-6">
+              <div className="text-3xl sm:text-4xl font-bold text-green-600 dark:text-green-400 mb-2">
                 {combinedTransactions.filter(t => t.source === 'manual').length}
-                  </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Manual Transactions</div>
+              </div>
+              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Manual Transactions</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+          <Card className="border-t-4 border-t-purple-500">
+            <CardContent className="p-5 sm:p-6">
+              <div className="text-3xl sm:text-4xl font-bold text-purple-600 dark:text-purple-400 mb-2">
                 {combinedTransactions.length}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Total Transactions</div>
+              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Transactions</div>
           </CardContent>
         </Card>
         </div>
@@ -294,7 +292,10 @@ export function TransactionsPage() {
           mode={formMode}
           initialData={getInitialFormData()}
           onSubmit={handleSubmitForm}
-          onCancel={() => setFormMode('view')}
+          onCancel={() => {
+            setFormMode('view');
+            setSelectedTransaction(null);
+          }}
         />
       </div>
     </Layout>

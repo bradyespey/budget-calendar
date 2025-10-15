@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Loader, Settings, Save, AlertTriangle, Sun, Moon, Monitor, Calendar } from 'lucide-react'
+import { PageHeader } from '../components/ui/PageHeader'
 import { Button } from '../components/ui/Button'
 import {
   Card,
@@ -509,13 +510,40 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto px-2 sm:px-4">
+    <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Settings
-        </h1>
-      </div>
+      <PageHeader
+        title="Settings"
+        helpSections={[
+          {
+            title: 'Quick Actions',
+            items: [
+              'Refresh Accounts - Update Monarch Money data',
+              'Update Balance - Pull latest account balances',
+              'Run Projection - Recalculate future balances',
+              'Sync Calendar - Push events to Google Calendar',
+              'Run All - Execute full automation workflow',
+            ],
+          },
+          {
+            title: 'Settings',
+            items: [
+              'Days to Project - How many days ahead to calculate',
+              'Low Balance Alert - Threshold for balance warnings',
+              'Manual Balance Override - Temporarily override live balance',
+            ],
+          },
+          {
+            title: 'Maintenance',
+            items: [
+              'Validate Projections - Check for missing bills',
+              'Clear Calendars - Remove all calendar events',
+              'Generate Icons - Create transaction icons',
+              'Import/Export - Manage transaction data',
+            ],
+          },
+        ]}
+      />
       
       {busy && (
         <div className="flex items-center justify-center mb-4">
@@ -523,13 +551,8 @@ export function SettingsPage() {
           <span className="text-blue-600 dark:text-blue-200 font-semibold">{getBusyMessage()}</span>
         </div>
       )}
-      {/* Save button inline with description */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-6">
-        <div>
-          <p className="text-gray-600 dark:text-gray-400">
-            Configure your budget settings, manage data, and run maintenance tasks. Update projection settings, refresh account data, and manage categories.
-          </p>
-        </div>
+      {/* Save button */}
+      <div className="flex justify-end mb-6">
         <Button
           onClick={handleSave}
           className="inline-flex items-center gap-2 px-6 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[100px] w-auto"

@@ -9,7 +9,8 @@ export const Card: React.FC<CardProps> = ({ children, className = '' }) => (
   <div
     className={[
       'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100',
-      'rounded-xl shadow-sm border border-gray-200 dark:border-gray-700',
+      'rounded-xl shadow-lg hover:shadow-xl border border-gray-200/50 dark:border-gray-700/50',
+      'transition-all duration-200',
       className
     ].join(' ')}
   >
@@ -18,13 +19,13 @@ export const Card: React.FC<CardProps> = ({ children, className = '' }) => (
 )
 
 export const CardHeader: React.FC<CardProps> = ({ children, className = '' }) => (
-  <div className={['p-4 border-b border-gray-200 dark:border-gray-700', className].join(' ')}>
+  <div className={['p-5 sm:p-6 border-b border-gray-200 dark:border-gray-700', className].join(' ')}>
     {children}
   </div>
 )
 
 export const CardTitle: React.FC<CardProps> = ({ children, className = '' }) => (
-  <h3 className={['font-semibold text-lg text-gray-900 dark:text-gray-100', className].join(' ')}>
+  <h3 className={['font-bold text-lg sm:text-xl text-gray-900 dark:text-gray-100', className].join(' ')}>
     {children}
   </h3>
 )
@@ -36,13 +37,13 @@ export const CardDescription: React.FC<CardProps> = ({ children, className = '' 
 )
 
 export const CardContent: React.FC<CardProps> = ({ children, className = '' }) => (
-  <div className={['p-4', className].join(' ')}>
+  <div className={['p-5 sm:p-6', className].join(' ')}>
     {children}
   </div>
 )
 
 export const CardFooter: React.FC<CardProps> = ({ children, className = '' }) => (
-  <div className={['p-4 border-t border-gray-200 dark:border-gray-700', className].join(' ')}>
+  <div className={['p-5 sm:p-6 border-t border-gray-200 dark:border-gray-700', className].join(' ')}>
     {children}
   </div>
 )

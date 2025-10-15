@@ -61,9 +61,10 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
     initialData && initialData.amount >= 0 ? 'credit' : 'debit'
   );
 
-  // Update form data when initialData changes (for editing)
+  // Update form data when mode or initialData changes
   useEffect(() => {
     if (initialData && mode === 'edit') {
+      // Populate form with existing transaction data
       setFormData({
         ...initialData,
         end_date: initialData.end_date || '',
@@ -72,6 +73,22 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
         accountType: initialData.accountType || 'Checking',
       });
       setTransactionType(initialData.amount >= 0 ? 'credit' : 'debit');
+    } else if (mode === 'create') {
+      // Reset form to defaults when creating new transaction
+      setFormData({
+        name: '',
+        category: '',
+        amount: 0,
+        frequency: 'monthly',
+        repeats_every: 1,
+        start_date: getCSTDate(),
+        end_date: '',
+        notes: '',
+        iconUrl: '',
+        iconType: null,
+        accountType: 'Checking',
+      });
+      setTransactionType('debit');
     }
   }, [initialData, mode]);
 
@@ -151,14 +168,40 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
   if (mode === 'view') return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-4xl">
-        <CardHeader>
-          <CardTitle>
-            {mode === 'create' ? 'Add transaction' : 'Edit transaction'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto"
+      onClick={(e) => {
+        // Close modal when clicking backdrop
+        if (e.target === e.currentTarget) {
+          onCancel();
+        }
+      }}
+    >
+      <div className="min-h-screen px-4 py-6 flex items-center justify-center"
+        onClick={(e) => {
+          // Also close when clicking on the inner wrapper
+          if (e.target === e.currentTarget) {
+            onCancel();
+          }
+        }}
+      >
+        <Card className="w-full max-w-4xl my-8 max-h-[calc(100vh-4rem)] flex flex-col">
+          <CardHeader className="flex-shrink-0 relative">
+            <CardTitle>
+              {mode === 'create' ? 'Add transaction' : 'Edit transaction'}
+            </CardTitle>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              aria-label="Close"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </CardHeader>
+        <CardContent className="overflow-y-auto flex-1">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Left Column */}
@@ -357,6 +400,7 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

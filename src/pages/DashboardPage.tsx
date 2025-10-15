@@ -12,6 +12,7 @@ import {
   Calculator,
   AlertTriangle,
 } from 'lucide-react'
+import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardContent } from '../components/ui/Card'
 import { SavingsChart } from '../components/SavingsChart'
 import { getHighLowProjections } from '../api/projections'
@@ -193,21 +194,28 @@ export function DashboardPage() {
 
   // ── UI ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 px-4 max-w-5xl mx-auto">
+    <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Financial Dashboard
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Your financial overview at a glance with current account balance, projected future balances, spending patterns, and projections calculated from recurring bills.
-        </p>
-      </div>
+      <PageHeader
+        title="Financial Dashboard"
+        helpSections={[
+          {
+            title: 'Quick Overview',
+            items: [
+              'Current account balances (checking, savings, credit)',
+              'Projected high/low balances for next 7+ days',
+              'Low balance alerts and threshold tracking',
+              'Monthly cash flow and spending patterns',
+              'Category averages and bills/income breakdown',
+            ],
+          },
+        ]}
+      />
       
       {/* Row 1: Account Balances */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Account Balances</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-5">Account Balances</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           {/* Checking Balance */}
           <Card>
             <CardContent className="pt-6">
@@ -289,8 +297,8 @@ export function DashboardPage() {
 
       {/* Row 2: Projected Balances */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Projected Balances</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-5">Projected Balances</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           {/* Threshold Breach Alert */}
           <Card>
             <CardContent className="pt-6">
@@ -383,8 +391,8 @@ export function DashboardPage() {
 
       {/* Row 3: Monthly Cash Flow */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Monthly Cash Flow</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-5">Monthly Cash Flow</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           {/* Total Monthly Income */}
           <Card>
             <CardContent className="pt-6">

@@ -58,24 +58,24 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
   ];
 
   return (
-    <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
-      <div className="max-w-5xl mx-auto px-4">
+    <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 sticky top-0 z-50 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center space-x-8">
             {/* Logo */}
-            <Link to="/dashboard" className="text-xl font-semibold text-blue-600 dark:text-blue-400">
+            <Link to="/dashboard" className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
               Budget Calendar
             </Link>
             {/* Desktop Navigation Links */}
-            <div className="hidden md:flex items-center space-x-1">
+            <div className="hidden md:flex items-center space-x-2">
               {navLinks.map(({ path, label }) => (
                 <Link
                   key={path}
                   to={path}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                     isActive(path)
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
                   onClick={() => {
                     setMobileMenuOpen(false);
@@ -103,11 +103,11 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
           <div className="hidden md:flex items-baseline space-x-4">
             {balance != null && (
               <div className="text-right self-center">
-                <div className="font-medium text-gray-900 dark:text-white">
+                <div className="text-lg font-bold text-gray-900 dark:text-white">
                   {formatCurrency(balance)}
                 </div>
                 {lastSync && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
                     As of {formatDistanceToNow(lastSync, { addSuffix: false }).replace('about ', '').replace(' hour', ' hr').replace(' hours', ' hrs').replace(' minute', ' min').replace(' minutes', ' mins')} ago
                   </div>
                 )}
@@ -136,15 +136,15 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 pb-4">
-            <div className="flex flex-col space-y-1 pt-2">
+            <div className="flex flex-col space-y-2 pt-3 px-2">
               {navLinks.map(({ path, label }) => (
                 <Link
                   key={path}
                   to={path}
-                  className={`px-4 py-2 rounded-md text-base font-medium transition-colors ${
+                  className={`px-4 py-3 rounded-lg text-base font-semibold transition-all ${
                     isActive(path)
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
                   onClick={() => {
                     setMobileMenuOpen(false);

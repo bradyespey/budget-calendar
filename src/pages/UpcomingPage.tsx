@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns';
 import { getProjections } from '../api/projections';
 import { Projection } from '../types';
 import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown, Search, X } from 'lucide-react';
+import { PageHeader } from '../components/ui/PageHeader';
 import { getSettings, getFunctionTimestamps } from '../api/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { useLocation } from 'react-router-dom';
@@ -204,48 +205,52 @@ export function UpcomingPage() {
   }
 
   return (
-    <div className="space-y-6 px-4 max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Upcoming Bills: {searchTerm ? `${filteredDays.length} of ${upcomingDays.length}` : upcomingDays.length}-Day Projection
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Preview upcoming bills and projected balance with Google Calendar sync.
-        </p>
-        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          <div className="mb-1"><strong>Display:</strong></div>
-          <div className="ml-2 space-y-1">
-            <div>• All transactions appear here (for awareness/cancellation)</div>
-            <div>• Credit card charges, payments, utilities, income, etc.</div>
-          </div>
-          <div className="mt-2 mb-1"><strong>Balance Calculation:</strong></div>
-          <div className="ml-2 space-y-1">
-            <div>• Recurring bills that hit checking directly (utilities, rent)</div>
-            <div>• Credit card payments (one-time bills, auto-update with Monarch)</div>
-            <div>• Manual budgets (food, custom estimates)</div>
-            <div>• Income (paychecks, deposits)</div>
-          </div>
-          <div className="mt-2 mb-1"><strong>Excluded from Balance:</strong></div>
-          <div className="ml-2 space-y-1">
-            <div>• Individual credit card charges (prevents double-counting)</div>
-          </div>
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Bills move to next business day on weekends/holidays, paychecks move to previous business day.
-          </div>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {budgetProjectionTimestamp && (
-            <span>Projections: {formatTimestamp(budgetProjectionTimestamp)}</span>
-          )}
-          {syncCalendarTimestamp && (
-            <span>Calendar Sync: {formatTimestamp(syncCalendarTimestamp)}</span>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title={`Upcoming Bills: ${searchTerm ? `${filteredDays.length} of ${upcomingDays.length}` : upcomingDays.length}-Day Projection`}
+        subtitle={
+          [
+            budgetProjectionTimestamp && `Projections: ${formatTimestamp(budgetProjectionTimestamp)}`,
+            syncCalendarTimestamp && `Calendar Sync: ${formatTimestamp(syncCalendarTimestamp)}`
+          ].filter(Boolean).join(' • ')
+        }
+        helpSections={[
+          {
+            title: 'Display',
+            items: [
+              'All transactions appear here (for awareness/cancellation)',
+              'Credit card charges, payments, utilities, income, etc.',
+            ],
+          },
+          {
+            title: 'Balance Calculation',
+            items: [
+              'Recurring bills that hit checking directly (utilities, rent)',
+              'Credit card payments (one-time bills, auto-update with Monarch)',
+              'Manual budgets (food, custom estimates)',
+              'Income (paychecks, deposits)',
+            ],
+          },
+          {
+            title: 'Excluded from Balance',
+            items: [
+              'Individual credit card charges (prevents double-counting)',
+            ],
+          },
+          {
+            title: 'Date Adjustments',
+            items: [
+              'Bills move to next business day on weekends/holidays',
+              'Paychecks move to previous business day',
+            ],
+          },
+        ]}
+      />
 
       {/* Search Filter */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <Card>
+        <CardContent className="p-4 sm:p-5">
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -276,17 +281,17 @@ export function UpcomingPage() {
             Showing {filteredDays.length} day{filteredDays.length !== 1 ? 's' : ''} with matching transactions
           </div>
         )}
-      </div>
+        </CardContent>
+      </Card>
       
-      <div className="flex justify-center">
-        <div className="w-full max-w-2xl space-y-4">
+      <div className="space-y-5">
         {filteredDays.map((day, index) => (
           <Card 
             key={day.date}
-            className={`w-full transition-all border-l-4
-              ${day.isHighest ? 'border-l-green-500' : ''}
-              ${day.isLowest ? 'border-l-red-500' : ''}
-              ${!day.isHighest && !day.isLowest ? 'border-l-transparent' : ''}
+            className={`w-full border-l-4
+              ${day.isHighest ? 'border-l-green-500 bg-green-50/30 dark:bg-green-900/10' : ''}
+              ${day.isLowest ? 'border-l-red-500 bg-red-50/30 dark:bg-red-900/10' : ''}
+              ${!day.isHighest && !day.isLowest ? 'border-l-blue-500/20' : ''}
             `}
           >
             <CardHeader className="pb-2">
@@ -367,7 +372,6 @@ export function UpcomingPage() {
             </CardContent>
           </Card>
         ))}
-        </div>
       </div>
     </div>
   );

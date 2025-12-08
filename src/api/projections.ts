@@ -8,12 +8,16 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../lib/firebaseConfig';
+import { db, functions, auth } from '../lib/firebaseConfig';
 import { Projection } from '../types';
 import { format } from 'date-fns';
+import { generateMockProjections } from './mockData';
 
 export async function getProjections() {
   try {
+    if (!auth.currentUser) {
+      return generateMockProjections();
+    }
     const today = new Date();
     const todayString = format(today, 'yyyy-MM-dd');
     
@@ -56,6 +60,21 @@ export async function getProjections() {
 
 export async function getHighLowProjections() {
   try {
+    if (!auth.currentUser) {
+      const mockProjections = generateMockProjections();
+      if (mockProjections.length === 0) return { highest: undefined, lowest: undefined, thresholdBreach: undefined };
+      
+      const highest = mockProjections.reduce((max, p) => p.projected_balance > max.projected_balance ? p : max, mockProjections[0]);
+      const lowest = mockProjections.reduce((min, p) => p.projected_balance < min.projected_balance ? p : min, mockProjections[0]);
+      // Mock threshold breach - assume none for simplicity or find one if balance < 0
+      const thresholdBreach = mockProjections.find(p => p.projected_balance < 0);
+
+      return {
+        highest,
+        lowest,
+        thresholdBreach: thresholdBreach ? { ...thresholdBreach, projDate: thresholdBreach.proj_date, projectedBalance: thresholdBreach.projected_balance, thresholdBreach: true } : undefined
+      };
+    }
     const today = new Date();
     const todayString = format(today, 'yyyy-MM-dd');
     const projectionsRef = collection(db, 'projections');

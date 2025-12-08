@@ -14,7 +14,8 @@ import {
   Timestamp,
   getCountFromServer 
 } from 'firebase/firestore';
-import { db } from '../lib/firebaseConfig';
+import { db, auth } from '../lib/firebaseConfig';
+import { MOCK_CATEGORIES } from './mockData';
 
 export interface Category {
   id: string;
@@ -25,7 +26,9 @@ export interface Category {
 
 export async function getCategories(): Promise<Category[]> {
   try {
-
+    if (!auth.currentUser) {
+      return MOCK_CATEGORIES;
+    }
     
     const categoriesRef = collection(db, 'categories');
     const q = query(categoriesRef, orderBy('name'));

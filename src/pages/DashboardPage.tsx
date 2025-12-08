@@ -21,6 +21,7 @@ import { getSavingsBalance, getSavingsHistory, getCreditCardDebt } from '../api/
 import { Bill, Projection } from '../types'
 import { format, parseISO } from 'date-fns'
 import { useBalance } from '../context/BalanceContext'
+import { useAuth } from '../context/AuthContext'
 import { getFunctionTimestamps, getSettings, getMonthlyCashFlow } from '../api/firebase'
 
 interface CategoryAverage {
@@ -66,6 +67,7 @@ export function DashboardPage() {
   const [settings, setSettings] = useState<any>(null)
 
   const { balance: checkingBalance, lastSync } = useBalance()
+  const { session } = useAuth()
 
   // Load refresh accounts timestamp
   const loadTimestamp = async () => {
@@ -159,7 +161,7 @@ export function DashboardPage() {
       }
     }
     fetchData()
-  }, [])
+  }, [session.isAuthenticated])
 
 
   const formatCurrency = (amount: number) =>

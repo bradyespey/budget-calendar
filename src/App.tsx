@@ -10,6 +10,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { TransactionsPage } from './pages/TransactionsPage'
 import { UpcomingPage } from './pages/UpcomingPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { BalanceProvider } from './context/BalanceContext'
 
 
 function App() {
@@ -17,49 +18,51 @@ function App() {
     <BrowserRouter>
       <ThemeProvider defaultTheme="system" storageKey="theme">
         <AuthProvider>
-        <Routes>
-          {/* Public */}
-          <Route path="/login" element={<LoginPage />} />
+          <BalanceProvider>
+            <Routes>
+              {/* Public */}
+              <Route path="/login" element={<LoginPage />} />
 
 
-          {/* Protected */}
-          <Route
-            path="/dashboard"
-            element={
-              <RequireAuth>
-                <Layout><DashboardPage /></Layout>
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/transactions"
-            element={
-              <RequireAuth>
-                <TransactionsPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/upcoming"
-            element={
-              <RequireAuth>
-                <Layout><UpcomingPage /></Layout>
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <RequireAuth>
-                <Layout><SettingsPage /></Layout>
-              </RequireAuth>
-            }
-          />
+              {/* Protected (now act as demo-aware wrappers) */}
+              <Route
+                path="/dashboard"
+                element={
+                  <RequireAuth>
+                    <Layout><DashboardPage /></Layout>
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/transactions"
+                element={
+                  <RequireAuth>
+                    <TransactionsPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/upcoming"
+                element={
+                  <RequireAuth>
+                    <Layout><UpcomingPage /></Layout>
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <RequireAuth>
+                    <Layout><SettingsPage /></Layout>
+                  </RequireAuth>
+                }
+              />
 
-          {/* Redirects */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to={window.location.pathname.toLowerCase()} replace />} />
-        </Routes>
+              {/* Redirects */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to={window.location.pathname.toLowerCase()} replace />} />
+            </Routes>
+          </BalanceProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

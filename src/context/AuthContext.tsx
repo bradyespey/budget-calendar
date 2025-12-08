@@ -59,7 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(defaultSession);
         setUserRole(null);
         if (user) {
-          // User not authorized
+          // User not authorized - show warning but don't crash
+          console.warn(`Access denied. Email ${user.email} is not authorized.`);
           alert(`Access denied. Email ${user.email} is not authorized. Allowed: ${allowedEmails.join(', ')}`);
           await firebaseSignOut(auth);
         }

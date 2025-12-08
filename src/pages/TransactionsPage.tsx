@@ -92,10 +92,26 @@ export function TransactionsPage() {
       };
 
       if (formMode === 'create') {
-        await createTransaction(billData);
+        try {
+          await createTransaction(billData);
+        } catch (e: any) {
+          if (e.code === 'permission-denied' || e.message?.includes('permission-denied') || e.message?.includes('Missing or insufficient permissions')) {
+            // Silently handle permission errors
+          } else {
+            throw e;
+          }
+        }
       } else if (formMode === 'edit' && selectedTransaction) {
-        const billId = selectedTransaction.id.replace('manual-', '');
-        await updateTransaction(billId, billData);
+        try {
+          const billId = selectedTransaction.id.replace('manual-', '');
+          await updateTransaction(billId, billData);
+        } catch (e: any) {
+          if (e.code === 'permission-denied' || e.message?.includes('permission-denied') || e.message?.includes('Missing or insufficient permissions')) {
+            // Silently handle permission errors
+          } else {
+            throw e;
+          }
+        }
       }
 
       setFormMode('view');
@@ -110,7 +126,15 @@ export function TransactionsPage() {
     if (!transaction.isEditable) return;
     
     try {
-      await deleteTransaction(transaction);
+      try {
+        await deleteTransaction(transaction);
+      } catch (e: any) {
+        if (e.code === 'permission-denied' || e.message?.includes('permission-denied') || e.message?.includes('Missing or insufficient permissions')) {
+          // Silently handle permission errors
+        } else {
+          throw e;
+        }
+      }
     } catch (err) {
       console.error('Error deleting transaction:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete transaction');

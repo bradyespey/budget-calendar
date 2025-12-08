@@ -8,8 +8,7 @@ interface RequireAuthProps {
 }
 
 export function RequireAuth({ children }: RequireAuthProps) {
-  const { session, loading } = useAuth();
-  const location = useLocation();
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -19,9 +18,6 @@ export function RequireAuth({ children }: RequireAuthProps) {
     );
   }
 
-  if (!session.isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
+  // Allow access even if not authenticated (Demo Mode)
   return <>{children}</>;
 }

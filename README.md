@@ -4,6 +4,8 @@
 ## Overview
 Full-stack financial forecasting web app that syncs real-time checking account balances via Monarch Money API, calculates projected cash flow, and displays upcoming bills/income in a calendar UI. Features intelligent recurring transaction comparison between Monarch Money and manual bills with exact matching validation, frequency-aware date comparison, comprehensive sorting functionality, automatic weekend/holiday adjustment, and unified data management with intelligent refresh logic. Supports manual updates and automated nightly workflows.
 
+**Demo Mode**: Public access with comprehensive mock financial data showcasing all features. Authenticated users see their real financial data after Google sign-in.
+
 Originally built using Python, Flask, Google Apps Script, and Google Sheets, the system has since been fully rebuilt using React, Firebase, and modern cloud-native tooling.
 
 ## Live and Admin

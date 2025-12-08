@@ -14,7 +14,7 @@ import {
   writeBatch 
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../lib/firebaseConfig';
+import { db, functions, auth } from '../lib/firebaseConfig';
 
 // Type definitions
 export interface Account {
@@ -69,6 +69,11 @@ const timestampToDate = (timestamp: any): Date => {
 
 // ACCOUNTS API
 export async function getAccounts(): Promise<Account[]> {
+  if (!auth.currentUser) {
+    // In demo mode we rely on dedicated mock APIs instead of this helper
+    // This function is unused by the public dashboard.
+    return [];
+  }
   const accountsRef = collection(db, 'accounts');
   const snapshot = await getDocs(accountsRef);
   
@@ -90,6 +95,10 @@ export async function updateAccountBalance(accountId: string, balance: number): 
 
 // BILLS API
 export async function getBills(): Promise<Bill[]> {
+  if (!auth.currentUser) {
+    // In demo mode, use the richer mock pipeline in src/api/bills.ts instead.
+    return [];
+  }
   const billsRef = collection(db, 'bills');
   const q = query(billsRef, orderBy('name'));
   const snapshot = await getDocs(q);
@@ -126,6 +135,10 @@ export async function deleteBill(billId: string): Promise<void> {
 
 // CATEGORIES API
 export async function getCategories(): Promise<Category[]> {
+  if (!auth.currentUser) {
+    // Demo mode uses src/api/categories.ts mock categories instead.
+    return [];
+  }
   const categoriesRef = collection(db, 'categories');
   const q = query(categoriesRef, orderBy('name'));
   const snapshot = await getDocs(q);
@@ -158,6 +171,10 @@ export async function deleteCategory(categoryId: string): Promise<void> {
 
 // PROJECTIONS API
 export async function getProjections(): Promise<Projection[]> {
+  if (!auth.currentUser) {
+    // Demo mode uses src/api/projections.ts for rich mock projections.
+    return [];
+  }
   const projectionsRef = collection(db, 'projections');
   const q = query(projectionsRef, orderBy('projDate'));
   const snapshot = await getDocs(q);
@@ -214,6 +231,10 @@ export interface RecurringTransaction {
 }
 
 export async function getRecurringTransactions(): Promise<RecurringTransaction[]> {
+  if (!auth.currentUser) {
+    // For demo, show no raw Monarch streams; transactions are represented via MOCK_BILLS instead.
+    return [];
+  }
   const recurringRef = collection(db, 'recurringTransactions');
   const q = query(recurringRef, orderBy('merchantName'));
   const snapshot = await getDocs(q);
@@ -253,6 +274,16 @@ export async function refreshRecurringTransactions(): Promise<void> {
 
 // SETTINGS API
 export async function getSettings(): Promise<Settings> {
+  if (!auth.currentUser) {
+    // Demo defaults: generous projection window and mid-range threshold
+    return {
+      projectionDays: 30,
+      balanceThreshold: 1000,
+      calendarMode: 'prod',
+      manualBalanceOverride: null,
+      lastProjectedAt: null,
+    };
+  }
   const settingsRef = doc(db, 'settings', 'config');
   const snapshot = await getDoc(settingsRef);
   
@@ -291,6 +322,15 @@ export async function updateSettings(updates: Partial<Settings>): Promise<void> 
 
 // FUNCTION TIMESTAMPS API
 export async function getFunctionTimestamps(): Promise<Record<string, Date>> {
+  if (!auth.currentUser) {
+    const now = new Date();
+    return {
+      refreshAccounts: new Date(now.getTime() - 60 * 60 * 1000),
+      refreshRecurringTransactions: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+      budgetProjection: new Date(now.getTime() - 3 * 60 * 60 * 1000),
+      syncCalendar: new Date(now.getTime() - 4 * 60 * 60 * 1000),
+    };
+  }
   const timestampsRef = doc(db, 'admin', 'functionTimestamps');
   const timestampsDoc = await getDoc(timestampsRef);
   
@@ -418,6 +458,30 @@ export async function validateProjections(): Promise<{ isValid: boolean; errors:
 // MONTHLY CASH FLOW API
 export async function getMonthlyCashFlow(): Promise<any> {
   try {
+    if (!auth.currentUser) {
+      // Mock monthly cash flow that matches MOCK_BILLS and projections
+      return {
+        categories: {
+          housing:   { monthly: 2500, yearly: 2500 * 12 },
+          groceries: { monthly: 600,  yearly: 600 * 12 },
+          entertainment: { monthly: 75, yearly: 75 * 12 },
+          health: { monthly: 280, yearly: 280 * 12 },
+          transportation: { monthly: 850, yearly: 850 * 12 },
+        },
+        summary: {
+          oneTime: { bills: 0, income: 0 },
+          daily:   { bills: 50, income: 0 },
+          weekly:  { bills: 200, income: 0 },
+          monthly: { bills: 4305, income: 7000 },
+          yearly:  { bills: 4305 * 12, income: 7000 * 12 },
+        },
+        monthlyTotals: {
+          income: 7000,
+          bills: 4305,
+          leftover: 7000 - 4305,
+        },
+      };
+    }
     const monthlyCashFlowRef = doc(db, 'monthlyCashFlow', 'current');
     const monthlyCashFlowDoc = await getDoc(monthlyCashFlowRef);
     

@@ -12,11 +12,15 @@ import {
   orderBy,
   writeBatch 
 } from 'firebase/firestore';
-import { db } from '../lib/firebaseConfig';
+import { db, auth } from '../lib/firebaseConfig';
 import { Bill } from '../types';
+import { MOCK_BILLS } from './mockData';
 
 export async function getBills() {
   try {
+    if (!auth.currentUser) {
+      return MOCK_BILLS;
+    }
     const billsRef = collection(db, 'bills');
     const snapshot = await getDocs(billsRef);
     
@@ -58,6 +62,11 @@ export async function getBills() {
 
 export async function getBill(id: string) {
   try {
+    if (!auth.currentUser) {
+      const mockBill = MOCK_BILLS.find(b => b.id === id);
+      if (!mockBill) throw new Error(`Bill with id ${id} not found`);
+      return mockBill;
+    }
     const billRef = doc(db, 'bills', id);
     const billDoc = await getDoc(billRef);
     

@@ -9,8 +9,9 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../lib/firebaseConfig';
+import { db, functions, auth } from '../lib/firebaseConfig';
 import type { Account } from "../types";
+import { MOCK_ACCOUNTS } from './mockData';
 
 // Helper function to convert Firestore timestamp to Date
 const timestampToDate = (timestamp: any): Date => {
@@ -20,8 +21,14 @@ const timestampToDate = (timestamp: any): Date => {
   return new Date(timestamp);
 };
 
-// ── Firebase query functions ─────────────────────────────────────────────
+/**
+ * Fetches all accounts from Firestore or returns mock accounts for demo mode
+ * @returns Array of Account objects
+ */
 export async function getAccounts(): Promise<Account[]> {
+  if (!auth.currentUser) {
+    return MOCK_ACCOUNTS;
+  }
   const accountsRef = collection(db, 'accounts');
   const q = query(accountsRef, orderBy('display_name'));
   const snapshot = await getDocs(q);
@@ -34,7 +41,15 @@ export async function getAccounts(): Promise<Account[]> {
   }));
 }
 
+/**
+ * Fetches checking account balance from Firestore or returns mock balance for demo mode
+ * @returns Checking account balance as number
+ * @throws Error if checking account not found (authenticated mode only)
+ */
 export async function getCheckingBalance(): Promise<number> {
+  if (!auth.currentUser) {
+    return MOCK_ACCOUNTS.find(a => a.id === 'checking')?.last_balance || 0;
+  }
   const accountRef = doc(db, 'accounts', 'checking');
   const accountDoc = await getDoc(accountRef);
   
@@ -45,7 +60,14 @@ export async function getCheckingBalance(): Promise<number> {
   return accountDoc.data().lastBalance;
 }
 
+/**
+ * Fetches savings account balance from Firestore or returns mock balance for demo mode
+ * @returns Savings account balance as number, or null if account doesn't exist
+ */
 export async function getSavingsBalance(): Promise<number | null> {
+  if (!auth.currentUser) {
+    return MOCK_ACCOUNTS.find(a => a.id === 'savings')?.last_balance || 0;
+  }
   const accountRef = doc(db, 'accounts', 'savings');
   const accountDoc = await getDoc(accountRef);
   
@@ -56,7 +78,14 @@ export async function getSavingsBalance(): Promise<number | null> {
   return accountDoc.data().lastBalance;
 }
 
+/**
+ * Fetches credit card debt balance from Firestore or returns mock balance for demo mode
+ * @returns Credit card debt balance as number, or null if account doesn't exist
+ */
 export async function getCreditCardDebt(): Promise<number | null> {
+  if (!auth.currentUser) {
+    return MOCK_ACCOUNTS.find(a => a.id === 'creditCards')?.last_balance || 0;
+  }
   const accountRef = doc(db, 'accounts', 'creditCards');
   const accountDoc = await getDoc(accountRef);
   
@@ -67,7 +96,19 @@ export async function getCreditCardDebt(): Promise<number | null> {
   return accountDoc.data().lastBalance;
 }
 
+/**
+ * Fetches savings account balance history from Firestore or returns mock history for demo mode
+ * @returns Array of balance history entries with balance and timestamp
+ */
 export async function getSavingsHistory(): Promise<Array<{ balance: number; timestamp: Date }>> {
+  if (!auth.currentUser) {
+    const savings = MOCK_ACCOUNTS.find(a => a.id === 'savings')?.last_balance || 0;
+    // Generate fake history
+    return Array.from({ length: 10 }).map((_, i) => ({
+      balance: savings - (i * 100),
+      timestamp: new Date(Date.now() - i * 86400000)
+    })).reverse();
+  }
   const historyRef = collection(db, 'savingsHistory');
   const q = query(historyRef, orderBy('timestamp', 'asc'));
   const snapshot = await getDocs(q);
@@ -78,7 +119,14 @@ export async function getSavingsHistory(): Promise<Array<{ balance: number; time
   }));
 }
 
+/**
+ * Fetches last sync time for checking account or returns current date for demo mode
+ * @returns Last sync timestamp as Date, or null if not available
+ */
 export async function getLastSyncTime(): Promise<Date | null> {
+  if (!auth.currentUser) {
+    return new Date();
+  }
   const accountRef = doc(db, 'accounts', 'checking');
   const accountDoc = await getDoc(accountRef);
   
@@ -89,7 +137,10 @@ export async function getLastSyncTime(): Promise<Date | null> {
   return timestampToDate(accountDoc.data().lastSynced);
 }
 
-// ── Refresh accounts via Firebase Cloud Function ────────────────────────────────────────
+/**
+ * Triggers account refresh via Flask API through Firebase Cloud Function
+ * @throws Error if refresh fails
+ */
 export async function refreshAccountsViaFlask(): Promise<void> {
   const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshAccounts', {
     method: 'POST',
@@ -133,7 +184,11 @@ export async function refreshBalancesInDb(): Promise<{ checking: number; savings
   };
 }
 
-// Legacy function name for backwards compatibility
+/**
+ * Legacy function name for backwards compatibility
+ * Refreshes Chase checking balance in database
+ * @returns Updated checking account balance
+ */
 export async function refreshChaseBalanceInDb(): Promise<number> {
   const balances = await refreshBalancesInDb();
   return balances.checking;

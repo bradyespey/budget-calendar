@@ -6,6 +6,7 @@ import { getCategories, Category } from '../api/categories';
 import { getRecurringTransactions, RecurringTransaction, refreshRecurringTransactions } from '../api/firebase';
 import { updateTransactionIcon } from '../api/icons';
 import { Bill } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 // Combined transaction interface
 export interface CombinedTransaction {
@@ -84,6 +85,7 @@ export function useTransactions() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { session } = useAuth();
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -97,7 +99,7 @@ export function useTransactions() {
       ]);
       
       setBills(billsData);
-      setMonarchTransactions([]); // No longer using separate monarch collection
+      setMonarchTransactions([]);
       setCategories(categoriesData);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -106,6 +108,11 @@ export function useTransactions() {
       setLoading(false);
     }
   }, []);
+
+  // Refetch when auth state changes
+  useEffect(() => {
+    fetchData();
+  }, [session.isAuthenticated, fetchData]);
 
   // Combine manual and Monarch transactions (now all from bills collection)
   // This runs automatically whenever bills change

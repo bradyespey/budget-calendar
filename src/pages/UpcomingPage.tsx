@@ -12,6 +12,7 @@ import { getSettings, getFunctionTimestamps } from '../api/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { useLocation } from 'react-router-dom';
 import { formatInTimeZone } from 'date-fns-tz';
+import { useAuth } from '../context/AuthContext';
 
 interface DayData {
   date: string;
@@ -53,6 +54,7 @@ export function UpcomingPage() {
   const [syncCalendarTimestamp, setSyncCalendarTimestamp] = useState<Date | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const location = useLocation();
+  const { session } = useAuth();
 
   // Load function timestamps
   const loadTimestamps = async () => {
@@ -106,7 +108,7 @@ export function UpcomingPage() {
       }
     }
     fetchLastProjected();
-  }, [location.pathname]);
+  }, [location.pathname, session.isAuthenticated]);
 
   const fetchUpcomingData = async () => {
     try {

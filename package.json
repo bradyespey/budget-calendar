@@ -19,7 +19,6 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.8",
-    "@supabase/supabase-js": "^2.39.8",
     "clsx": "^2.1.1",
     "date-fns": "^3.4.0",
     "date-fns-tz": "^3.2.0",

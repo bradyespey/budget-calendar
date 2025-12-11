@@ -4,12 +4,12 @@ import { getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA8PBORjASZYT51SzcFng6itsQRaOYGo7I",
-  authDomain: "budgetcalendar-e6538.firebaseapp.com",
-  projectId: "budgetcalendar-e6538",
-  storageBucket: "budgetcalendar-e6538.firebasestorage.app",
-  messagingSenderId: "342823251353",
-  appId: "1:342823251353:web:6a1e2bd82a1926b5897708"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase

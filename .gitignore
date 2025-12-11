@@ -91,3 +91,7 @@ env/
 # Temporary files
 *.temp
 *.tmp
+
+# Secrets and sensitive directories
+secrets/
+old/secrets/

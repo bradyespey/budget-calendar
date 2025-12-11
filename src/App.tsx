@@ -19,49 +19,49 @@ function App() {
       <ThemeProvider defaultTheme="system" storageKey="theme">
         <AuthProvider>
           <BalanceProvider>
-            <Routes>
-              {/* Public */}
-              <Route path="/login" element={<LoginPage />} />
+        <Routes>
+          {/* Public */}
+          <Route path="/login" element={<LoginPage />} />
 
 
               {/* Protected (now act as demo-aware wrappers) */}
-              <Route
-                path="/dashboard"
-                element={
-                  <RequireAuth>
-                    <Layout><DashboardPage /></Layout>
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/transactions"
-                element={
-                  <RequireAuth>
-                    <TransactionsPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/upcoming"
-                element={
-                  <RequireAuth>
-                    <Layout><UpcomingPage /></Layout>
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <RequireAuth>
-                    <Layout><SettingsPage /></Layout>
-                  </RequireAuth>
-                }
-              />
+          <Route
+            path="/dashboard"
+            element={
+              <RequireAuth>
+                <Layout><DashboardPage /></Layout>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/transactions"
+            element={
+              <RequireAuth>
+                <TransactionsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/upcoming"
+            element={
+              <RequireAuth>
+                <Layout><UpcomingPage /></Layout>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <RequireAuth>
+                <Layout><SettingsPage /></Layout>
+              </RequireAuth>
+            }
+          />
 
-              {/* Redirects */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="*" element={<Navigate to={window.location.pathname.toLowerCase()} replace />} />
-            </Routes>
+          {/* Redirects */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to={window.location.pathname.toLowerCase()} replace />} />
+        </Routes>
           </BalanceProvider>
         </AuthProvider>
       </ThemeProvider>

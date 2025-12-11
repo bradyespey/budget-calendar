@@ -150,9 +150,9 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
             )}
             <div className="pt-1">
               {session.isAuthenticated ? (
-                <Button variant="outline" size="sm" onClick={signOut}>
-                  Sign Out
-                </Button>
+              <Button variant="outline" size="sm" onClick={signOut}>
+                Sign Out
+              </Button>
               ) : (
                 <Button variant="primary" size="sm" onClick={handleSignIn} className="bg-blue-600 hover:bg-blue-700 text-white">
                   <LogIn size={16} className="mr-2" />
@@ -200,9 +200,9 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
               )}
               <div className="px-4 pt-2">
                  {session.isAuthenticated ? (
-                  <Button variant="outline" size="sm" onClick={signOut} className="w-full">
-                    Sign Out
-                  </Button>
+                <Button variant="outline" size="sm" onClick={signOut} className="w-full">
+                  Sign Out
+                </Button>
                 ) : (
                   <Button variant="primary" size="sm" onClick={handleSignIn} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                     <LogIn size={16} className="mr-2" />

@@ -18,12 +18,6 @@ if (!firebaseConfig.apiKey || firebaseConfig.apiKey.trim() === '') {
   throw new Error('Firebase API key is not configured. Check environment variables.');
 }
 
-// Log first/last 10 chars for debugging (safe to log)
-if (import.meta.env.DEV) {
-  const key = firebaseConfig.apiKey || '';
-  console.log('Firebase API Key loaded:', key.substring(0, 10) + '...' + key.substring(key.length - 10));
-}
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 

@@ -1,13 +1,10 @@
-name: Weekly Data Backup
+name: Weekly Data Backup to Firebase Storage
 
 on:
   schedule:
     # Run at midnight Central Time (06:00 UTC) every Tuesday
     - cron: '0 6 * * 2'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
-
-permissions:
-  contents: write
 
 jobs:
   backup:
@@ -22,25 +19,12 @@ jobs:
           node-version: '18'
 
       - name: Install Dependencies
-        run: npm install firebase-admin --no-save
+        run: npm install firebase-admin
 
       - name: Run Backup Script
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: node scripts/backup.js
+        run: node scripts/backup-to-storage.js
 
-      - name: Commit and Push Backup
-        run: |
-          git config --global user.name 'Backup Bot'
-          git config --global user.email 'bot@noreply.github.com'
-          
-          # Check if there are changes
-          if [[ -n $(git status -s data-backups/) ]]; then
-            git add data-backups/
-            git commit -m "Automated data backup: $(date +'%Y-%m-%d')"
-            git push
-            echo "Backup updated and pushed."
-          else
-            echo "No changes in data to backup."
-          fi
+
 

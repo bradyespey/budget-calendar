@@ -95,3 +95,6 @@ env/
 # Secrets and sensitive directories
 secrets/
 old/secrets/
+.github/secrets/
+*service-account*.json
+firebase-adminsdk*.json

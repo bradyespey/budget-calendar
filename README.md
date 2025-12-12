@@ -12,7 +12,7 @@ Originally built using Python, Flask, Google Apps Script, and Google Sheets, the
 - 🌐 **App URL**: https://budget.theespeys.com
 - 🔥 **Firebase Console**: budgetcalendar-e6538
 - 🚀 **Netlify Dashboard**: budgetcalendar
-- ⏰ **GitHub Actions**: Automated nightly runs at 7:30 AM CT
+- ⏰ **GitHub Actions**: Automated nightly runs at 7:30 AM CT + weekly database backup (Tuesday 12:00 AM CT)
 - 🐍 **Flask API**: https://api.theespeys.com
 
 ## Tech Stack
@@ -57,6 +57,7 @@ VITE_DEBUG_MODE=true
 - **Deploy Functions**: `npx firebase deploy --only functions`
 - **Check Automation**: `npm run check:automation` - Quick status check
 - **Manual Trigger**: `gh workflow run budget-nightly.yml`
+- **Backup Trigger**: `gh workflow run backup.yml` - Manual database backup
 - **Migration**: `npm run migrate` - Migrate data to Firebase
 - **Import**: `npm run import:firebase` - Import data to Firebase
 

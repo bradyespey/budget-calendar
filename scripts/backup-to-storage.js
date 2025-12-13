@@ -179,11 +179,57 @@ async function cleanupOldBackups() {
 async function testStorageConnection() {
   console.log('Testing Firebase Storage connection...');
   try {
+    // Check if bucket exists
+    const [exists] = await bucket.exists();
+    
+    if (!exists) {
+      console.log(`  ⚠️  Bucket ${bucket.name} does not exist. Creating...`);
+      try {
+        // Create bucket in us-central1 (supports free tier)
+        await bucket.create({
+          location: 'us-central1',
+          storageClass: 'STANDARD'
+        });
+        console.log(`  ✅ Created bucket: ${bucket.name} in us-central1`);
+      } catch (createError) {
+        if (createError.code === 409) {
+          // Bucket already exists (race condition)
+          console.log(`  ✅ Bucket already exists: ${bucket.name}`);
+        } else if (createError.code === 403) {
+          console.error(`  ❌ Permission denied. Service account needs Storage Admin role.`);
+          console.error(`  → Grant permissions: https://console.cloud.google.com/iam-admin/iam?project=${firebaseServiceAccount.project_id}`);
+          console.error(`  → Find: ${firebaseServiceAccount.client_email}`);
+          console.error(`  → Add role: "Storage Admin"\n`);
+          throw createError;
+        } else {
+          console.error(`  ❌ Failed to create bucket:`, createError.message);
+          console.error(`  → Try creating manually: https://console.firebase.google.com/project/${firebaseServiceAccount.project_id}/storage`);
+          console.error(`  → Or use gcloud: gcloud storage buckets create gs://${bucket.name} --location=us-central1\n`);
+          throw createError;
+        }
+      }
+    } else {
+      console.log(`  ✅ Connected to Firebase Storage bucket: ${bucket.name}`);
+    }
+    
+    // Try to list files (just to test connection)
     await bucket.getFiles({ prefix: BACKUP_PREFIX, maxResults: 1 });
-    console.log(`  ✅ Connected to Firebase Storage bucket: ${bucket.name}`);
     return true;
   } catch (error) {
     console.error(`  ❌ Storage connection failed:`, error.message);
+    if (error.code === 404 || error.message.includes('does not exist')) {
+      console.error(`\n  📋 ACTION REQUIRED:`);
+      console.error(`  → Firebase Storage bucket does not exist`);
+      console.error(`  → The script will try to create it automatically`);
+      console.error(`  → If that fails, create manually: https://console.firebase.google.com/project/${firebaseServiceAccount.project_id}/storage`);
+      console.error(`  → Or use gcloud CLI: gcloud storage buckets create gs://${bucket.name} --location=us-central1\n`);
+    } else if (error.code === 403) {
+      console.error(`\n  📋 ACTION REQUIRED:`);
+      console.error(`  → Service account needs Storage Admin permissions`);
+      console.error(`  → Grant permissions: https://console.cloud.google.com/iam-admin/iam?project=${firebaseServiceAccount.project_id}`);
+      console.error(`  → Find: ${firebaseServiceAccount.client_email}`);
+      console.error(`  → Add role: "Storage Admin"\n`);
+    }
     throw error;
   }
 }
@@ -230,3 +276,5 @@ async function main() {
 }
 
 main();
+
+

@@ -67,6 +67,7 @@ const COLLECTIONS = [
   'monthlyCashFlow'
 ];
 const BACKUP_DIR = path.join(__dirname, '../data-backups');
+const RETENTION_DAYS = 90; // Keep backups for 3 months
 
 async function backupCollection(collectionName) {
   console.log(`  Backing up ${collectionName}...`);
@@ -138,6 +139,76 @@ async function backup() {
   console.log(`Collections: ${COLLECTIONS.join(', ')}`);
   console.log(`Saved to: ${filePath}`);
   console.log(`🔒 Backup is encrypted and secure`);
+  
+  // Clean up old backups (3-month rotation with safety check)
+  await cleanupOldBackups(timestamp);
+}
+
+async function cleanupOldBackups(currentBackupDate) {
+  console.log('\nCleaning up old backups...');
+  
+  try {
+    const files = fs.readdirSync(BACKUP_DIR);
+    const backupFiles = files.filter(f => f.endsWith('.encrypted.json'));
+    
+    if (backupFiles.length === 0) {
+      console.log('  No existing backups found');
+      return;
+    }
+    
+    // Parse current backup date
+    const currentDate = new Date(currentBackupDate + 'T00:00:00Z');
+    const cutoffDate = new Date(currentDate);
+    cutoffDate.setDate(cutoffDate.getDate() - RETENTION_DAYS);
+    
+    // Safety check: Find most recent backup date
+    const backupDates = backupFiles
+      .map(f => {
+        const match = f.match(/^(\d{4}-\d{2}-\d{2})-/);
+        return match ? new Date(match[1] + 'T00:00:00Z') : null;
+      })
+      .filter(d => d !== null)
+      .sort((a, b) => b - a);
+    
+    if (backupDates.length === 0) {
+      console.log('  Could not parse backup dates, skipping cleanup');
+      return;
+    }
+    
+    const mostRecentBackupDate = backupDates[0];
+    const daysSinceLastBackup = Math.floor((currentDate - mostRecentBackupDate) / (1000 * 60 * 60 * 24));
+    
+    // Safety check: Don't delete if no recent backup (within retention period)
+    if (daysSinceLastBackup > RETENTION_DAYS) {
+      console.log(`  ⚠️  Safety check: Most recent backup is ${daysSinceLastBackup} days old (beyond ${RETENTION_DAYS} day retention)`);
+      console.log(`  Skipping cleanup to prevent data loss`);
+      return;
+    }
+    
+    // Delete backups older than retention period
+    let deletedCount = 0;
+    for (const file of backupFiles) {
+      const match = file.match(/^(\d{4}-\d{2}-\d{2})-/);
+      if (!match) continue;
+      
+      const fileDate = new Date(match[1] + 'T00:00:00Z');
+      if (fileDate < cutoffDate) {
+        const filePath = path.join(BACKUP_DIR, file);
+        fs.unlinkSync(filePath);
+        deletedCount++;
+        console.log(`  Deleted old backup: ${file}`);
+      }
+    }
+    
+    if (deletedCount === 0) {
+      console.log(`  No backups older than ${RETENTION_DAYS} days found`);
+    } else {
+      console.log(`  Cleaned up ${deletedCount} old backup(s)`);
+    }
+  } catch (error) {
+    console.error('  Error during cleanup:', error.message);
+    // Don't fail the backup if cleanup fails
+  }
 }
 
 backup().catch(error => {

@@ -28,21 +28,74 @@ Originally built using Python, Flask, Google Apps Script, and Google Sheets, the
 git clone https://github.com/bradyespey/budget-calendar
 cd Budget
 npm install
+
+# Install 1Password CLI (if not already installed)
+brew install --cask 1password-cli
+
+# Set up 1Password Environment (see Environment section below)
 npm run dev
 ```
 
 ## Environment
-Required environment variables:
+
+**All projects use 1Password Developer Environments for local environment variables.** This allows seamless setup on any computer without managing local `.env` files.
+
+### 1Password Setup
+
+1. **Enable 1Password Developer**:
+   - Open 1Password desktop app
+   - Settings → Developer → Turn on "Show 1Password Developer experience"
+
+2. **Create Environment**:
+   - Go to Developer → Environments (Espey Family account)
+   - Create new environment: `Budget Calendar`
+   - Import `.env` file or add variables manually
+
+3. **Install 1Password CLI**:
+   ```bash
+   brew install --cask 1password-cli
+   ```
+
+4. **Run Project**:
+   ```bash
+   npm run dev
+   ```
+   - The `dev` script uses `op run --env-file=.env -- vite` to automatically load variables from 1Password
+   - No local `.env` file needed
+
+### Required Environment Variables
+
+All variables should be stored in your 1Password Environment:
 
 ```env
+# Firebase Configuration
 VITE_FIREBASE_API_KEY=YOUR_API_KEY
 VITE_FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
 VITE_FIREBASE_STORAGE_BUCKET=YOUR_PROJECT.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=YOUR_SENDER_ID
 VITE_FIREBASE_APP_ID=YOUR_APP_ID
+
+# Application Configuration
 VITE_ALLOWED_EMAILS=YOUR_EMAIL,YOUR_EMAIL_2,YOUR_EMAIL_3
 VITE_REFRESH_ACCOUNTS_API_URL=https://api.theespeys.com
+VITE_REFRESH_ACCOUNTS_API_AUTH=YOUR_AUTH
+VITE_SITE_URL=https://budget.theespeys.com
+
+# Monarch Money API
+API_AUTH=YOUR_AUTH
+MONARCH_EMAIL=YOUR_EMAIL
+MONARCH_PASSWORD=YOUR_PASSWORD
+MONARCH_MFA_SECRET=YOUR_SECRET
+MONARCH_CHASE_CHECKING_ACCOUNT_ID=YOUR_ACCOUNT_ID
+MONARCH_SAVINGS_CHECKING_ACCOUNT_ID=YOUR_ACCOUNT_ID
+MONARCH_TOKEN=YOUR_TOKEN
+
+# OpenAI Configuration
+VITE_OPENAI_API_KEY=YOUR_OPENAI_KEY
+VITE_OPENAI_MODEL=gpt-4o-mini
+
+# Debug
 VITE_DEBUG_MODE=true
 ```
 

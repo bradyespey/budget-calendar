@@ -34,13 +34,10 @@ const AuthContext = createContext<AuthContextType>({
 
 // Move allowed emails OUTSIDE component to prevent recreation on every render
 // Normalize: trim whitespace and lowercase for case-insensitive matching
+// REQUIRED: VITE_ALLOWED_EMAILS must be set in environment variables
 const ALLOWED_EMAILS = import.meta.env.VITE_ALLOWED_EMAILS
   ? import.meta.env.VITE_ALLOWED_EMAILS.split(',').map((s: string) => s.trim().toLowerCase())
-  : [
-      'your-email-1@gmail.com',
-      'your-email-2@gmail.com', 
-      'your-email-3@gmail.com'
-    ].map((s: string) => s.toLowerCase());
+  : [];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session>(defaultSession);

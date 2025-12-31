@@ -214,6 +214,21 @@ Budget/
 - **Migration Policy**: Never modify files in `/old/` directory unless explicitly requested - these serve as historical context
 - **Platform Migration**: Successfully migrated from Supabase to Firebase
 
+## Performance
+
+### CPU Performance Fix (December 2025)
+Fixed infinite Firestore reconnection loop that caused ~117% CPU usage while idle. Root cause was non-stable array reference in `useEffect` dependency array in `AuthContext.tsx`. 
+
+**Key changes:**
+- Moved `ALLOWED_EMAILS` to module scope for stable reference
+- Removed from `useEffect` dependency array (empty deps = runs once)
+- Added email normalization (`.trim().toLowerCase()`) for robust matching
+- Optimized chart rendering with `useMemo` in `SavingsChart.tsx`
+
+**Result:** CPU drops to ~0-2% when idle, single Firestore listen channel instead of thousands of reconnects.
+
+See `/Users/brady/Library/CloudStorage/GoogleDrive-baespey@gmail.com/My Drive/Tech/Guides/CPU Performance Fix.md` for detailed guide on diagnosing and fixing similar issues.
+
 ## Troubleshooting
 
 ### Automation Issues
@@ -241,7 +256,7 @@ Budget/
 - **Data Matching**: Zero tolerance amount matching, timezone-safe date comparison, frequency-aware matching with repeats_every logic
 - **Date Range**: Extended queries (today to 1.5 years) capture all yearly transactions, return next immediate upcoming dates matching Monarch UI exactly
 - **Weekend/Holiday Adjustment**: Automatic date adjustment for events - paychecks move to previous business day, bills move to next business day, with US holiday API integration
-- **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes, optimized form state management
+- **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes, optimized form state management, fixed infinite Firestore reconnection loop (CPU performance fix)
 - **Loading States**: Fixed infinite loading on Transactions page when using cached data
 - **Monarch Status**: Added reverse matching (bills → Monarch) with visual indicators and status filtering
 - **End Date Support**: Fixed field name mapping between frontend (`end_date`) and database (`endDate`) for proper projection filtering

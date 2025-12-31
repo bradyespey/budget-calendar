@@ -1,6 +1,12 @@
 #!/bin/bash
 # Firebase Functions Configuration Setup
+# 
+# NOTE: This uses the legacy Firebase Functions config system (functions.config())
+# which is still in use by this project's functions. Modern Firebase Functions
+# should use environment variables instead, but this project hasn't migrated yet.
+#
 # Run these commands one by one to set up Firebase Functions configuration
+# After setting config, redeploy functions: npx firebase deploy --only functions
 
 echo "Setting up Firebase Functions configuration..."
 

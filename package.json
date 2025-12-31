@@ -10,10 +10,6 @@
     "lint": "eslint --ext .ts,.tsx . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "migrate": "tsx scripts/migrateData.ts",
-    "migrate:dry-run": "tsx scripts/migrateData.ts --dry-run",
-    "import:firebase": "tsx scripts/importDataToFirebase.ts",
-    "cleanup:supabase": "tsx scripts/cleanupSupabase.ts",
     "check:automation": "./scripts/check-automation.sh",
     "trigger:nightly": "node scripts/trigger-nightly.js",
     "deploy:watch": "./scripts/deploy-and-watch.sh"

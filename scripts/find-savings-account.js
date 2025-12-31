@@ -1,5 +1,8 @@
 // scripts/find-savings-account.js
 // Helper script to identify savings account ID from Monarch API
+//
+// NOTE: This script uses the legacy Firebase Functions config system
+// (firebase functions:config:get) which is still in use by this project.
 
 const https = require('https');
 

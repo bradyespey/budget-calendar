@@ -286,6 +286,7 @@ All frequencies support custom "repeats every" multipliers:
 - **Weekend/Holiday Adjustment**: Bills move to next business day, paychecks move to previous business day
 - **Cash Flow Calculations**: Accurate monthly/yearly financial summaries for all frequency types
 - **Dynamic Pattern Matching**: Supports unlimited "Every X" intervals using regex pattern matching
+- **Today's Balance**: Today's transactions are displayed but don't affect today's balance projection. Balance projections start from tomorrow, assuming today's transactions have already been processed. Daily refreshes run at 7:30 AM CT, so transactions scheduled for today are assumed to have already cleared by the time projections are calculated.
 
 #### Transaction Filtering for Projections
 The projection system displays ALL transactions for visibility while intelligently filtering which ones affect balance calculations:

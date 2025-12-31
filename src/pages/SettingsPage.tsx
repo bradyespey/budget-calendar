@@ -282,8 +282,8 @@ export function SettingsPage() {
       await saveFunctionTimestampLocal('syncCalendar');
       
       const email = calendarMode === 'dev'
-        ? 'baespey@gmail.com'
-        : 'bradyjennytx@gmail.com';
+        ? 'dev-calendar@example.com'
+        : 'prod-calendar@example.com';
       if (result.success) {
         const totalEvents = (result.eventsCreated || 0) + (result.eventsUpdated || 0) + (result.eventsDeleted || 0);
         showNotification(`Calendar sync completed for ${email}. Created ${result.eventsCreated || 0}, updated ${result.eventsUpdated || 0}, deleted ${result.eventsDeleted || 0} events.`, 'success');

@@ -214,21 +214,6 @@ Budget/
 - **Migration Policy**: Never modify files in `/old/` directory unless explicitly requested - these serve as historical context
 - **Platform Migration**: Successfully migrated from Supabase to Firebase
 
-## Performance
-
-### CPU Performance Fix (December 2025)
-Fixed infinite Firestore reconnection loop that caused ~117% CPU usage while idle. Root cause was non-stable array reference in `useEffect` dependency array in `AuthContext.tsx`. 
-
-**Key changes:**
-- Moved `ALLOWED_EMAILS` to module scope for stable reference
-- Removed from `useEffect` dependency array (empty deps = runs once)
-- Added email normalization (`.trim().toLowerCase()`) for robust matching
-- Optimized chart rendering with `useMemo` in `SavingsChart.tsx`
-
-**Result:** CPU drops to ~0-2% when idle, single Firestore listen channel instead of thousands of reconnects.
-
-See `/Users/brady/Library/CloudStorage/GoogleDrive-baespey@gmail.com/My Drive/Tech/Guides/CPU Performance Fix.md` for detailed guide on diagnosing and fixing similar issues.
-
 ## Troubleshooting
 
 ### Automation Issues

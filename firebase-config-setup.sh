@@ -23,7 +23,7 @@ echo "⚠️ Replace with your actual calendar IDs:"
 # Email Alert Configuration (FOR LATER - when migrating sendAlert function)
 echo "📧 Setting up Email Alert configuration (for later)..."
 echo "⚠️ Replace with your actual values:"
-# npx firebase functions:config:set alert.email="baespey@gmail.com"
+# npx firebase functions:config:set alert.email="your-email@example.com"
 # npx firebase functions:config:set resend.api_key="your-resend-api-key"
 
 echo ""

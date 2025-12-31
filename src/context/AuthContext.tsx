@@ -37,9 +37,9 @@ const AuthContext = createContext<AuthContextType>({
 const ALLOWED_EMAILS = import.meta.env.VITE_ALLOWED_EMAILS
   ? import.meta.env.VITE_ALLOWED_EMAILS.split(',').map((s: string) => s.trim().toLowerCase())
   : [
-      'baespey@gmail.com',
-      'jennycespey@gmail.com', 
-      'bradyjennytx@gmail.com'
+      'your-email-1@gmail.com',
+      'your-email-2@gmail.com', 
+      'your-email-3@gmail.com'
     ].map((s: string) => s.toLowerCase());
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

@@ -148,7 +148,7 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 - **refreshTransactions**: Intelligent refresh of Monarch transactions with smart comparison (create/update/delete only when needed)
 - **updateBalance**: Updates checking, savings, and credit card balances from Monarch API with historical tracking
 - **budgetProjection**: Complete projection calculation with complex scheduling logic and end date support for manual transactions
-- **syncCalendar**: Google Calendar integration with separate bills/balance calendars, intelligent change detection, and comma-formatted amounts
+- **syncCalendar**: Google Calendar integration with separate bills/balance calendars, intelligent change detection, comma-formatted amounts, and improved error handling for service account authentication
 - **runAll**: Orchestrates full nightly workflow automation with automatic timestamp updates
 
 **Maintenance:**
@@ -173,10 +173,11 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 
 ## Deploy
 - **Frontend**: Automatic via GitHub integration to Netlify
-- **Functions**: `npx firebase deploy --only functions`
+- **Functions**: `npx firebase deploy --only functions` (requires Node.js 20 runtime, configured in `firebase.json`)
 - **Publish Directory**: `dist`
 - **Domains**: budget.theespeys.com (primary), budgetcalendar.netlify.app
-- **Build Monitoring**: `npm run deploy:watch` (pushes + watches build completion)
+- **Build Monitoring**: `npm run deploy:watch` (pushes to GitHub + watches Netlify build completion)
+- **Google Calendar API**: Must be enabled in Google Cloud Console (project: budgetcalendar-e6538) for calendar sync to work
 
 ## App Pages / Routes
 - **Dashboard**: Checking, savings, and credit card balances with historical trend chart, projected future balances, low balance alerts, spending patterns, and comprehensive financial overview
@@ -223,7 +224,7 @@ Budget/
 - **Chrome profile expired** - Re-run setup script
 - **Monarch API changes** - Update credentials
 - **Firebase timeout** - Check function memory/timeout settings
-- **Calendar sync fails** - Verify Google Calendar permissions
+- **Calendar sync fails** - Verify Google Calendar API is enabled in Google Cloud Console and service account has calendar access. Service account JSON must be configured in Firebase Functions config.
 
 ### Technical Issues
 - **CORS Issues**: Resolved by using Firebase callable functions (HTTPS onCall)
@@ -241,6 +242,8 @@ Budget/
 - **Loading States**: Fixed infinite loading on Transactions page when using cached data
 - **Monarch Status**: Added reverse matching (bills → Monarch) with visual indicators and status filtering
 - **End Date Support**: Fixed field name mapping between frontend (`end_date`) and database (`endDate`) for proper projection filtering
+- **Node.js Runtime**: Upgraded from Node.js 18 to Node.js 20 (required for Firebase Functions deployment)
+- **Calendar Sync Error Handling**: Improved error logging and handling for Google Calendar API authentication issues, fixed logger serialization errors with URLSearchParams objects
 
 ## Supported Transaction Frequencies
 

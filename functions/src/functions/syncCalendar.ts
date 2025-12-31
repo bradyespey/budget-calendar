@@ -382,17 +382,45 @@ export const syncCalendar = functions
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const errorStack = error instanceof Error ? error.stack : undefined;
       
-      logger.error("Error syncing calendar:", {
+      // Safely extract error details without circular references or problematic objects
+      // Convert to plain object to avoid URLSearchParams and other non-serializable objects
+      let errorDetails: any = {
         message: errorMessage,
-        stack: errorStack,
-        error: error
-      });
+        stack: errorStack
+      };
+      
+      if (error instanceof Error) {
+        errorDetails.name = error.name;
+        // Only extract primitive properties (using type assertion for non-standard properties)
+        const errorAny = error as any;
+        if (errorAny.code && (typeof errorAny.code === 'string' || typeof errorAny.code === 'number')) {
+          errorDetails.code = errorAny.code;
+        }
+        if (errorAny.status && typeof errorAny.status === 'number') {
+          errorDetails.status = errorAny.status;
+        }
+        // Safely extract response data if it exists
+        if (errorAny.response && typeof errorAny.response === 'object') {
+          const resp = errorAny.response;
+          errorDetails.response = {};
+          if (typeof resp.status === 'number') errorDetails.response.status = resp.status;
+          if (typeof resp.statusText === 'string') errorDetails.response.statusText = resp.statusText;
+          if (resp.data && typeof resp.data === 'object') {
+            // Only extract simple data properties
+            if (typeof resp.data.error === 'string') errorDetails.response.error = resp.data.error;
+            if (typeof resp.data.error_description === 'string') errorDetails.response.error_description = resp.data.error_description;
+          }
+        }
+      }
+      
+      // Log as simple string to avoid serialization issues with complex error objects
+      logger.error(`Error syncing calendar: ${errorMessage}${errorDetails.code ? ` (code: ${errorDetails.code})` : ''}${errorDetails.status ? ` (status: ${errorDetails.status})` : ''}`);
       
       // Return detailed error for debugging
       res.status(500).json({
         error: "Internal server error",
         message: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? errorStack : undefined
+        details: errorDetails
       });
     }
   }

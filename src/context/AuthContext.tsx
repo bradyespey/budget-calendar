@@ -7,7 +7,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+  import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../lib/firebaseConfig';
 import { Session } from '../types';
 
@@ -32,21 +32,27 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+// Move allowed emails OUTSIDE component to prevent recreation on every render
+// Normalize: trim whitespace and lowercase for case-insensitive matching
+const ALLOWED_EMAILS = import.meta.env.VITE_ALLOWED_EMAILS
+  ? import.meta.env.VITE_ALLOWED_EMAILS.split(',').map((s: string) => s.trim().toLowerCase())
+  : [
+      'baespey@gmail.com',
+      'jennycespey@gmail.com', 
+      'bradyjennytx@gmail.com'
+    ].map((s: string) => s.toLowerCase());
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session>(defaultSession);
   const [userRole, setUserRole] = useState<'admin' | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fallback to hardcoded emails if env var is missing
-  const allowedEmails = import.meta.env.VITE_ALLOWED_EMAILS?.split(',') || [
-    'baespey@gmail.com',
-    'jennycespey@gmail.com', 
-    'bradyjennytx@gmail.com'
-  ];
-
+  // NO DEPS ARRAY - onAuthStateChanged should only run ONCE on mount
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user && allowedEmails.includes(user.email || '')) {
+      // Case-insensitive email check
+      const userEmail = user?.email?.toLowerCase().trim();
+      if (user && userEmail && ALLOWED_EMAILS.includes(userEmail)) {
         setSession({
           user: {
             id: user.uid,
@@ -61,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (user) {
           // User not authorized - show warning but don't crash
           console.warn(`Access denied. Email ${user.email} is not authorized.`);
-          alert(`Access denied. Email ${user.email} is not authorized. Allowed: ${allowedEmails.join(', ')}`);
+          alert(`Access denied. Email ${user.email} is not authorized. Allowed: ${ALLOWED_EMAILS.join(', ')}`);
           await firebaseSignOut(auth);
         }
       }
@@ -69,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return unsubscribe;
-  }, [allowedEmails]);
+  }, []); // EMPTY deps - this effect should ONLY run ONCE on mount
 
   const handleUserDocument = async (user: User) => {
     try {

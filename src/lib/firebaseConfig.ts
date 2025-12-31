@@ -18,10 +18,10 @@ if (!firebaseConfig.apiKey || firebaseConfig.apiKey.trim() === '') {
   throw new Error('Firebase API key is not configured. Check environment variables.');
 }
 
-// Initialize Firebase
+// Initialize Firebase - ONCE, at module scope, never re-initialized
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase services
+// Initialize Firebase services - these are stable references
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app, 'us-central1');

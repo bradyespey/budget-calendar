@@ -12,8 +12,26 @@ async function getCalendarAuth() {
     throw new Error('Google service account not configured');
   }
   
+  // Handle both string and object formats
+  let credentials;
+  if (typeof serviceAccountJson === 'string') {
+    try {
+      credentials = JSON.parse(serviceAccountJson);
+    } catch (parseError) {
+      logger.error('Failed to parse service account JSON:', parseError);
+      throw new Error('Invalid service account JSON format. Must be valid JSON string or object.');
+    }
+  } else {
+    credentials = serviceAccountJson;
+  }
+  
+  // Validate required fields
+  if (!credentials.client_email || !credentials.private_key || !credentials.project_id) {
+    throw new Error('Service account JSON missing required fields: client_email, private_key, or project_id');
+  }
+  
   const auth = new google.auth.GoogleAuth({
-    credentials: serviceAccountJson,
+    credentials: credentials,
     scopes: ['https://www.googleapis.com/auth/calendar'],
   });
 
@@ -39,16 +57,35 @@ export const syncCalendar = functions
 
     try {
       const env = req.body?.env || 'dev';
+      logger.info(`Starting calendar sync for environment: ${env}`);
+      
+      // Check Google service account configuration
+      const googleConfig = functions.config().google;
+      if (!googleConfig) {
+        logger.error('Google configuration not found in Firebase Functions config');
+        throw new Error('Google service account not configured. Run: firebase functions:config:set google.service_account_json="..."');
+      }
+      
+      if (!googleConfig.service_account_json) {
+        logger.error('Google service_account_json not found in config');
+        throw new Error('Google service account JSON not configured. Run: firebase functions:config:set google.service_account_json="..."');
+      }
+      
+      logger.info('Google service account configuration found');
       
       const auth = await getCalendarAuth();
       const calendar = google.calendar({ version: 'v3', auth });
       
-      const googleConfig = functions.config().google;
       const billsCalendarId = env === 'prod' ? googleConfig?.prod_bills_calendar_id : googleConfig?.dev_bills_calendar_id;
       const balanceCalendarId = env === 'prod' ? googleConfig?.prod_balance_calendar_id : googleConfig?.dev_balance_calendar_id;
       
+      logger.info(`Calendar IDs - Bills: ${billsCalendarId ? 'configured' : 'MISSING'}, Balance: ${balanceCalendarId ? 'configured' : 'MISSING'}`);
+      
       if (!billsCalendarId || !balanceCalendarId) {
-        throw new Error(`Calendar IDs not configured for environment: ${env}`);
+        const missing = [];
+        if (!billsCalendarId) missing.push(`${env}_bills_calendar_id`);
+        if (!balanceCalendarId) missing.push(`${env}_balance_calendar_id`);
+        throw new Error(`Calendar IDs not configured for environment '${env}'. Missing: ${missing.join(', ')}. Run: firebase functions:config:set google.${missing[0]}="..."`);
       }
       
       // Get all projections from database
@@ -342,10 +379,20 @@ export const syncCalendar = functions
       });
       
     } catch (error) {
-      logger.error("Error syncing calendar:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      logger.error("Error syncing calendar:", {
+        message: errorMessage,
+        stack: errorStack,
+        error: error
+      });
+      
+      // Return detailed error for debugging
       res.status(500).json({
         error: "Internal server error",
-        message: error instanceof Error ? error.message : "Unknown error"
+        message: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? errorStack : undefined
       });
     }
   }

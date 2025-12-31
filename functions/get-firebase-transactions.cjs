@@ -2,6 +2,8 @@ const admin = require('firebase-admin');
 const path = require('path');
 
 // Initialize Firebase Admin
+// NOTE: This script requires serviceAccountKey.json in the functions/ directory
+// This file is gitignored and must be added locally for this script to work
 const serviceAccount = require(path.join(__dirname, 'serviceAccountKey.json'));
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)

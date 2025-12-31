@@ -111,8 +111,6 @@ VITE_DEBUG_MODE=true
 - **Check Automation**: `npm run check:automation` - Quick status check
 - **Manual Trigger**: `gh workflow run budget-nightly.yml`
 - **Backup Trigger**: `gh workflow run backup.yml` - Manual database backup
-- **Migration**: `npm run migrate` - Migrate data to Firebase
-- **Import**: `npm run import:firebase` - Import data to Firebase
 
 ### Automation Monitoring
 **Quick Check:**
@@ -209,10 +207,8 @@ Budget/
 └── package.json          # Node.js dependencies and scripts
 ```
 
-## Historical Context & Migration Notes
-- **Supabase Functions Preserved**: All original Supabase functions are kept in `/old/supabase/functions/` for historical reference
-- **Migration Policy**: Never modify files in `/old/` directory unless explicitly requested - these serve as historical context
-- **Platform Migration**: Successfully migrated from Supabase to Firebase
+## Historical Context
+- **Platform Migration**: Successfully migrated from Supabase to Firebase in 2024
 
 ## Troubleshooting
 

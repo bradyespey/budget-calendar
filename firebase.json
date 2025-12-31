@@ -20,7 +20,7 @@
         "npm --prefix \"$RESOURCE_DIR\" run lint",
         "npm --prefix \"$RESOURCE_DIR\" run build"
       ],
-      "runtime": "nodejs18",
+      "runtime": "nodejs20",
       "timeoutSeconds": 540,
       "memory": "1GB"
     }

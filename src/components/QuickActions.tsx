@@ -115,7 +115,7 @@ export function QuickActionButtons({
       <div className="space-y-1">
         <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onRefreshTransactions} disabled={busy}>
           {busy && activeAction === 'transactions' ? <Loader className="animate-spin" size={18} /> : <Database size={18} />}
-          Refresh Transactions
+          Update Recurring Transactions
         </Button>
         <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Refreshes recurring transactions data from Monarch API with accurate amounts</p>
         {showTimestamps && (

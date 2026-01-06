@@ -148,7 +148,7 @@ curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll
 - **refreshTransactions**: Intelligent refresh of Monarch transactions with smart comparison (create/update/delete only when needed)
 - **updateBalance**: Updates checking, savings, and credit card balances from Monarch API with historical tracking
 - **budgetProjection**: Complete projection calculation with complex scheduling logic and end date support for manual transactions
-- **syncCalendar**: Google Calendar integration with separate bills/balance calendars, intelligent change detection, comma-formatted amounts, and improved error handling for service account authentication
+- **syncCalendar**: Google Calendar integration with separate bills/balance calendars, intelligent change detection, comma-formatted amounts, improved error handling for service account authentication, and disabled all-day alerts for Balance and Bills events
 - **runAll**: Orchestrates full nightly workflow automation with automatic timestamp updates
 
 **Maintenance:**

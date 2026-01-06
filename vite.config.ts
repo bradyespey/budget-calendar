@@ -8,6 +8,7 @@ export default defineConfig({
   base: '/',
   server: {
     port: 5174,
+    strictPort: true, // Fail if port is already in use instead of using next available port
     host: true,
     open: false,
     watch: {

@@ -17,9 +17,8 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "old/stores"],
+  "include": ["src"],
   "exclude": [
-    "old/supabase/functions",
     "dist",
     "node_modules"
   ]

@@ -212,7 +212,8 @@ export const syncCalendar = functions
                 summary: billSummary,
                 description: `Amount: ${bill.amount < 0 ? '-' : ''}$${billAmountFormatted}\nCategory: ${bill.category || 'Unknown'}`,
                 start: { date: projDate },
-                end: { date: projDate }
+                end: { date: projDate },
+                reminders: { useDefault: false }
               };
               
               await withRateLimit(async () => {
@@ -268,7 +269,8 @@ export const syncCalendar = functions
             summary: `${eventTitle} $${balanceAmountFormatted}`,
             description: `Projected balance: $${balanceAmountFormatted}\nBills due: ${projection.bills?.length || 0}`,
             start: { date: projDate },
-            end: { date: projDate }
+            end: { date: projDate },
+            reminders: { useDefault: false }
           };
           
           await withRateLimit(async () => {

@@ -85,8 +85,8 @@ Google Calendar functions also require runtime config for:
 Key Functions:
 - `refreshAccounts`: calls the external refresh API
 - `updateBalance`: pulls checking, savings, and credit-card totals from Monarch and stores account snapshots
-- `refreshTransactions`: refreshes recurring Monarch streams into Firestore
-- `budgetProjection`: calculates projected checking balances with business-day adjustments
+- `refreshTransactions`: refreshes recurring Monarch streams into Firestore; maps Monarch account types to Checking/Credit Card; Unknown account type + negative amount is reclassified as Credit Card (CC charges without a real account don't affect balance projection)
+- `budgetProjection`: calculates projected checking balances with business-day adjustments; excludes Credit Card and unknown-account-type expenses from balance (those are covered by CC payment bills); writes monthly cash flow summary (category averages and bills/income by frequency) to `monthlyCashFlow/current`
 - `syncCalendar`: syncs bills and projected balances to Google Calendar
 - `clearCalendars`: clears future events from configured calendars
 - `runAll`: orchestrates the nightly automation flow
@@ -109,9 +109,9 @@ Important:
 - treat any `Build failed` output or error lines as a failed deploy even if the watcher prints a success-style summary
 
 ## App Pages / Routes
-- `/dashboard`: balances, alerts, forecast summary, savings trend, cash flow
-- `/transactions`: recurring dataset, filters, edit/create manual transactions, category management
-- `/upcoming`: 7-day projection view, transaction search, balance-impact vs excluded display
+- `/dashboard`: balances, alerts, forecast summary, savings trend; category averages (client-side, all bills, clickable → filtered transactions); bills/income summary by frequency (daily/weekly/biweekly/semimonthly/monthly/yearly/one-time)
+- `/transactions`: Recurring Bills & Income — Monarch entries are read-only (categories and details sync from Monarch); manual transactions can be created and edited freely
+- `/upcoming`: 7-day projection view, transaction search, balance-impact vs excluded display; CC charges shown as excluded (covered by CC payment bill)
 - `/settings`: projection settings, quick actions, maintenance actions, calendar controls
 - `/login`: restricted sign-in and demo access
 

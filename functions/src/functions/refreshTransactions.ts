@@ -210,6 +210,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
         const accountIcon = item.account?.icon || 'dollar-sign';
         const category = mapMonarchCategory(item.category?.name || 'Other', stream.name);
         const rawAccountType = item.account?.type?.name || null;
+        const transactionAmount = nextTransaction.amount || 0;
         
         // For credit card payments, use 'one-time' frequency since each statement is unique
         // When Monarch refreshes, it will create a new one-time bill for the next statement
@@ -235,7 +236,13 @@ export const refreshTransactions = functions.region(region).https.onRequest(
           // Account data
           accountName,
           accountIcon,
-          accountType: mapAccountType(rawAccountType, accountName, category, accountIcon),
+          accountType: (() => {
+            const mapped = mapAccountType(rawAccountType, accountName, category, accountIcon);
+            // Manual Monarch recurring entries have no real account (Unknown Account, negative amount)
+            // These are CC charges — exclude them from balance projection like other CC transactions
+            if (mapped === 'Unknown' && transactionAmount < 0) return 'Credit Card';
+            return mapped;
+          })(),
           accountSubtype: item.account?.subtype?.name || null,
           institutionName: item.account?.institution?.name || null,
           institutionId: item.account?.institution?.id || null,
@@ -271,7 +278,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
             existingBill.accountType !== billData.accountType ||
             existingBill.isActive !== billData.isActive
           );
-          
+
           if (needsUpdate) {
             // Update existing bill
             const docRef = admin.firestore().collection('bills').doc(existingBill.id);

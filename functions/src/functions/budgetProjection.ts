@@ -316,6 +316,10 @@ async function computeProjections(settings: any) {
     // Skip bills from credit card accounts (they're already in the CC payment)
     // This applies to both manual and Monarch transactions
     if (bill.accountType === 'Credit Card') return false;
+
+    // Unknown account type expenses are manual Monarch recurring entries with no real account —
+    // they're CC charges and are covered by the CC payment, so don't double-count them
+    if (bill.accountType === 'Unknown' && Number(bill.amount) < 0) return false;
     
     // Credit card payment transactions affect balance (they hit checking)
     // Note: These are now 'one-time' bills, so they naturally only appear once
@@ -508,8 +512,8 @@ function calculateMonthlyCashFlow(bills: any[]) {
           const monthsMatch = frequency.match(/every_(\d+)_months/);
           if (monthsMatch) {
             const monthInterval = parseInt(monthsMatch[1]);
-            monthlyAmount = (amount * 12) / (monthInterval * repeatsEvery);
-            yearlyAmount = amount / (monthInterval * repeatsEvery);
+            monthlyAmount = amount / (monthInterval * repeatsEvery);
+            yearlyAmount = (amount * 12) / (monthInterval * repeatsEvery);
             summary.monthly[amount >= 0 ? 'income' : 'bills'] += Math.abs(amount);
           } else {
             // Fallback to monthly

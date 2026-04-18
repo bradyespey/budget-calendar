@@ -23,6 +23,7 @@ import { getBills } from '../api/bills'
 import { getSavingsBalance, getSavingsHistory, getCreditCardDebt } from '../api/accounts'
 import { Bill, Projection } from '../types'
 import { format, parseISO } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import { useBalance } from '../context/BalanceContext'
 import { useAuth } from '../context/AuthContext'
 import { getFunctionTimestamps, getSettings, getMonthlyCashFlow } from '../api/firebase'
@@ -35,6 +36,7 @@ const SavingsChart = lazy(async () => {
 interface CategoryAverage {
   monthly: number
   yearly: number
+  displayName: string
 }
 
 interface BillsIncome {
@@ -46,6 +48,8 @@ interface BillsSummary {
   oneTime: BillsIncome
   daily: BillsIncome
   weekly: BillsIncome
+  biweekly: BillsIncome
+  semimonthly: BillsIncome
   monthly: BillsIncome
   yearly: BillsIncome
 }
@@ -58,6 +62,50 @@ interface SummaryCard {
   iconBg: string
   detail: string
   supporting?: string
+}
+
+function computeCategoryAverages(bills: Bill[]): Record<string, CategoryAverage> {
+  const categories: Record<string, CategoryAverage> = {}
+  for (const bill of bills) {
+    const amount = Number(bill.amount) || 0
+    const frequency = (bill.frequency || 'monthly') as string
+    const repeatsEvery = Number(bill.repeats_every ?? 1) || 1
+    const rawCategory = bill.category || 'Uncategorized'
+    const category = rawCategory.toLowerCase()
+    if (!categories[category]) categories[category] = { monthly: 0, yearly: 0, displayName: rawCategory }
+    let monthly = 0
+    let yearly = 0
+    switch (frequency) {
+      case 'daily':       monthly = (amount * 30.44) / repeatsEvery;  yearly = (amount * 365.25) / repeatsEvery; break
+      case 'weekly':      monthly = (amount * 4.35)  / repeatsEvery;  yearly = (amount * 52.18)  / repeatsEvery; break
+      case 'biweekly':    monthly = (amount * 26 / 12) / repeatsEvery; yearly = (amount * 26)     / repeatsEvery; break
+      case 'semimonthly':
+      case 'Semimonthly_mid_end':
+      case 'semimonthly_mid_end': monthly = (amount * 2.0) / repeatsEvery; yearly = (amount * 24) / repeatsEvery; break
+      case 'monthly':     monthly = amount / repeatsEvery;             yearly = (amount * 12)    / repeatsEvery; break
+      case 'yearly':      monthly = amount / (12 * repeatsEvery);     yearly = amount / repeatsEvery; break
+      case 'one-time':    break
+      default: {
+        const mMatch = frequency.match(/every_(\d+)_months/)
+        const wMatch = frequency.match(/every_(\d+)_weeks/)
+        if (mMatch) {
+          const n = parseInt(mMatch[1])
+          monthly = amount / (n * repeatsEvery)
+          yearly  = (amount * 12) / (n * repeatsEvery)
+        } else if (wMatch) {
+          const n = parseInt(wMatch[1])
+          monthly = (amount * 52.18) / (n * 12 * repeatsEvery)
+          yearly  = (amount * 52.18) / (n * repeatsEvery)
+        } else {
+          monthly = amount / repeatsEvery
+          yearly  = (amount * 12) / repeatsEvery
+        }
+      }
+    }
+    categories[category].monthly += monthly
+    categories[category].yearly  += yearly
+  }
+  return categories
 }
 
 function SortIndicator({ active, direction }: { active: boolean; direction: 'asc' | 'desc' }) {
@@ -79,6 +127,8 @@ export function DashboardPage() {
     oneTime: { bills: 0, income: 0 },
     daily: { bills: 0, income: 0 },
     weekly: { bills: 0, income: 0 },
+    biweekly: { bills: 0, income: 0 },
+    semimonthly: { bills: 0, income: 0 },
     monthly: { bills: 0, income: 0 },
     yearly: { bills: 0, income: 0 },
   })
@@ -96,6 +146,7 @@ export function DashboardPage() {
 
   const { balance: checkingBalance, lastSync } = useBalance()
   const { session } = useAuth()
+  const navigate = useNavigate()
 
   // Load refresh accounts timestamp
   const loadTimestamp = async () => {
@@ -161,12 +212,14 @@ export function DashboardPage() {
           setThresholdBreach(null)
         }
         
-        // Set Monthly Cash Flow from API (calculated by budgetProjection function)
-        setCategoryAverages(monthlyCashFlow.categories || {})
+        // Compute category averages client-side from all bills so every category is included
+        setCategoryAverages(computeCategoryAverages(billsData))
         setBillsSummary(monthlyCashFlow.summary || {
           oneTime: { bills: 0, income: 0 },
           daily: { bills: 0, income: 0 },
           weekly: { bills: 0, income: 0 },
+          biweekly: { bills: 0, income: 0 },
+          semimonthly: { bills: 0, income: 0 },
           monthly: { bills: 0, income: 0 },
           yearly: { bills: 0, income: 0 },
         })
@@ -180,6 +233,8 @@ export function DashboardPage() {
           oneTime: { bills: 0, income: 0 },
           daily: { bills: 0, income: 0 },
           weekly: { bills: 0, income: 0 },
+          biweekly: { bills: 0, income: 0 },
+          semimonthly: { bills: 0, income: 0 },
           monthly: { bills: 0, income: 0 },
           yearly: { bills: 0, income: 0 },
         })
@@ -507,8 +562,13 @@ export function DashboardPage() {
                       return sortDirection === 'asc' ? comparison : -comparison
                     })
                     .map(([category, averages]) => (
-                      <tr key={category} className="border-b surface-divider">
-                        <td className="px-4 py-4 capitalize text-[color:var(--text)]">{category}</td>
+                      <tr
+                        key={category}
+                        className="border-b surface-divider cursor-pointer hover:bg-[color:var(--surface-muted)] transition-colors"
+                        onClick={() => navigate('/transactions', { state: { category: averages.displayName } })}
+                        title={`View ${averages.displayName} transactions`}
+                      >
+                        <td className="px-4 py-4 text-[color:var(--text)] text-[color:var(--accent)] hover:underline">{averages.displayName}</td>
                         <td className="px-4 py-4 text-right text-[color:var(--text)]">
                           {formatCurrency(averages.monthly)}
                         </td>
@@ -553,6 +613,24 @@ export function DashboardPage() {
                     </td>
                     <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.weekly.income)}
+                    </td>
+                  </tr>
+                  <tr className="border-b surface-divider">
+                    <td className="px-4 py-4 text-[color:var(--text)]">Biweekly</td>
+                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
+                      -{formatCurrency((billsSummary.biweekly ?? { bills: 0 }).bills)}
+                    </td>
+                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
+                      {formatCurrency((billsSummary.biweekly ?? { income: 0 }).income)}
+                    </td>
+                  </tr>
+                  <tr className="border-b surface-divider">
+                    <td className="px-4 py-4 text-[color:var(--text)]">Semimonthly</td>
+                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
+                      -{formatCurrency((billsSummary.semimonthly ?? { bills: 0 }).bills)}
+                    </td>
+                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
+                      {formatCurrency((billsSummary.semimonthly ?? { income: 0 }).income)}
                     </td>
                   </tr>
                   <tr className="border-b surface-divider">

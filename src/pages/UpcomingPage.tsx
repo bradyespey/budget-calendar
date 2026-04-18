@@ -246,7 +246,8 @@ export function UpcomingPage() {
           {
             title: 'Excluded from Balance',
             items: [
-              'Individual credit card charges (already represented by the monthly credit card payment)',
+              'Individual credit card charges — groceries, dining, etc. charged to a card are excluded here because they\'re already captured by your monthly credit card payment bill.',
+              'The CC payment syncs automatically from Monarch and reflects your full statement balance, so all CC spending (including food, gas, etc.) is accounted for through that one payment.',
             ],
           },
           {

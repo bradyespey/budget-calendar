@@ -6,7 +6,7 @@ import { Layout } from '../components/Layout/Layout';
 import { Plus, Pencil } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
-import { Card, CardContent, CardDescription, CardTitle } from '../components/ui/Card';
+import { Card, CardContent, CardTitle } from '../components/ui/Card';
 import { TransactionsFilters } from '../components/TransactionsFilters';
 import { TransactionsTable } from '../components/TransactionsTable';
 import { TransactionForm, FormMode } from '../components/TransactionForm';
@@ -190,6 +190,9 @@ export function TransactionsPage() {
     if (location.state?.action === 'create') {
       handleCreateTransaction();
     }
+    if (location.state?.category) {
+      setCategoryFilter(location.state.category);
+    }
   }, [location.state]);
 
   // Get initial form data for editing
@@ -230,14 +233,15 @@ export function TransactionsPage() {
           eyebrow="Transactions"
           title="Transactions"
           subtitle={refreshTransactionsTimestamp ? formatTimestamp(refreshTransactionsTimestamp) : undefined}
-          description="Keep recurring Monarch streams and manual bills in one compact workspace. Filters, sorting, edits, and review all stay tied to the same dataset."
+          description="Recurring bills and income from Monarch and manual entries."
           helpSections={[
             {
               title: 'Quick Tips',
               items: [
-                'View recurring transactions (Monarch + Manual)',
-                'Create and edit manual transactions',
-                'Filter by frequency, account, category, or source',
+                'Monarch transactions are read-only — categories and details sync automatically from Monarch and cannot be edited here.',
+                'To change a Monarch transaction\'s category, update it in Monarch and click Refresh.',
+                'Manual transactions (nanny, one-off bills, etc.) can be created and edited freely.',
+                'Filter by frequency, account, category, or source to narrow the list.',
               ],
             },
           ]}
@@ -271,10 +275,7 @@ export function TransactionsPage() {
           <CardContent className="space-y-5 p-5 sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CardTitle>Recurring Dataset</CardTitle>
-                <CardDescription>
-                  Filters, sorting, and inline actions all stay attached to one shared surface so the list reads like a workspace instead of stacked utility cards.
-                </CardDescription>
+                <CardTitle>Recurring Bills & Income</CardTitle>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button

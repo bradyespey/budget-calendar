@@ -476,6 +476,7 @@ export function SettingsPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       {/* Header */}
       <PageHeader
+        className="mb-24 lg:mb-28"
         eyebrow="Settings"
         title="Settings"
         description="Adjust projection behavior, run manual automation steps, manage transaction metadata, and keep your workspace theme and calendars aligned."

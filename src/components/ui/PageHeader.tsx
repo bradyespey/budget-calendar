@@ -10,6 +10,7 @@ interface HelpSection {
 }
 
 interface PageHeaderProps {
+  className?: string;
   eyebrow?: string;
   title: string;
   subtitle?: string;
@@ -33,6 +34,7 @@ const toneStyles = {
 }
 
 export function PageHeader({
+  className,
   eyebrow,
   title,
   subtitle,
@@ -42,7 +44,7 @@ export function PageHeader({
   stats,
 }: PageHeaderProps) {
   return (
-    <div className="relative z-20 mb-6 sm:mb-8">
+    <div className={clsx('relative z-20 mb-6 sm:mb-8', className)}>
       <div className="surface-card relative z-20 overflow-visible p-5 sm:p-6 lg:p-7">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">

@@ -215,6 +215,7 @@ export function UpcomingPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       {/* Header */}
       <PageHeader
+        className="mb-24 lg:mb-28"
         eyebrow="Upcoming"
         title={`Upcoming Bills: ${searchTerm ? `${filteredDays.length} of ${upcomingDays.length}` : upcomingDays.length}-Day Projection`}
         subtitle={

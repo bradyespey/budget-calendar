@@ -1,61 +1,5 @@
 import { Button } from './ui/Button'
-import { Loader, Settings, RefreshCw, DollarSign, Database, TrendingUp, Calendar, Zap } from 'lucide-react'
-
-interface QuickActionsProps {
-  busy: boolean
-  activeAction: string | null
-  runAllStep: string | null
-  calendarMode: 'dev' | 'prod'
-  setCalendarMode: (mode: 'dev' | 'prod') => void
-  showTimestamps: boolean
-  toggleTimestamps: () => void
-  functionTimestamps: Record<string, Date>
-  formatTimestamp: (date?: Date) => string
-  onRefreshAccounts: () => void
-  onUpdateBalance: () => void
-  onRefreshTransactions: () => void
-  onRecalculate: () => void
-  onSyncCalendar: () => void
-  onAllActions: () => void
-}
-
-export function QuickActions({
-  busy,
-  activeAction,
-  runAllStep,
-  calendarMode,
-  setCalendarMode,
-  showTimestamps,
-  toggleTimestamps,
-  functionTimestamps,
-  formatTimestamp,
-  onRefreshAccounts,
-  onUpdateBalance,
-  onRefreshTransactions,
-  onRecalculate,
-  onSyncCalendar,
-  onAllActions
-}: QuickActionsProps) {
-  return (
-    <div className="flex flex-row items-center justify-between">
-      <div>
-        <h3 className="text-lg font-semibold">Quick Actions</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-200">Manual triggers for account updates and calculations.</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={toggleTimestamps}
-          className="px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg shadow-sm"
-          variant="outline"
-          title={showTimestamps ? "Hide technical info" : "Show technical info"}
-          disabled={busy}
-        >
-          <Settings size={16} className={showTimestamps ? "text-blue-600 dark:text-blue-400" : ""} />
-        </Button>
-      </div>
-    </div>
-  )
-}
+import { Loader, RefreshCw, DollarSign, Database, TrendingUp, Calendar, Zap } from 'lucide-react'
 
 interface QuickActionButtonsProps {
   busy: boolean
@@ -64,7 +8,7 @@ interface QuickActionButtonsProps {
   calendarMode: 'dev' | 'prod'
   setCalendarMode: (mode: 'dev' | 'prod') => void
   showTimestamps: boolean
-  functionTimestamps: Record<string, Date>
+  functionTimestamps: Record<string, Date | undefined>
   formatTimestamp: (date?: Date) => string
   onRefreshAccounts: () => void
   onUpdateBalance: () => void
@@ -90,50 +34,55 @@ export function QuickActionButtons({
   onSyncCalendar,
   onAllActions
 }: QuickActionButtonsProps) {
+  const actionButtonClass =
+    'h-12 w-full justify-center rounded-[18px] border-[color:var(--line-strong)] bg-[color:var(--surface)] text-[color:var(--text)] shadow-none hover:bg-[color:var(--surface-hover)]'
+
+  const actionMetaClass = 'px-2 text-xs leading-6 text-[color:var(--muted)]'
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onRefreshAccounts} disabled={busy}>
+        <Button className={actionButtonClass} variant="outline" onClick={onRefreshAccounts} disabled={busy}>
           {busy && activeAction === 'refresh' ? <Loader className="animate-spin" size={18} /> : <RefreshCw size={18} />}
           Refresh Accounts
         </Button>
-        <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Forces an accounts refresh in Monarch so latest bank balances can be obtained</p>
+        <p className={actionMetaClass}>Forces an accounts refresh in Monarch so latest bank balances can be obtained</p>
         {showTimestamps && (
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.refreshAccounts)}</p>
+          <p className="px-2 text-xs font-medium text-[color:var(--accent)]">Last run: {formatTimestamp(functionTimestamps.refreshAccounts)}</p>
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onUpdateBalance} disabled={busy}>
+        <Button className={actionButtonClass} variant="outline" onClick={onUpdateBalance} disabled={busy}>
           {busy && activeAction === 'balance' ? <Loader className="animate-spin" size={18} /> : <DollarSign size={18} />}
           Update Balances
         </Button>
-        <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Grabs the latest checking and savings balances from Monarch</p>
+        <p className={actionMetaClass}>Grabs the latest checking and savings balances from Monarch</p>
         {showTimestamps && (
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.updateBalance)}</p>
+          <p className="px-2 text-xs font-medium text-[color:var(--accent)]">Last run: {formatTimestamp(functionTimestamps.updateBalance)}</p>
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onRefreshTransactions} disabled={busy}>
+        <Button className={actionButtonClass} variant="outline" onClick={onRefreshTransactions} disabled={busy}>
           {busy && activeAction === 'transactions' ? <Loader className="animate-spin" size={18} /> : <Database size={18} />}
           Update Recurring Transactions
         </Button>
-        <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Refreshes recurring transactions data from Monarch API with accurate amounts</p>
+        <p className={actionMetaClass}>Refreshes recurring transactions data from Monarch API with accurate amounts</p>
         {showTimestamps && (
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.refreshRecurringTransactions)}</p>
+          <p className="px-2 text-xs font-medium text-[color:var(--accent)]">Last run: {formatTimestamp(functionTimestamps.refreshRecurringTransactions)}</p>
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onRecalculate} disabled={busy}>
+        <Button className={actionButtonClass} variant="outline" onClick={onRecalculate} disabled={busy}>
           {busy && activeAction === 'projection' ? <Loader className="animate-spin" size={18} /> : <TrendingUp size={18} />}
           Budget Projection
         </Button>
-        <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Projects future budget in the Upcoming tab based on Budget Projection Settings</p>
+        <p className={actionMetaClass}>Projects future budget in the Upcoming tab based on Budget Projection Settings</p>
         {showTimestamps && (
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.budgetProjection)}</p>
+          <p className="px-2 text-xs font-medium text-[color:var(--accent)]">Last run: {formatTimestamp(functionTimestamps.budgetProjection)}</p>
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all" onClick={onSyncCalendar} disabled={busy}>
+        <Button className={actionButtonClass} variant="outline" onClick={onSyncCalendar} disabled={busy}>
           {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <Calendar size={18} />}
           Sync Calendar
         </Button>
@@ -162,20 +111,20 @@ export function QuickActionButtons({
               <span className="text-gray-600 dark:text-gray-400">Test</span>
             </label>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Syncs the budget projection with Google Calendar</p>
+          <p className={actionMetaClass.replace('px-2 ', '')}>Syncs the budget projection with Google Calendar</p>
         </div>
         {showTimestamps && (
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.syncCalendar)}</p>
+          <p className="px-2 text-xs font-medium text-[color:var(--accent)]">Last run: {formatTimestamp(functionTimestamps.syncCalendar)}</p>
         )}
       </div>
       <div className="space-y-1">
-        <Button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-700 text-white rounded-lg shadow-sm transition-all" onClick={onAllActions} disabled={busy}>
+        <Button className={actionButtonClass} variant="outline" onClick={onAllActions} disabled={busy}>
           {busy && activeAction === 'all' ? <Loader className="animate-spin" size={18} /> : <Zap size={18} />}
           {busy && activeAction === 'all' && runAllStep ? 'Running...' : 'Run All'}
         </Button>
-        <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Runs all Quick Actions in sequence automatically</p>
+        <p className={actionMetaClass}>Runs all Quick Actions in sequence automatically</p>
         {showTimestamps && (
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.runAll)}</p>
+          <p className="px-2 text-xs font-medium text-[color:var(--accent)]">Last run: {formatTimestamp(functionTimestamps.runAll)}</p>
         )}
       </div>
     </div>

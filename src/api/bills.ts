@@ -8,8 +8,6 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
-  query, 
-  orderBy,
   writeBatch 
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebaseConfig';
@@ -175,9 +173,11 @@ export async function importBills(bills: Array<{
   repeats_every: number;
   frequency: string;
   start_date: string;
-  end_date?: string;
+  end_date?: string | null;
   owner?: string;
-  note?: string;
+  note?: string | null;
+  notes?: string | null;
+  accountType?: string;
 }>) {
   try {
     const batch = writeBatch(db);
@@ -196,6 +196,8 @@ export async function importBills(bills: Array<{
       if (bill.end_date) payload.endDate = bill.end_date;
       if (bill.owner) payload.owner = bill.owner;
       if (bill.note) payload.note = bill.note;
+      if (bill.notes) payload.notes = bill.notes;
+      if (bill.accountType) payload.accountType = bill.accountType;
       batch.set(newBillRef, payload);
     });
     

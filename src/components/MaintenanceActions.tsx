@@ -59,7 +59,7 @@ export function MaintenanceActions({
           </Button>
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Generates icons for transactions using AI and brand mapping</p>
           {showTimestamps && (
-            <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.generateTransactionIcons)}</p>
+            <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.generateIcons)}</p>
           )}
         </div>
         <div className="space-y-2">

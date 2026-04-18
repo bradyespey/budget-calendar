@@ -8,8 +8,7 @@ import {
   query, 
   orderBy 
 } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions, auth } from '../lib/firebaseConfig';
+import { db, auth } from '../lib/firebaseConfig';
 import type { Account } from "../types";
 import { MOCK_ACCOUNTS } from './mockData';
 

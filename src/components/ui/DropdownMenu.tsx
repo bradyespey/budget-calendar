@@ -51,7 +51,7 @@ const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
     >
       <Menu.Items 
         className={clsx(
-          "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-white dark:bg-gray-800 p-1 text-gray-900 dark:text-gray-100 shadow-md",
+          "absolute z-50 min-w-[8rem] overflow-hidden rounded-xl border border-[color:var(--line-strong)] bg-[color:var(--surface-elevated)] p-1 text-[color:var(--text)] shadow-[var(--shadow-crisp)] backdrop-blur-xl",
           align === 'end' ? 'right-0' : 'left-0',
           className
         )}
@@ -73,10 +73,10 @@ const DropdownMenuItem: React.FC<DropdownMenuItemProps> = ({
         <button
           onClick={onClick}
           className={clsx(
-            "relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
+            "relative flex w-full cursor-default select-none items-center rounded-lg px-2 py-1.5 text-sm outline-none transition-colors",
             active 
-              ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100" 
-              : "text-gray-700 dark:text-gray-300",
+              ? "bg-[color:var(--surface-hover)] text-[color:var(--text)]" 
+              : "text-[color:var(--muted)]",
             className
           )}
         >

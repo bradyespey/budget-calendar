@@ -1,22 +1,28 @@
 //src/types/index.ts
 
+export type Frequency = string
+export type IconType = 'brand' | 'generated' | 'category' | 'custom' | null
+
 // ── Domain model types ───────────────────────────────────────────────────────
 export interface Bill {
   id: string
   name: string
   category: string
   amount: number
-  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'one-time'
+  frequency: Frequency
   repeats_every: number
   start_date: string
-  end_date?: string
-  notes?: string
+  end_date?: string | null
+  notes?: string | null
+  note?: string | null
+  owner?: string
   iconUrl?: string | null
-  iconType?: 'brand' | 'generated' | 'category' | 'custom' | null
+  iconType?: IconType
   source?: 'manual' | 'monarch'
   streamId?: string
   accountName?: string
-  logoUrl?: string
+  logoUrl?: string | null
+  isActive?: boolean
   // Enhanced fields from Monarch API
   merchantName?: string
   merchantId?: string
@@ -41,7 +47,15 @@ export interface Projection {
   projected_balance: number
   lowest: boolean
   highest: boolean
-  bills?: any[] // Array of bill data for the projection
+  thresholdBreach?: boolean
+  bills?: Bill[]
+}
+
+export interface Category {
+  id: string
+  name: string
+  created_at: string
+  transaction_count?: number
 }
 
 export interface User {

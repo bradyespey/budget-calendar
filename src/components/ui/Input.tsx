@@ -12,29 +12,29 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className = '', label, error, helperText, ...props }, ref) => (
     <div className="w-full">
       {label && (
-        <label htmlFor={props.id} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label htmlFor={props.id} className="mb-2 block text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-[color:var(--muted)]">
           {label}
         </label>
       )}
       <input
         ref={ref}
         className={[
-          'w-full rounded-md border py-2 px-3 shadow-sm transition-all',
-          'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white',
-          'focus:border-blue-500 focus:ring-1 focus:ring-blue-500',
-          'disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-70',
-          // Custom styling for date inputs to make calendar icon white in dark mode
+          'w-full rounded-2xl border px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-all',
+          'border-[color:var(--line-strong)] bg-[color:var(--surface)] text-[color:var(--text)]',
+          'focus:border-[color:var(--accent)] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-soft)]',
+          'placeholder:text-slate-400 dark:placeholder:text-slate-500',
+          'disabled:cursor-not-allowed disabled:opacity-60',
           props.type === 'date' ? 'dark:[color-scheme:dark]' : '',
           error
-            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+            ? 'border-[color:var(--danger)] focus:border-[color:var(--danger)] focus:ring-[color:var(--danger-soft)]'
             : '',
           className
         ].join(' ')}
         {...props}
       />
-      {error && <p className="mt-1 text-sm text-red-600 dark:text-red-500">{error}</p>}
+      {error && <p className="mt-2 text-sm text-[color:var(--danger)]">{error}</p>}
       {!error && helperText && (
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{helperText}</p>
+        <p className="mt-2 text-sm text-[color:var(--muted)]">{helperText}</p>
       )}
     </div>
   )

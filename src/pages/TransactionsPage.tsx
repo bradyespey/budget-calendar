@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Layout } from '../components/Layout/Layout';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
-import { Card, CardContent } from '../components/ui/Card';
+import { Card, CardContent, CardDescription, CardTitle } from '../components/ui/Card';
 import { TransactionsFilters } from '../components/TransactionsFilters';
 import { TransactionsTable } from '../components/TransactionsTable';
 import { TransactionForm, FormMode } from '../components/TransactionForm';
@@ -61,6 +61,7 @@ export function TransactionsPage() {
   // Form state
   const [formMode, setFormMode] = useState<FormMode>('view');
   const [selectedTransaction, setSelectedTransaction] = useState<CombinedTransaction | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   // Form handlers
   const handleCreateTransaction = () => {
@@ -124,6 +125,7 @@ export function TransactionsPage() {
 
   const handleDeleteTransaction = async (transaction: CombinedTransaction) => {
     if (!transaction.isEditable) return;
+    if (!window.confirm(`Delete "${transaction.name}"? This cannot be undone.`)) return;
     
     try {
       try {
@@ -214,8 +216,8 @@ export function TransactionsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading transactions...</div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="surface-card px-6 py-5 text-sm text-[color:var(--muted)]">Loading transactions…</div>
       </div>
     );
   }
@@ -225,8 +227,10 @@ export function TransactionsPage() {
       <div className="space-y-6">
         {/* Header */}
         <PageHeader
+          eyebrow="Transactions"
           title="Transactions"
           subtitle={refreshTransactionsTimestamp ? formatTimestamp(refreshTransactionsTimestamp) : undefined}
+          description="Keep recurring Monarch streams and manual bills in one compact workspace. Filters, sorting, edits, and review all stay tied to the same dataset."
           helpSections={[
             {
               title: 'Quick Tips',
@@ -237,79 +241,85 @@ export function TransactionsPage() {
               ],
             },
           ]}
+          stats={[
+            { label: 'Total', value: combinedTransactions.length.toString(), tone: 'accent' },
+            { label: 'Visible', value: filteredTransactions.length.toString(), tone: 'success' },
+            { label: 'Manual', value: combinedTransactions.filter(t => t.source === 'manual').length.toString(), tone: 'warning' },
+            { label: 'Monarch', value: combinedTransactions.filter(t => t.source === 'monarch').length.toString(), tone: 'danger' },
+            { label: 'Categories', value: categories.length.toString(), tone: 'violet' },
+          ]}
           actions={
-            <Button onClick={handleCreateTransaction} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Transaction
-            </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={handleRefresh} size="sm" variant="outline" isLoading={refreshing}>
+                Refresh
+              </Button>
+              <Button onClick={handleCreateTransaction} size="sm">
+                <Plus className="h-4 w-4" />
+                Add Transaction
+              </Button>
+            </div>
           }
         />
               
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
-            <p className="text-red-800 dark:text-red-200">{error}</p>
+          <div className="surface-panel border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] p-4">
+            <p className="text-sm font-medium text-[color:var(--danger)]">{error}</p>
           </div>
         )}
 
-        {/* Filters */}
-        <TransactionsFilters
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          frequencyFilter={frequencyFilter}
-          setFrequencyFilter={setFrequencyFilter}
-          accountFilter={accountFilter}
-          setAccountFilter={setAccountFilter}
-          accountTypeFilter={accountTypeFilter}
-          setAccountTypeFilter={setAccountTypeFilter}
-          categoryFilter={categoryFilter}
-          setCategoryFilter={setCategoryFilter}
-          sourceFilter={sourceFilter}
-          setSourceFilter={setSourceFilter}
-          uniqueFrequencies={uniqueFrequencies}
-          uniqueAccounts={uniqueAccounts}
-          uniqueAccountTypes={uniqueAccountTypes}
-          uniqueCategories={uniqueCategories}
-          resetFilters={resetFilters}
-        />
+        <Card className="overflow-hidden">
+          <CardContent className="space-y-5 p-5 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>Recurring Dataset</CardTitle>
+                <CardDescription>
+                  Filters, sorting, and inline actions all stay attached to one shared surface so the list reads like a workspace instead of stacked utility cards.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={() => setEditMode((current) => !current)}
+                  size="sm"
+                  variant={editMode ? 'primary' : 'outline'}
+                >
+                  <Pencil className="h-4 w-4" />
+                  {editMode ? 'Done Editing' : 'Edit Transactions'}
+                </Button>
+              </div>
+            </div>
 
-        {/* Transactions Table */}
-        <TransactionsTable
-          transactions={filteredTransactions}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-          onEdit={handleEditTransaction}
-          onDelete={handleDeleteTransaction}
-          onFilterClick={handleFilterClick}
-        />
+            <TransactionsFilters
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              frequencyFilter={frequencyFilter}
+              setFrequencyFilter={setFrequencyFilter}
+              accountFilter={accountFilter}
+              setAccountFilter={setAccountFilter}
+              accountTypeFilter={accountTypeFilter}
+              setAccountTypeFilter={setAccountTypeFilter}
+              categoryFilter={categoryFilter}
+              setCategoryFilter={setCategoryFilter}
+              sourceFilter={sourceFilter}
+              setSourceFilter={setSourceFilter}
+              uniqueFrequencies={uniqueFrequencies}
+              uniqueAccounts={uniqueAccounts}
+              uniqueAccountTypes={uniqueAccountTypes}
+              uniqueCategories={uniqueCategories}
+              resetFilters={resetFilters}
+            />
 
-        {/* Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          <Card className="border-t-4 border-t-blue-500">
-            <CardContent className="p-5 sm:p-6">
-              <div className="text-3xl sm:text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">
-                {combinedTransactions.filter(t => t.source === 'monarch').length}
-              </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Monarch Transactions</div>
-            </CardContent>
-          </Card>
-          <Card className="border-t-4 border-t-green-500">
-            <CardContent className="p-5 sm:p-6">
-              <div className="text-3xl sm:text-4xl font-bold text-green-600 dark:text-green-400 mb-2">
-                {combinedTransactions.filter(t => t.source === 'manual').length}
-              </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Manual Transactions</div>
-            </CardContent>
-          </Card>
-          <Card className="border-t-4 border-t-purple-500">
-            <CardContent className="p-5 sm:p-6">
-              <div className="text-3xl sm:text-4xl font-bold text-purple-600 dark:text-purple-400 mb-2">
-                {combinedTransactions.length}
-              </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Transactions</div>
+            <TransactionsTable
+              transactions={filteredTransactions}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              onEdit={handleEditTransaction}
+              onDelete={handleDeleteTransaction}
+              onFilterClick={handleFilterClick}
+              editMode={editMode}
+            />
           </CardContent>
         </Card>
-        </div>
 
         {/* Form Modal */}
         <TransactionForm

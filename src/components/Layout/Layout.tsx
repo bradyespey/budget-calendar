@@ -10,13 +10,15 @@ interface LayoutProps {
 
 export function Layout({ children, onTransactionsClick }: LayoutProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-150">
-      {/* Navbar with theme toggle */}
-      <Navbar onTransactionsClick={onTransactionsClick} />
-      {/* Main content area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        {children}
-      </main>
+    <div className="min-h-screen overflow-x-clip text-[color:var(--text)] transition-colors duration-150">
+      <div className="mx-auto flex min-h-screen max-w-[1880px] flex-col gap-4 px-3 py-4 sm:px-4 lg:flex-row lg:gap-5 lg:px-5 lg:py-5">
+        <Navbar onTransactionsClick={onTransactionsClick} />
+        <main className="min-w-0 w-full flex-1">
+          <div className="surface-card min-h-full p-4 sm:p-5 lg:p-6">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

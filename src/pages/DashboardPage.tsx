@@ -1,5 +1,6 @@
 //src/pages/DashboardPage.tsx
 
+import type { ComponentType } from 'react'
 import { useEffect, useState } from 'react'
 import {
   Wallet,
@@ -7,6 +8,9 @@ import {
   CreditCard,
   TrendingDown,
   TrendingUp,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   ArrowUpCircle,
   ArrowDownCircle,
   Calculator,
@@ -40,6 +44,26 @@ interface BillsSummary {
   weekly: BillsIncome
   monthly: BillsIncome
   yearly: BillsIncome
+}
+
+interface SummaryCard {
+  label: string
+  value: string
+  icon: ComponentType<{ size?: number | string; className?: string }>
+  iconTone: string
+  iconBg: string
+  detail: string
+  supporting?: string
+}
+
+function SortIndicator({ active, direction }: { active: boolean; direction: 'asc' | 'desc' }) {
+  if (!active) {
+    return <ArrowUpDown className="table-sort-icon h-3 w-3" />
+  }
+
+  return direction === 'asc'
+    ? <ArrowUp className="table-sort-icon h-3 w-3" />
+    : <ArrowDown className="table-sort-icon h-3 w-3" />
 }
 
 export function DashboardPage() {
@@ -172,6 +196,100 @@ export function DashboardPage() {
       maximumFractionDigits: 0,
     }).format(Math.round(amount))
 
+  const accountSummaryCards: SummaryCard[] = [
+    {
+      label: 'Checking Balance',
+      value: formatCurrency(checkingBalance ?? 0),
+      icon: Wallet,
+      iconTone: 'text-blue-600 dark:text-blue-400',
+      iconBg: 'bg-blue-100 dark:bg-blue-900/50',
+      detail: lastSync
+        ? `as of ${format(lastSync, 'MMM d, h:mm a')} • ${refreshAccountsTimestamp ? `Refresh: ${formatTimestamp(refreshAccountsTimestamp)}` : 'Awaiting refresh'}`
+        : 'Live checking balance',
+    },
+    {
+      label: 'Savings Balance',
+      value: savingsBalance !== null ? formatCurrency(savingsBalance) : 'Not configured',
+      icon: PiggyBank,
+      iconTone: 'text-emerald-600 dark:text-emerald-400',
+      iconBg: 'bg-emerald-100 dark:bg-emerald-900/50',
+      detail: lastSync && savingsBalance !== null
+        ? `as of ${format(lastSync, 'MMM d, h:mm a')} • Tracked in savings trend`
+        : 'Savings account snapshot',
+      supporting: savingsBalance === null ? 'Add a savings account ID to enable' : undefined,
+    },
+    {
+      label: 'Credit Card Debt',
+      value: creditCardDebt !== null ? formatCurrency(creditCardDebt) : 'Not available',
+      icon: CreditCard,
+      iconTone: 'text-rose-600 dark:text-rose-400',
+      iconBg: 'bg-rose-100 dark:bg-rose-900/50',
+      detail: lastSync && creditCardDebt !== null
+        ? `as of ${format(lastSync, 'MMM d, h:mm a')} • Used for visibility, not checking projections`
+        : 'Combined card balance',
+    },
+  ]
+
+  const projectionSummaryCards: SummaryCard[] = [
+    {
+      label: 'Low Balance Alert',
+      value: thresholdBreach ? format(parseISO(thresholdBreach.date), 'MMM d') : 'No breach',
+      icon: AlertTriangle,
+      iconTone: 'text-orange-600 dark:text-orange-400',
+      iconBg: 'bg-orange-100 dark:bg-orange-900/50',
+      detail: thresholdBreach
+        ? `${format(parseISO(thresholdBreach.date), 'EEEE, MMM d')} • First date below ${formatCurrency(settings?.balanceThreshold ?? 1000)}`
+        : `Stays above ${formatCurrency(settings?.balanceThreshold ?? 1000)} • Alert threshold: ${formatCurrency(settings?.balanceThreshold ?? 1000)}`,
+    },
+    {
+      label: 'Lowest Projected Balance',
+      value: highLow.lowest ? formatCurrency(highLow.lowest.projected_balance) : formatCurrency(0),
+      icon: TrendingDown,
+      iconTone: 'text-rose-600 dark:text-rose-400',
+      iconBg: 'bg-rose-100 dark:bg-rose-900/50',
+      detail: highLow.lowest
+        ? `${format(parseISO(highLow.lowest.proj_date), 'EEEE, MMM d')} • Minimum balance over the next ${projectionDays} days`
+        : 'No projection yet',
+    },
+    {
+      label: 'Highest Projected Balance',
+      value: highLow.highest ? formatCurrency(highLow.highest.projected_balance) : formatCurrency(0),
+      icon: TrendingUp,
+      iconTone: 'text-emerald-600 dark:text-emerald-400',
+      iconBg: 'bg-emerald-100 dark:bg-emerald-900/50',
+      detail: highLow.highest
+        ? `${format(parseISO(highLow.highest.proj_date), 'EEEE, MMM d')} • Peak balance over the next ${projectionDays} days`
+        : 'No projection yet',
+    },
+  ]
+
+  const monthlySummaryCards: SummaryCard[] = [
+    {
+      label: 'Total Monthly Income',
+      value: formatCurrency(monthlyTotals.income),
+      icon: ArrowUpCircle,
+      iconTone: 'text-emerald-600 dark:text-emerald-400',
+      iconBg: 'bg-emerald-100 dark:bg-emerald-900/50',
+      detail: 'Expected recurring income from all included income sources',
+    },
+    {
+      label: 'Total Monthly Bills',
+      value: formatCurrency(monthlyTotals.bills),
+      icon: ArrowDownCircle,
+      iconTone: 'text-rose-600 dark:text-rose-400',
+      iconBg: 'bg-rose-100 dark:bg-rose-900/50',
+      detail: 'Expected recurring expenses from checking-impact bills and payments',
+    },
+    {
+      label: 'Monthly Leftover',
+      value: formatCurrency(monthlyTotals.leftover),
+      icon: Calculator,
+      iconTone: 'text-[color:var(--accent)]',
+      iconBg: 'bg-[color:var(--accent-soft)]',
+      detail: 'Remaining after bills and food/drinks',
+    },
+  ]
+
   const handleSort = (field: 'category' | 'monthly' | 'yearly') => {
     if (field === sortField) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
@@ -181,15 +299,16 @@ export function DashboardPage() {
     }
   }
 
-  const getSortIcon = (field: 'category' | 'monthly' | 'yearly') => {
-    if (field !== sortField) return '↕️'
-    return sortDirection === 'asc' ? '↑' : '↓'
-  }
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
+      <div className="flex h-64 items-center justify-center">
+        <div className="surface-card flex items-center gap-3 px-6 py-5">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[color:var(--line)] border-t-[color:var(--accent)]" />
+          <div>
+            <p className="eyebrow mb-2">Loading</p>
+            <p className="text-sm text-[color:var(--muted)]">Pulling your latest balances and projections.</p>
+          </div>
+        </div>
       </div>
     )
   }
@@ -199,7 +318,10 @@ export function DashboardPage() {
     <div className="space-y-8">
       {/* Header */}
       <PageHeader
+        eyebrow="Dashboard"
         title="Financial Dashboard"
+        subtitle={refreshAccountsTimestamp ? formatTimestamp(refreshAccountsTimestamp) : 'Live account summary'}
+        description="Keep checking, savings, debt, and monthly cash flow in one place while the current projection window highlights the next pressure point."
         helpSections={[
           {
             title: 'Quick Overview',
@@ -212,254 +334,98 @@ export function DashboardPage() {
             ],
           },
         ]}
+        stats={[
+          { label: 'Checking', value: formatCurrency(checkingBalance ?? 0), tone: 'success' },
+          { label: 'Next low point', value: thresholdBreach ? format(parseISO(thresholdBreach.date), 'MMM d') : 'Clear', tone: 'danger' },
+          { label: 'Monthly leftover', value: formatCurrency(monthlyTotals.leftover), tone: 'success' },
+          { label: 'Projection window', value: `${projectionDays} days`, tone: 'warning' },
+        ]}
       />
       
       {/* Row 1: Account Balances */}
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-5">Account Balances</h2>
+        <h2 className="section-display mb-5 text-[2rem] text-[color:var(--text)]">Account Balances</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          {/* Checking Balance */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 mr-4">
-                  <Wallet size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Checking Balance
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(checkingBalance ?? 0)}
-                  </h3>
-                  {lastSync && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      as of {format(lastSync, 'MMM d, h:mm a')}
-                    </p>
-                  )}
-                  {refreshAccountsTimestamp && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Refresh: {formatTimestamp(refreshAccountsTimestamp)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Savings Balance */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mr-4">
-                  <PiggyBank size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Savings Balance
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {savingsBalance !== null ? formatCurrency(savingsBalance) : 'Not configured'}
-                  </h3>
-                  {lastSync && savingsBalance !== null && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      as of {format(lastSync, 'MMM d, h:mm a')}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Credit Card Debt */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 dark:text-red-400 mr-4">
-                  <CreditCard size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Credit Card Debt
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {creditCardDebt !== null ? formatCurrency(creditCardDebt) : 'Not available'}
-                  </h3>
-                  {lastSync && creditCardDebt !== null && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      as of {format(lastSync, 'MMM d, h:mm a')}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {accountSummaryCards.map((card) => {
+            const Icon = card.icon
+            return (
+              <Card key={card.label}>
+                <CardContent className="p-5">
+                  <div className="stat-card flex items-start gap-4 p-4 sm:p-5">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${card.iconBg} ${card.iconTone}`}>
+                      <Icon size={22} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="eyebrow mb-2">{card.label}</p>
+                      <p className="display-copy text-[2rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
+                      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{card.detail}</p>
+                      {card.supporting ? (
+                        <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]/85">{card.supporting}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       </div>
 
       {/* Row 2: Projected Balances */}
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-5">Projected Balances</h2>
+        <h2 className="section-display mb-5 text-[2rem] text-[color:var(--text)]">Projected Balances</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          {/* Threshold Breach Alert */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center text-orange-600 dark:text-orange-400 mr-4">
-                  <AlertTriangle size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Low Balance Alert
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {thresholdBreach 
-                      ? format(parseISO(thresholdBreach.date), 'MMM d')
-                      : 'No breach'
-                    }
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    First date below ${(settings?.balanceThreshold ?? 1000).toLocaleString()} threshold
-                  </p>
-                  {thresholdBreach && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Balance: {formatCurrency(thresholdBreach.balance)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Lowest Projected Balance */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 dark:text-red-400 mr-4">
-                  <TrendingDown size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Lowest Projected Balance
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {highLow.lowest
-                      ? formatCurrency(highLow.lowest.projected_balance)
-                      : formatCurrency(0)}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Minimum balance over next {projectionDays} days
-                  </p>
-                  {highLow.lowest && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      on {format(parseISO(highLow.lowest.proj_date), 'MMM d')}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Highest Projected Balance */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 mr-4">
-                  <TrendingUp size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Highest Projected Balance
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {highLow.highest
-                      ? formatCurrency(highLow.highest.projected_balance)
-                      : formatCurrency(0)}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Peak balance over next {projectionDays} days
-                  </p>
-                  {highLow.highest && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      on {format(parseISO(highLow.highest.proj_date), 'MMM d')}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {projectionSummaryCards.map((card) => {
+            const Icon = card.icon
+            return (
+              <Card key={card.label}>
+                <CardContent className="p-5">
+                  <div className="stat-card flex items-start gap-4 p-4 sm:p-5">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${card.iconBg} ${card.iconTone}`}>
+                      <Icon size={22} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="eyebrow mb-2">{card.label}</p>
+                      <p className="display-copy text-[2rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
+                      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{card.detail}</p>
+                      {card.supporting ? (
+                        <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]/85">{card.supporting}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       </div>
 
       {/* Row 3: Monthly Cash Flow */}
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-5">Monthly Cash Flow</h2>
+        <h2 className="section-display mb-5 text-[2rem] text-[color:var(--text)]">Monthly Cash Flow</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          {/* Total Monthly Income */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mr-4">
-                  <ArrowUpCircle size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Total Monthly Income
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(monthlyTotals.income)}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Expected recurring income from all sources
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Total Monthly Bills */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-rose-100 dark:bg-rose-900 rounded-full flex items-center justify-center text-rose-600 dark:text-rose-400 mr-4">
-                  <ArrowDownCircle size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Total Monthly Bills
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(monthlyTotals.bills)}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Expected recurring expenses and payments
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Monthly Leftover */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-400 mr-4">
-                  <Calculator size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Monthly Leftover
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(monthlyTotals.leftover)}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Remaining balance left for spending after bills and food/drinks
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {monthlySummaryCards.map((card) => {
+            const Icon = card.icon
+            return (
+              <Card key={card.label}>
+                <CardContent className="p-5">
+                  <div className="stat-card flex items-start gap-4 p-4 sm:p-5">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${card.iconBg} ${card.iconTone}`}>
+                      <Icon size={22} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="eyebrow mb-2">{card.label}</p>
+                      <p className="display-copy text-[2rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
+                      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{card.detail}</p>
+                      {card.supporting ? (
+                        <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]/85">{card.supporting}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       </div>
 
@@ -467,8 +433,8 @@ export function DashboardPage() {
       {savingsBalance !== null && (
         <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-2">Savings Trend</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <h3 className="section-display text-[1.8rem] text-[color:var(--text)]">Savings Trend</h3>
+            <p className="mb-4 text-sm leading-7 text-[color:var(--muted)]">
               Track your savings growth over time. Updates when you click "Update Balances" or during nightly automation.
             </p>
             <SavingsChart data={savingsHistory} />
@@ -480,28 +446,34 @@ export function DashboardPage() {
         {/* Category Averages */}
         <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Category Averages</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[400px]">
+            <h3 className="section-display text-[1.8rem] text-[color:var(--text)]">Category Averages</h3>
+            <div className="table-shell mt-4 overflow-x-auto">
+              <table className="table-surface min-w-[400px]">
                 <thead>
-                  <tr className="border-b dark:border-gray-700">
+                  <tr className="border-b surface-divider">
                     <th 
-                      className="text-left py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => handleSort('category')}
+                      className="px-4 py-4 text-left"
                     >
-                      Category {getSortIcon('category')}
+                      <button type="button" className="table-sort-button" data-active={sortField === 'category'} onClick={() => handleSort('category')}>
+                        Category
+                        <SortIndicator active={sortField === 'category'} direction={sortDirection} />
+                      </button>
                     </th>
                     <th 
-                      className="text-right py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => handleSort('monthly')}
+                      className="px-4 py-4 text-right"
                     >
-                      Monthly {getSortIcon('monthly')}
+                      <button type="button" className="table-sort-button ml-auto" data-active={sortField === 'monthly'} onClick={() => handleSort('monthly')}>
+                        Monthly
+                        <SortIndicator active={sortField === 'monthly'} direction={sortDirection} />
+                      </button>
                     </th>
                     <th 
-                      className="text-right py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => handleSort('yearly')}
+                      className="px-4 py-4 text-right"
                     >
-                      Yearly {getSortIcon('yearly')}
+                      <button type="button" className="table-sort-button ml-auto" data-active={sortField === 'yearly'} onClick={() => handleSort('yearly')}>
+                        Yearly
+                        <SortIndicator active={sortField === 'yearly'} direction={sortDirection} />
+                      </button>
                     </th>
                   </tr>
                 </thead>
@@ -523,12 +495,12 @@ export function DashboardPage() {
                       return sortDirection === 'asc' ? comparison : -comparison
                     })
                     .map(([category, averages]) => (
-                      <tr key={category} className="border-b dark:border-gray-700">
-                        <td className="py-2 capitalize">{category}</td>
-                        <td className="text-right">
+                      <tr key={category} className="border-b surface-divider">
+                        <td className="px-4 py-4 capitalize text-[color:var(--text)]">{category}</td>
+                        <td className="px-4 py-4 text-right text-[color:var(--text)]">
                           {formatCurrency(averages.monthly)}
                         </td>
-                        <td className="text-right">
+                        <td className="px-4 py-4 text-right text-[color:var(--text)]">
                           {formatCurrency(averages.yearly)}
                         </td>
                       </tr>
@@ -542,59 +514,59 @@ export function DashboardPage() {
         {/* Bills/Income Summary */}
         <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Bills/Income Summary</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[400px]">
+            <h3 className="section-display text-[1.8rem] text-[color:var(--text)]">Bills/Income Summary</h3>
+            <div className="table-shell mt-4 overflow-x-auto">
+              <table className="table-surface min-w-[400px]">
                 <thead>
-                  <tr className="border-b dark:border-gray-700">
-                    <th className="text-left py-2">Type</th>
-                    <th className="text-right py-2">Bills</th>
-                    <th className="text-right py-2">Income</th>
+                  <tr className="border-b surface-divider">
+                    <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">Type</th>
+                    <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">Bills</th>
+                    <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">Income</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b dark:border-gray-700">
-                    <td className="py-2">Daily</td>
-                    <td className="text-right text-red-600 dark:text-red-400">
+                  <tr className="border-b surface-divider">
+                    <td className="px-4 py-4 text-[color:var(--text)]">Daily</td>
+                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.daily.bills)}
                     </td>
-                    <td className="text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.daily.income)}
                     </td>
                   </tr>
-                  <tr className="border-b dark:border-gray-700">
-                    <td className="py-2">Weekly</td>
-                    <td className="text-right text-red-600 dark:text-red-400">
+                  <tr className="border-b surface-divider">
+                    <td className="px-4 py-4 text-[color:var(--text)]">Weekly</td>
+                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.weekly.bills)}
                     </td>
-                    <td className="text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.weekly.income)}
                     </td>
                   </tr>
-                  <tr className="border-b dark:border-gray-700">
-                    <td className="py-2">Monthly</td>
-                    <td className="text-right text-red-600 dark:text-red-400">
+                  <tr className="border-b surface-divider">
+                    <td className="px-4 py-4 text-[color:var(--text)]">Monthly</td>
+                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.monthly.bills)}
                     </td>
-                    <td className="text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.monthly.income)}
                     </td>
                   </tr>
-                  <tr className="border-b dark:border-gray-700">
-                    <td className="py-2">Yearly</td>
-                    <td className="text-right text-red-600 dark:text-red-400">
+                  <tr className="border-b surface-divider">
+                    <td className="px-4 py-4 text-[color:var(--text)]">Yearly</td>
+                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.yearly.bills)}
                     </td>
-                    <td className="text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.yearly.income)}
                     </td>
                   </tr>
                   <tr>
-                    <td className="py-2">One-Time</td>
-                    <td className="text-right text-red-600 dark:text-red-400">
+                    <td className="px-4 py-4 text-[color:var(--text)]">One-Time</td>
+                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.oneTime.bills)}
                     </td>
-                    <td className="text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.oneTime.income)}
                     </td>
                   </tr>

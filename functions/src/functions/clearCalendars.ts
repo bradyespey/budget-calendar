@@ -62,6 +62,7 @@ export const clearCalendars = functions
       let devBalanceCleared = 0;
       let prodBillsCleared = 0;
       let prodBalanceCleared = 0;
+      const calendarErrors: string[] = [];
       
       // Helper function to handle rate limiting
       async function withRateLimit<T>(operation: () => Promise<T>, maxRetries = 5): Promise<T> {
@@ -174,6 +175,7 @@ export const clearCalendars = functions
           }
         } catch (error) {
           logger.error("Error clearing dev bills calendar:", error);
+          calendarErrors.push(`dev bills: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
       
@@ -192,6 +194,7 @@ export const clearCalendars = functions
           }
         } catch (error) {
           logger.error("Error clearing dev balance calendar:", error);
+          calendarErrors.push(`dev balance: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
       
@@ -210,6 +213,7 @@ export const clearCalendars = functions
           }
         } catch (error) {
           logger.error("Error clearing prod bills calendar:", error);
+          calendarErrors.push(`prod bills: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
       
@@ -228,7 +232,23 @@ export const clearCalendars = functions
           }
         } catch (error) {
           logger.error("Error clearing prod balance calendar:", error);
+          calendarErrors.push(`prod balance: ${error instanceof Error ? error.message : String(error)}`);
         }
+      }
+
+      if (calendarErrors.length > 0 && clearedCount === 0) {
+        res.status(500).json({
+          error: "Calendar clear failed",
+          message: `Unable to clear calendars: ${calendarErrors.join(' | ')}`,
+          clearedCount,
+          devBillsCleared,
+          devBalanceCleared,
+          prodBillsCleared,
+          prodBalanceCleared,
+          errors: calendarErrors,
+          timestamp: new Date().toISOString()
+        });
+        return;
       }
       
       await db.collection('admin').doc('functionTimestamps').set({
@@ -243,6 +263,7 @@ export const clearCalendars = functions
         devBalanceCleared,
         prodBillsCleared,
         prodBalanceCleared,
+        errors: calendarErrors,
         timestamp: new Date().toISOString()
       });
       

@@ -19,36 +19,6 @@ export async function exportBillsToCSV() {
     return f;
   };
   
-  const currency = (n: number) => {
-    const abs = Math.abs(n);
-    const formatted = `$${abs.toFixed(2)}`;
-    return n < 0 ? `-$${abs.toFixed(2)}`.replace('--', '-') : formatted;
-  };
-  
-  const calcMonthly = (amount: number, freq: string, repeatsEvery: number) => {
-    const r = repeatsEvery || 1;
-    switch (freq) {
-      case 'daily': return (amount * 30.44) / r;
-      case 'weekly': return (amount * 4.35) / r;
-      case 'monthly': return amount / r;
-      case 'yearly': return amount / (12 * r);
-      case 'one-time': return 0;
-      default: return amount / r;
-    }
-  };
-  
-  const calcYearly = (amount: number, freq: string, repeatsEvery: number) => {
-    const r = repeatsEvery || 1;
-    switch (freq) {
-      case 'daily': return (amount * 365.25) / r;
-      case 'weekly': return (amount * 52.18) / r;
-      case 'monthly': return (amount * 12) / r;
-      case 'yearly': return amount / r;
-      case 'one-time': return 0;
-      default: return (amount * 12) / r;
-    }
-  };
-
   const csvContent = [
     headers.join(','),
     ...bills.map(bill => {

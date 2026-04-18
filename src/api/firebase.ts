@@ -9,7 +9,6 @@ import {
   setDoc,
   query, 
   orderBy, 
-  where,
   Timestamp,
   writeBatch 
 } from 'firebase/firestore';
@@ -66,6 +65,15 @@ const timestampToDate = (timestamp: any): Date => {
   }
   return new Date(timestamp);
 };
+
+async function getFunctionError(response: Response, fallbackMessage: string) {
+  try {
+    const result = await response.json();
+    return result.message || result.error || fallbackMessage;
+  } catch {
+    return fallbackMessage;
+  }
+}
 
 // ACCOUNTS API
 export async function getAccounts(): Promise<Account[]> {
@@ -257,7 +265,12 @@ export async function getRecurringTransactions(): Promise<RecurringTransaction[]
   }));
 }
 
-export async function refreshRecurringTransactions(): Promise<void> {
+export async function refreshRecurringTransactions(): Promise<{
+  success?: boolean;
+  message?: string;
+  storedCount?: number;
+  deletedCount?: number;
+}> {
   // Call the main refresh function with accurate Monarch data
   const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshTransactions', {
     method: 'POST',
@@ -266,10 +279,12 @@ export async function refreshRecurringTransactions(): Promise<void> {
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to refresh recurring transactions: ${response.status}`);
+    const errorMessage = await getFunctionError(response, `Failed to refresh recurring transactions: ${response.status}`);
+    throw new Error(errorMessage);
   }
   
   const result = await response.json();
+  return result;
 }
 
 // SETTINGS API
@@ -391,7 +406,8 @@ export async function clearCalendars(): Promise<any> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to clear calendars: ${response.status}`);
+    const errorMessage = await getFunctionError(response, `Failed to clear calendars: ${response.status}`);
+    throw new Error(errorMessage);
   }
 
   const result = await response.json();

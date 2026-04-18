@@ -43,8 +43,9 @@ export const MOCK_BILLS: Bill[] = [
     source: 'manual',
     accountName: 'Chase Total Checking',
     accountType: 'Checking',
-    iconType: 'home',
-    end_date: '',
+    iconUrl: '/icons/home.svg',
+    iconType: 'category',
+    end_date: null,
   },
   {
     id: 'mock-2',
@@ -58,8 +59,9 @@ export const MOCK_BILLS: Bill[] = [
     source: 'manual',
     accountName: 'Chase Sapphire Reserve',
     accountType: 'Credit Card',
-    iconType: 'utensils',
-    end_date: '',
+    iconUrl: '/icons/utensils.svg',
+    iconType: 'category',
+    end_date: null,
   },
   {
     id: 'mock-3',
@@ -73,8 +75,9 @@ export const MOCK_BILLS: Bill[] = [
     source: 'manual',
     accountName: 'Chase Sapphire Reserve',
     accountType: 'Credit Card',
-    iconType: 'monitor',
-    end_date: '',
+    iconUrl: '/icons/cloud.svg',
+    iconType: 'category',
+    end_date: null,
   },
   {
     id: 'mock-4',
@@ -88,8 +91,9 @@ export const MOCK_BILLS: Bill[] = [
     source: 'manual',
     accountName: 'Chase Total Checking',
     accountType: 'Checking',
-    iconType: 'dumbbell',
-    end_date: '',
+    iconUrl: '/icons/dumbbell.svg',
+    iconType: 'category',
+    end_date: null,
   },
   {
     id: 'mock-5',
@@ -103,7 +107,8 @@ export const MOCK_BILLS: Bill[] = [
     source: 'manual',
     accountName: 'Chase Total Checking',
     accountType: 'Checking',
-    iconType: 'car',
+    iconUrl: '/icons/car.svg',
+    iconType: 'category',
     end_date: '2026-01-20',
   },
   {
@@ -118,8 +123,9 @@ export const MOCK_BILLS: Bill[] = [
     source: 'manual',
     accountName: 'Chase Total Checking',
     accountType: 'Checking',
-    iconType: 'briefcase',
-    end_date: '',
+    iconUrl: '/icons/briefcase.svg',
+    iconType: 'category',
+    end_date: null,
   },
   {
     id: 'mock-7',
@@ -133,8 +139,9 @@ export const MOCK_BILLS: Bill[] = [
     source: 'manual',
     accountName: 'Chase Sapphire Reserve',
     accountType: 'Credit Card',
-    iconType: 'music',
-    end_date: '',
+    iconUrl: '/icons/repeat.svg',
+    iconType: 'category',
+    end_date: null,
   },
   {
     id: 'mock-8',
@@ -148,8 +155,9 @@ export const MOCK_BILLS: Bill[] = [
     source: 'manual',
     accountName: 'Chase Sapphire Reserve',
     accountType: 'Credit Card',
-    iconType: 'package',
-    end_date: '',
+    iconUrl: '/icons/utensils.svg',
+    iconType: 'category',
+    end_date: null,
   }
 ];
 
@@ -210,11 +218,19 @@ export const generateMockProjections = (): Projection[] => {
     projections.push({
       proj_date: dateString,
       projected_balance: currentBalance,
-      lowest: currentBalance - 100,
-      highest: currentBalance + 100,
+      lowest: false,
+      highest: false,
+      thresholdBreach: currentBalance < 1000,
       bills: todaysBills
     });
   }
-  return projections;
-};
 
+  const lowestBalance = Math.min(...projections.map((projection) => projection.projected_balance));
+  const highestBalance = Math.max(...projections.map((projection) => projection.projected_balance));
+
+  return projections.map((projection) => ({
+    ...projection,
+    lowest: projection.projected_balance === lowestBalance,
+    highest: projection.projected_balance === highestBalance,
+  }));
+};

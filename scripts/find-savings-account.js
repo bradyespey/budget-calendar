@@ -70,7 +70,7 @@ function makeRequest(token, body) {
     const postData = JSON.stringify(body);
     
     const options = {
-      hostname: 'api.monarchmoney.com',
+      hostname: 'api.monarch.com',
       path: '/graphql',
       method: 'POST',
       headers: {

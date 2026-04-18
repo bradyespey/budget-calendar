@@ -1,7 +1,7 @@
 //src/utils/validateProjections.ts
 
 import { getSettings, getBills, getProjections } from '../api/firebase'
-import { addDays, parseISO, startOfDay, format } from 'date-fns'
+import { addDays, parseISO, format } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { fetchUSHolidays, adjustTransactionDate } from './dateAdjustment'
 
@@ -179,10 +179,11 @@ export async function validateProjections(): Promise<ValidationResult> {
   const allProjections = await getProjections()
   
   // Filter projections to the date range
-  const projections = allProjections.filter(proj => {
-    const projDate = proj.projDate
-    return projDate >= today && projDate <= endDate
-  }).sort((a, b) => a.projDate.localeCompare(b.projDate))
+  const projections = allProjections
+    .filter((projection): projection is typeof projection & { projDate: string } => {
+      return typeof projection.projDate === 'string' && projection.projDate >= today && projection.projDate <= endDate
+    })
+    .sort((a, b) => a.projDate.localeCompare(b.projDate))
 
   if (!projections) {
     throw new Error('Failed to fetch projections')
@@ -224,7 +225,7 @@ export async function validateProjections(): Promise<ValidationResult> {
       if (shouldBillOccurOnDate(bill, projDate)) {
         // Adjust for weekends/holidays (skip for daily)
         let adjustedDate = new Date(projDate);
-        const isPaycheck = bill.category && bill.category.toLowerCase() === 'paycheck';
+        const isPaycheck = bill.category?.toLowerCase() === 'paycheck';
         if (bill.frequency !== 'daily') {
           adjustedDate = adjustTransactionDate(adjustedDate, isPaycheck, holidays);
         }

@@ -17,11 +17,11 @@ export function PageHelpTooltip({ sections, useFixedPosition = false }: PageHelp
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       {/* Help Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--line-strong)] bg-[color:var(--surface)] text-[color:var(--muted)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text)]"
         aria-label="Help"
       >
         <HelpCircle className="h-4 w-4" />
@@ -30,37 +30,42 @@ export function PageHelpTooltip({ sections, useFixedPosition = false }: PageHelp
       {/* Tooltip Panel */}
       {isOpen && (
         <>
-          {/* Backdrop */}
           <div
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          
-              {/* Tooltip Content - Compact like SportsHub */}
-              <div className={`${useFixedPosition ? 'fixed top-16 right-4' : 'fixed sm:absolute right-4 sm:right-0 top-16 sm:top-8'} z-50 w-80 max-w-[calc(100vw-2rem)] rounded-md border border-gray-700 bg-gray-800 dark:bg-gray-900 shadow-xl max-h-[80vh] overflow-y-auto`}>
-            {/* Close button */}
+
+          <div
+            className={`${
+              useFixedPosition
+                ? 'fixed right-4 top-20 sm:absolute sm:right-0 sm:top-[calc(100%+0.75rem)]'
+                : 'fixed right-4 top-20 sm:absolute sm:right-0 sm:top-[calc(100%+0.75rem)]'
+            } z-[120] w-[min(21rem,calc(100vw-2rem))] overflow-hidden surface-card`}
+          >
             <button
               onClick={() => setIsOpen(false)}
-              className="sticky top-0 right-0 float-right m-1.5 text-gray-400 hover:text-gray-300 z-10 bg-gray-800 dark:bg-gray-900 rounded"
+              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--surface-muted)] text-[color:var(--muted)] transition hover:text-[color:var(--text)]"
+              aria-label="Close help"
             >
               <X className="h-3.5 w-3.5" />
             </button>
 
-            {/* Content */}
-            <div className="p-3 pb-4 pt-2 space-y-1.5 clear-both">
-              {sections.map((section, index) => (
-                <div key={index}>
-                  {index > 0 && <div className="border-t border-gray-700 my-1.5" />}
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-xs text-white mb-1">{section.title}</p>
-                    <div className="text-xs text-gray-300 space-y-0">
-                      {section.items.map((item, itemIndex) => (
-                        <p key={itemIndex} className="leading-tight py-0.5">• {item}</p>
-                      ))}
+            <div className="max-h-[calc(100vh-7rem)] overflow-y-auto px-5 pb-5 pt-5">
+              <div className="space-y-4 pr-6">
+                {sections.map((section, index) => (
+                  <div key={index}>
+                    {index > 0 && <div className="mb-4 border-t surface-divider" />}
+                    <div className="space-y-2">
+                      <p className="eyebrow">{section.title}</p>
+                      <div className="space-y-1.5 text-sm leading-7 text-[color:var(--muted)]">
+                        {section.items.map((item, itemIndex) => (
+                          <p key={itemIndex} className="leading-7">• {item}</p>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </>
@@ -68,4 +73,3 @@ export function PageHelpTooltip({ sections, useFixedPosition = false }: PageHelp
     </div>
   );
 }
-

@@ -3,13 +3,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { getProjections } from '../api/projections';
 import { Projection } from '../types';
 import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown, Search, X } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { getSettings, getFunctionTimestamps } from '../api/firebase';
-import { formatDistanceToNow } from 'date-fns';
 import { useLocation } from 'react-router-dom';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useAuth } from '../context/AuthContext';
@@ -200,23 +199,32 @@ export function UpcomingPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="surface-card flex items-center gap-3 px-6 py-5">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[color:var(--line)] border-t-[color:var(--accent)]" />
+          <div>
+            <p className="eyebrow mb-2">Loading</p>
+            <p className="text-sm text-[color:var(--muted)]">Building your upcoming projection view.</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-5xl space-y-6">
       {/* Header */}
       <PageHeader
+        eyebrow="Upcoming"
         title={`Upcoming Bills: ${searchTerm ? `${filteredDays.length} of ${upcomingDays.length}` : upcomingDays.length}-Day Projection`}
         subtitle={
           [
             budgetProjectionTimestamp && `Projections: ${formatTimestamp(budgetProjectionTimestamp)}`,
-            syncCalendarTimestamp && `Calendar Sync: ${formatTimestamp(syncCalendarTimestamp)}`
+            syncCalendarTimestamp && `Calendar Sync: ${formatTimestamp(syncCalendarTimestamp)}`,
+            lastProjected && `Last projected: ${formatTimestamp(lastProjected)}`,
           ].filter(Boolean).join(' • ')
         }
+        description="Search the forecast by merchant or category and review the checking balance day by day. Credit card charges still appear for visibility, but they stay out of the checking-balance math because the monthly credit card payment already includes them."
         helpSections={[
           {
             title: 'Display',
@@ -237,7 +245,7 @@ export function UpcomingPage() {
           {
             title: 'Excluded from Balance',
             items: [
-              'Individual credit card charges (prevents double-counting)',
+              'Individual credit card charges (already represented by the monthly credit card payment)',
             ],
           },
           {
@@ -251,11 +259,11 @@ export function UpcomingPage() {
       />
 
       {/* Search Filter */}
-      <Card>
+      <Card className="overflow-hidden">
         <CardContent className="p-4 sm:p-5">
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--muted)]" />
             <Input
               type="text"
               placeholder="Search transactions or categories (e.g., Factor, Netflix, Paycheck, Food & Drinks)..."
@@ -266,20 +274,20 @@ export function UpcomingPage() {
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[color:var(--muted)] transition hover:text-[color:var(--text)]"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
           {searchTerm && (
-            <div className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+            <div className="whitespace-nowrap text-sm text-[color:var(--muted)]">
               {totalOccurrences} occurrence{totalOccurrences !== 1 ? 's' : ''} found
             </div>
           )}
         </div>
         {searchTerm && (
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-[color:var(--muted)]">
             Showing {filteredDays.length} day{filteredDays.length !== 1 ? 's' : ''} with matching transactions
           </div>
         )}
@@ -291,34 +299,34 @@ export function UpcomingPage() {
           <Card 
             key={day.date}
             className={`w-full border-l-4
-              ${day.isHighest ? 'border-l-green-500 bg-green-50/30 dark:bg-green-900/10' : ''}
-              ${day.isLowest ? 'border-l-red-500 bg-red-50/30 dark:bg-red-900/10' : ''}
-              ${!day.isHighest && !day.isLowest ? 'border-l-blue-500/20' : ''}
+              ${day.isHighest ? 'border-l-green-500' : ''}
+              ${day.isLowest ? 'border-l-red-500' : ''}
+              ${!day.isHighest && !day.isLowest ? 'border-l-[color:var(--accent)]/30' : ''}
             `}
           >
             <CardHeader className="pb-2">
               <div className="flex justify-between items-center">
-                <CardTitle className="flex items-center">
-                  <span className="text-lg font-bold">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="display-copy text-[1.9rem]">
                     {formatDate(day.date)}
                   </span>
                   {day.isHighest && (
-                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-300">
                       <TrendingUp size={14} className="mr-1" /> Highest
                     </span>
                   )}
                   {day.isLowest && (
-                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                    <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800 dark:bg-red-900/30 dark:text-red-300">
                       <TrendingDown size={14} className="mr-1" /> Lowest
                     </span>
                   )}
                 </CardTitle>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-gray-900 dark:text-white">
+                  <div className="display-copy text-[1.8rem] text-[color:var(--text)]">
                     {formatCurrency(day.balance)}
                   </div>
                   {index > 0 && (
-                    <div className={`flex items-center text-sm ${
+                    <div className={`mt-1 flex items-center justify-end text-sm ${
                       getBalanceChange(day, index) >= 0 
                         ? 'text-green-600 dark:text-green-400' 
                         : 'text-red-600 dark:text-red-400'
@@ -343,18 +351,18 @@ export function UpcomingPage() {
               {day.transactions.length > 0 ? (
                 <ul className="space-y-2">
                   {day.transactions.map(transaction => (
-                    <li key={`${day.date}-${transaction.id}`} className="flex justify-between items-start gap-3 py-1 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <li key={`${day.date}-${transaction.id}`} className="surface-panel flex items-start justify-between gap-3 px-3 py-3">
                       <div className="flex items-center flex-wrap gap-2 min-w-0 flex-1">
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                           transaction.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
                         }`}></span>
-                        <span className="font-medium text-gray-900 dark:text-white break-words">{transaction.name}</span>
-                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        <span className="break-words font-medium text-[color:var(--text)]">{transaction.name}</span>
+                        <span className="pill-chip whitespace-nowrap px-2.5 py-1 text-xs font-semibold">
                           {transaction.category}
                         </span>
                         {!affectsBalance(transaction) && (
-                          <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 rounded text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                            Excluded
+                          <span className="whitespace-nowrap rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                            Excluded from balance
                           </span>
                         )}
                       </div>
@@ -369,7 +377,7 @@ export function UpcomingPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-gray-500 dark:text-gray-400 text-sm">No transactions on this day.</p>
+                <p className="text-sm text-[color:var(--muted)]">No transactions on this day.</p>
               )}
             </CardContent>
           </Card>

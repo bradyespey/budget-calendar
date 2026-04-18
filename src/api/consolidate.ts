@@ -1,6 +1,6 @@
 // API function to call the consolidateData Firebase function
 import { httpsCallable } from 'firebase/functions';
-import { functions } from './firebase';
+import { functions } from '../lib/firebaseConfig';
 
 export async function consolidateData() {
   const consolidateFunction = httpsCallable(functions, 'consolidateData');

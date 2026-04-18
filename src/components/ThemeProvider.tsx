@@ -20,6 +20,24 @@ const initialState: ThemeProviderState = {
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 
+function resolveTheme(theme: Theme) {
+  if (theme !== 'system') {
+    return theme
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+function applyTheme(theme: Theme) {
+  const root = window.document.documentElement
+  const resolvedTheme = resolveTheme(theme)
+
+  root.classList.remove('light', 'dark')
+  root.classList.add(resolvedTheme)
+  root.dataset.theme = resolvedTheme
+  root.style.colorScheme = resolvedTheme
+}
+
 export function ThemeProvider({
   children,
   defaultTheme = 'system',
@@ -31,46 +49,17 @@ export function ThemeProvider({
   )
 
   useEffect(() => {
-    const root = window.document.documentElement
-
-    // Force remove both classes
-    root.classList.remove("light", "dark")
-
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light"
-
-      // Only add dark class if system theme is dark
-      if (systemTheme === "dark") {
-        root.classList.add("dark")
-      }
-      return
-    }
-
-    // Only add dark class if theme is dark
-    if (theme === "dark") {
-      root.classList.add("dark")
-    }
+    applyTheme(theme)
   }, [theme])
 
-  // Listen for system theme changes when theme is "system"
   useEffect(() => {
-    if (theme !== "system") return
+    if (theme !== 'system') return
 
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-    const handleChange = () => {
-      const root = window.document.documentElement
-      root.classList.remove("light", "dark")
-      const systemTheme = mediaQuery.matches ? "dark" : "light"
-      if (systemTheme === "dark") {
-        root.classList.add("dark")
-      }
-    }
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleChange = () => applyTheme('system')
 
-    mediaQuery.addEventListener("change", handleChange)
-    return () => mediaQuery.removeEventListener("change", handleChange)
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
   }, [theme])
 
   const value = {
@@ -91,6 +80,6 @@ export function ThemeProvider({
 export const useTheme = () => {
   const context = useContext(ThemeProviderContext)
   if (context === undefined)
-    throw new Error("useTheme must be used within a ThemeProvider")
+    throw new Error('useTheme must be used within a ThemeProvider')
   return context
 }

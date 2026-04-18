@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { CombinedTransaction } from './useTransactions';
 
-export type SortField = 'name' | 'dueDate' | 'frequency' | 'account' | 'accountType' | 'category' | 'amount' | 'source' | 'note';
+export type SortField = 'name' | 'dueDate' | 'frequency' | 'account' | 'accountType' | 'category' | 'amount' | 'source' | 'notes';
 export type SortDirection = 'asc' | 'desc';
 
 export function useTransactionFilters(transactions: CombinedTransaction[]) {
@@ -14,7 +14,7 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
   const [accountTypeFilter, setAccountTypeFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
-  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortField, setSortField] = useState<SortField>('dueDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   // Filter and sort transactions
@@ -22,7 +22,7 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
     let filtered = transactions.filter(transaction => {
       const matchesSearch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            transaction.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (transaction.note && transaction.note.toLowerCase().includes(searchTerm.toLowerCase()));
+                           (transaction.notes && transaction.notes.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesFrequency = !frequencyFilter || transaction.frequency.toLowerCase().includes(frequencyFilter.toLowerCase());
       const matchesAccount = !accountFilter || transaction.account.toLowerCase().includes(accountFilter.toLowerCase());
       const matchesAccountType = !accountTypeFilter || (transaction.accountType && transaction.accountType.toLowerCase().includes(accountTypeFilter.toLowerCase()));
@@ -59,7 +59,11 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
   // Get unique values for filters
   const uniqueFrequencies = [...new Set(transactions.map(t => t.frequency))].sort();
   const uniqueAccounts = [...new Set(transactions.map(t => t.account).filter(a => a !== '—'))].sort();
-  const uniqueAccountTypes = [...new Set(transactions.map(t => t.accountType).filter(a => a && a !== '—'))].sort();
+  const uniqueAccountTypes = [...new Set(
+    transactions
+      .map((transaction) => transaction.accountType)
+      .filter((accountType): accountType is string => Boolean(accountType && accountType !== '—'))
+  )].sort();
   const uniqueCategories = [...new Set(transactions.map(t => t.category))].sort();
 
   // Reset filters
@@ -70,7 +74,7 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
     setAccountTypeFilter('');
     setCategoryFilter('');
     setSourceFilter('');
-    setSortField('name');
+    setSortField('dueDate');
     setSortDirection('asc');
   };
 
@@ -135,5 +139,3 @@ export function useTransactionFilters(transactions: CombinedTransaction[]) {
     handleFilterClick
   };
 }
-
-

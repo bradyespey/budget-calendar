@@ -178,6 +178,9 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
               <Button
                 onClick={() => setIsAdding(true)}
                 leftIcon={<Plus size={16} />}
+                variant="outline"
+                size="md"
+                className="min-w-[116px] justify-center"
               >
                 Add
               </Button>
@@ -209,6 +212,8 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                   onClick={handleAddCategory}
                   leftIcon={<Check size={16} />}
                   size="sm"
+                  variant="outline"
+                  className="min-w-[92px] justify-center"
                 >
                   Add
                 </Button>
@@ -234,7 +239,7 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
           ) : (
             <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
               {/* Table Header */}
-              <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <div className="hidden bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sm:block">
                 <div className="grid grid-cols-12 gap-4 px-6 py-3">
                   <div className="col-span-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Category Name
@@ -257,8 +262,8 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                   >
                     {editingId === category.id ? (
                       // Edit mode
-                      <div className="grid grid-cols-12 gap-4 px-6 py-4">
-                        <div className="col-span-7 flex items-center">
+                      <div className="space-y-3 px-4 py-4 sm:grid sm:grid-cols-12 sm:gap-4 sm:space-y-0 sm:px-6">
+                        <div className="sm:col-span-7 flex items-center">
                           <Input
                             value={editingName}
                             onChange={(e) => setEditingName(e.target.value)}
@@ -271,14 +276,15 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                                 handleCancelEdit();
                               }
                             }}
-                            className="max-w-xs"
+                            className="w-full sm:max-w-xs"
                           />
                         </div>
-                        <div className="col-span-5 flex items-center justify-end gap-2">
+                        <div className="sm:col-span-5 flex flex-wrap items-center justify-start gap-2 sm:justify-end">
                           <Button
                             onClick={handleSaveEdit}
                             leftIcon={<Check size={14} />}
                             size="sm"
+                            className="min-w-[92px] justify-center"
                           >
                             Save
                           </Button>
@@ -287,6 +293,7 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                             variant="outline"
                             leftIcon={<X size={14} />}
                             size="sm"
+                            className="min-w-[92px] justify-center"
                           >
                             Cancel
                           </Button>
@@ -294,13 +301,13 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                       </div>
                     ) : (
                       // View mode
-                      <div className="grid grid-cols-12 gap-4 px-6 py-4">
-                        <div className="col-span-4 flex items-center">
+                      <div className="space-y-3 px-4 py-4 sm:grid sm:grid-cols-12 sm:gap-4 sm:space-y-0 sm:px-6">
+                        <div className="sm:col-span-4 flex items-center">
                           <span className="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">
                             {category.name}
                           </span>
                         </div>
-                        <div className="col-span-3 flex items-center">
+                        <div className="sm:col-span-3 flex items-center">
                           {typeof category.transaction_count === 'number' && (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               category.transaction_count === 0 
@@ -314,12 +321,13 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                             </span>
                           )}
                         </div>
-                        <div className="col-span-5 flex items-center justify-end gap-2">
+                        <div className="sm:col-span-5 flex flex-wrap items-center justify-start gap-2 sm:justify-end">
                           <Button
                             onClick={() => handleStartEdit(category)}
                             variant="outline"
                             size="sm"
                             leftIcon={<Edit2 size={14} />}
+                            className="min-w-[92px] justify-center"
                           >
                             Edit
                           </Button>
@@ -332,7 +340,7 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                               category.transaction_count === 0
                                 ? 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900 border-red-200 dark:border-red-800'
                                 : 'text-gray-400 cursor-not-allowed opacity-50'
-                            }`}
+                            } min-w-[92px] justify-center`}
                             disabled={category.transaction_count !== 0}
                             title={category.transaction_count !== 0 ? `Cannot delete: ${category.transaction_count} transaction(s) using this category` : 'Delete category'}
                           >

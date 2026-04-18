@@ -1,5 +1,7 @@
 //src/components/ui/Card.tsx
 
+import clsx from 'clsx'
+
 export interface CardProps {
   children: React.ReactNode
   className?: string
@@ -7,43 +9,38 @@ export interface CardProps {
 
 export const Card: React.FC<CardProps> = ({ children, className = '' }) => (
   <div
-    className={[
-      'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100',
-      'rounded-xl shadow-lg hover:shadow-xl border border-gray-200/50 dark:border-gray-700/50',
-      'transition-all duration-200',
-      className
-    ].join(' ')}
+    className={clsx('surface-card transition-transform duration-200', className)}
   >
     {children}
   </div>
 )
 
 export const CardHeader: React.FC<CardProps> = ({ children, className = '' }) => (
-  <div className={['p-5 sm:p-6 border-b border-gray-200 dark:border-gray-700', className].join(' ')}>
+  <div className={clsx('border-b px-5 py-5 sm:px-6 surface-divider', className)}>
     {children}
   </div>
 )
 
 export const CardTitle: React.FC<CardProps> = ({ children, className = '' }) => (
-  <h3 className={['font-bold text-lg sm:text-xl text-gray-900 dark:text-gray-100', className].join(' ')}>
+  <h3 className={clsx('display-copy text-[1.45rem] font-semibold text-[color:var(--text)]', className)}>
     {children}
   </h3>
 )
 
 export const CardDescription: React.FC<CardProps> = ({ children, className = '' }) => (
-  <p className={['text-sm text-gray-500 dark:text-gray-400 mt-1', className].join(' ')}>
+  <p className={clsx('mt-2 text-sm leading-6 text-[color:var(--muted)]', className)}>
     {children}
   </p>
 )
 
 export const CardContent: React.FC<CardProps> = ({ children, className = '' }) => (
-  <div className={['p-5 sm:p-6', className].join(' ')}>
+  <div className={clsx('p-5 sm:p-6', className)}>
     {children}
   </div>
 )
 
 export const CardFooter: React.FC<CardProps> = ({ children, className = '' }) => (
-  <div className={['p-5 sm:p-6 border-t border-gray-200 dark:border-gray-700', className].join(' ')}>
+  <div className={clsx('border-t p-5 sm:p-6 surface-divider', className)}>
     {children}
   </div>
 )

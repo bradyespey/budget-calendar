@@ -95,7 +95,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
         return;
       }
 
-      const monarchApiUrl = "https://api.monarchmoney.com/graphql";
+      const monarchApiUrl = "https://api.monarch.com/graphql";
       const headers = {
         "Content-Type": "application/json",
         "Authorization": `Token ${monarchToken}`,

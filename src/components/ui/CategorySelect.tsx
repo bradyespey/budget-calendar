@@ -1,7 +1,7 @@
 //src/components/ui/CategorySelect.tsx
 
 import { useState, useEffect } from 'react';
-import { Plus, Check, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { Select } from './Select';
 import { Input } from './Input';
 import { Button } from './Button';
@@ -14,6 +14,7 @@ interface CategorySelectProps {
   onChange: (value: string) => void;
   error?: string;
   helperText?: string;
+  required?: boolean;
 }
 
 export function CategorySelect({ 
@@ -22,7 +23,8 @@ export function CategorySelect({
   value, 
   onChange, 
   error, 
-  helperText 
+  helperText,
+  required
 }: CategorySelectProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -174,6 +176,7 @@ export function CategorySelect({
       onChange={handleSelectChange}
       error={error}
       helperText={helperText}
+      required={required}
       options={[
         { value: '', label: 'Select a category...' },
         ...categoryOptions,

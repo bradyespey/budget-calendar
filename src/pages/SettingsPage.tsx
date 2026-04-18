@@ -1,7 +1,7 @@
 //src/pages/SettingsPage.tsx
 
 import { useState, useRef, useEffect } from 'react'
-import { Loader, Settings, Save, AlertTriangle, Sun, Moon, Monitor, Calendar } from 'lucide-react'
+import { Loader, Settings, Save, Calendar } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Button } from '../components/ui/Button'
 import {
@@ -18,9 +18,7 @@ import {
   getLastSyncTime,
 } from '../api/accounts'
 import { triggerManualRecalculation } from '../api/projections'
-import { syncCalendar, getSettings, updateSettings, getFunctionTimestamps, saveFunctionTimestamp } from '../api/firebase'
-import { getHighLowProjections } from '../api/projections'
-import { format, parseISO } from 'date-fns'
+import { syncCalendar, getSettings, updateSettings, getFunctionTimestamps, saveFunctionTimestamp, refreshRecurringTransactions } from '../api/firebase'
 import { useBalance } from '../context/BalanceContext'
 import { useTheme } from '../components/ThemeProvider'
 import { useLocation } from 'react-router-dom'
@@ -29,6 +27,7 @@ import { getIconBackupInfo } from '../api/icons'
 import { QuickActionButtons } from '../components/QuickActions'
 import { MaintenanceActions } from '../components/MaintenanceActions'
 import { useMaintenanceActions } from '../hooks/useMaintenanceActions'
+import { ThemeToggleMenu } from '../components/ThemeToggleMenu'
 
 type CurrencyInputProps = React.ComponentProps<typeof Input> & {
   value: string;
@@ -64,7 +63,7 @@ export function SettingsPage() {
   const [backupInfo, setBackupInfo] = useState<{ hasBackup: boolean; backupCount?: number; timestamp?: string; message: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { setBalance, setLastSync } = useBalance()
-  const { theme, setTheme } = useTheme()
+  const { theme } = useTheme()
   const [localProjectionDays, setLocalProjectionDays] = useState<number | null>(null)
   const [localBalanceThreshold, setLocalBalanceThreshold] = useState<number>(1000)
   const [saveMessage] = useState('')
@@ -73,22 +72,19 @@ export function SettingsPage() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const location = useLocation()
 
-  // State for focus
-  const [balanceThresholdFocused, setBalanceThresholdFocused] = useState(false);
-  const [manualOverrideFocused, setManualOverrideFocused] = useState(false);
   const [balanceThresholdInput, setBalanceThresholdInput] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [runAllStep, setRunAllStep] = useState<string | null>(null);
-  const [thresholdBreach, setThresholdBreach] = useState<{ date: string; balance: number } | null>(null);
 
   // State for function last run timestamps
   const [functionTimestamps, setFunctionTimestamps] = useState<{
     refreshAccounts?: Date;
+    refreshRecurringTransactions?: Date;
     updateBalance?: Date;
     budgetProjection?: Date;
     syncCalendar?: Date;
     clearCalendars?: Date;
-    generateTransactionIcons?: Date;
+    generateIcons?: Date;
     resetAllTransactionIcons?: Date;
     backupTransactionIcons?: Date;
     restoreTransactionIcons?: Date;
@@ -116,7 +112,7 @@ export function SettingsPage() {
   }
 
   // Function to save timestamp for a specific function
-  async function saveFunctionTimestampLocal(functionName: keyof typeof functionTimestamps) {
+  async function saveFunctionTimestampLocal(functionName: string) {
     const now = new Date();
     const newTimestamps = { ...functionTimestamps, [functionName]: now };
     setFunctionTimestamps(newTimestamps);
@@ -131,12 +127,10 @@ export function SettingsPage() {
 
   // Initialize maintenance actions hook
   const maintenanceActions = useMaintenanceActions({
-    busy,
     setBusy,
     showNotification,
     saveFunctionTimestamp: saveFunctionTimestampLocal,
     saveSettings,
-    activeAction,
     setActiveAction,
     backupInfo,
     setBackupInfo,
@@ -180,7 +174,7 @@ export function SettingsPage() {
         setLocalProjectionDays(settings.projectionDays ?? 7)
         setLocalBalanceThreshold(settings.balanceThreshold ?? 1000)
         setManualBalanceOverride(settings.manualBalanceOverride?.toString() ?? '')
-        setCalendarMode(settings.calendarMode ?? 'dev')
+        setCalendarMode((settings.calendarMode ?? 'dev') as 'prod' | 'dev')
         setBalanceThresholdInput((settings.balanceThreshold ?? 1000).toString())
       } catch (error) {
         console.error('Error fetching settings:', error);
@@ -203,13 +197,6 @@ export function SettingsPage() {
     
     initializeData();
   }, [])
-
-  // Keep balanceThresholdInput in sync with localBalanceThreshold when not focused
-  useEffect(() => {
-    if (!balanceThresholdFocused && balanceThresholdInput !== null) {
-      setBalanceThresholdInput(localBalanceThreshold.toString());
-    }
-  }, [localBalanceThreshold, balanceThresholdFocused]);
 
   useEffect(() => {
     setNotification(null);
@@ -282,7 +269,6 @@ export function SettingsPage() {
       await saveFunctionTimestampLocal('syncCalendar');
       
       if (result.success) {
-        const totalEvents = (result.eventsCreated || 0) + (result.eventsUpdated || 0) + (result.eventsDeleted || 0);
         showNotification(`Calendar sync completed for ${calendarMode} calendar. Created ${result.eventsCreated || 0}, updated ${result.eventsUpdated || 0}, deleted ${result.eventsDeleted || 0} events.`, 'success');
       } else {
         showNotification(`Calendar sync failed: ${result.message}`, 'error');
@@ -302,22 +288,14 @@ export function SettingsPage() {
     try {
       await saveSettings();
       
-      // Call the main refresh function with accurate Monarch data
-      const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshTransactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to refresh transactions: ${response.status}`);
-      }
-      
-      const result = await response.json();
+      const result = await refreshRecurringTransactions();
       
       await saveFunctionTimestampLocal('refreshRecurringTransactions');
       
-      showNotification(`Transactions refreshed. Stored ${result.count} transactions.`, 'success');
+      showNotification(
+        `Transactions refreshed. Stored ${result.storedCount ?? 0} transactions${typeof result.deletedCount === 'number' ? ` and deleted ${result.deletedCount}` : ''}.`,
+        'success'
+      );
     } catch (e: any) {
       showNotification(`Error refreshing transactions: ${e.message}`, 'error');
     } finally {
@@ -422,14 +400,8 @@ export function SettingsPage() {
       setRunAllStep('Step 4/7: Refreshing Transactions...');
       try {
         await saveSettings();
-        const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshTransactions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
-        });
-        if (response.ok) {
-          await saveFunctionTimestampLocal('refreshRecurringTransactions');
-        }
+        await refreshRecurringTransactions();
+        await saveFunctionTimestampLocal('refreshRecurringTransactions');
       } catch (e) {
         // ignore error
       }
@@ -482,12 +454,6 @@ export function SettingsPage() {
     }
   }
 
-  // Helper to format as $X,XXX (no cents)
-  function formatCurrencyNoCents(val: string | number) {
-    if (val === "" || val === null || isNaN(Number(val))) return "";
-    return "$" + Number(val).toLocaleString("en-US", { maximumFractionDigits: 0 });
-  }
-
   // Helper to get contextual feedback for busy state
   function getBusyMessage() {
     if (activeAction === 'refresh') return 'Refreshing Accounts...';
@@ -507,10 +473,22 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-5xl space-y-6">
       {/* Header */}
       <PageHeader
+        eyebrow="Settings"
         title="Settings"
+        description="Adjust projection behavior, run manual automation steps, manage transaction metadata, and keep your workspace theme and calendars aligned."
+        actions={(
+          <Button
+            onClick={handleSave}
+            className="min-w-[120px]"
+            disabled={busy}
+          >
+            {busy && activeAction === 'save' ? <Loader className="animate-spin" size={18} /> : <Save size={18} />}
+            Save
+          </Button>
+        )}
         helpSections={[
           {
             title: 'Quick Actions',
@@ -540,6 +518,12 @@ export function SettingsPage() {
             ],
           },
         ]}
+        stats={[
+          { label: 'Projection days', value: `${localProjectionDays ?? 7}`, tone: 'accent' },
+          { label: 'Low balance alert', value: `$${localBalanceThreshold.toLocaleString()}`, tone: 'danger' },
+          { label: 'Calendar target', value: calendarMode === 'prod' ? 'Main' : 'Test', tone: 'warning' },
+          { label: 'Theme', value: theme.charAt(0).toUpperCase() + theme.slice(1), tone: 'success' },
+        ]}
       />
       
       {busy && (
@@ -548,25 +532,14 @@ export function SettingsPage() {
           <span className="text-blue-600 dark:text-blue-200 font-semibold">{getBusyMessage()}</span>
         </div>
       )}
-      {/* Save button */}
-      <div className="flex justify-end mb-6">
-        <Button
-          onClick={handleSave}
-          className="inline-flex items-center gap-2 px-6 py-2 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow min-w-[100px] w-auto"
-          disabled={busy}
-        >
-          {busy && activeAction === 'save' ? <Loader className="animate-spin" size={18} /> : <Save size={18} />}
-          Save
-        </Button>
-      </div>
       {saveMessage && <div className="mb-2">{saveMessage}</div>}
 
       {notification && (
         <div
-          className={`mb-4 p-4 rounded border-l-4 ${
+          className={`mb-4 rounded-[22px] border p-4 ${
             notification.type === 'success'
-              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-900 dark:text-blue-100'
-              : 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-900 dark:text-red-100'
+              ? 'border-[color:var(--success-soft)] bg-[color:var(--success-soft)] text-[color:var(--success)]'
+              : 'border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] text-[color:var(--danger)]'
           }`}
         >
           {notification.message}
@@ -746,31 +719,11 @@ export function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant={theme === 'light' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTheme('light')}
-              >
-                <Sun className="mr-2 h-4 w-4" />
-                Light
-              </Button>
-              <Button
-                variant={theme === 'dark' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTheme('dark')}
-              >
-                <Moon className="mr-2 h-4 w-4" />
-                Dark
-              </Button>
-              <Button
-                variant={theme === 'system' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTheme('system')}
-              >
-                <Monitor className="mr-2 h-4 w-4" />
-                System
-              </Button>
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-sm text-[color:var(--muted)]">
+                Current theme: <span className="font-semibold text-[color:var(--text)]">{theme.charAt(0).toUpperCase() + theme.slice(1)}</span>
+              </div>
+              <ThemeToggleMenu align="end" />
             </div>
           </CardContent>
         </Card>
@@ -789,7 +742,7 @@ export function SettingsPage() {
                   href="https://calendar.google.com/calendar/u/0/r/agenda"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  className="inline-flex h-11 items-center gap-2 rounded-full border border-[color:var(--line-strong)] bg-[color:var(--surface)] px-5 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface-hover)]"
                 >
                   <Calendar className="h-4 w-4" />
                   Test Calendar
@@ -803,7 +756,7 @@ export function SettingsPage() {
                   href="https://calendar.google.com/calendar/u/1/r/agenda"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  className="inline-flex h-11 items-center gap-2 rounded-full border border-[color:var(--line-strong)] bg-[color:var(--surface)] px-5 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface-hover)]"
                 >
                   <Calendar className="h-4 w-4" />
                   Main Calendar

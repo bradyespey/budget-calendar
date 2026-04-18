@@ -136,7 +136,10 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
       }
       return;
     }
-    if (formData.frequency !== 'one-time' && (!formData.repeats_every || formData.repeats_every === '' || formData.repeats_every <= 0)) {
+    if (
+      formData.frequency !== 'one-time' &&
+      (!formData.repeats_every || formData.repeats_every === '' || Number(formData.repeats_every) <= 0)
+    ) {
       const repeatsInput = e.currentTarget.querySelector('input[name="repeats_every"]') as HTMLInputElement;
       if (repeatsInput) {
         repeatsInput.setCustomValidity('Repeats Every must be greater than 0');
@@ -404,5 +407,4 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
     </div>
   );
 }
-
 

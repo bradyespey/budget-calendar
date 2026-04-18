@@ -2,322 +2,154 @@
 **Scope**: This README replaces prior selected overview docs
 
 ## Overview
-Full-stack financial forecasting web app that syncs real-time checking account balances via Monarch Money API, calculates projected cash flow, and displays upcoming bills/income in a calendar UI. Features intelligent recurring transaction comparison between Monarch Money and manual bills with exact matching validation, frequency-aware date comparison, comprehensive sorting functionality, automatic weekend/holiday adjustment, and unified data management with intelligent refresh logic. Supports manual updates and automated nightly workflows.
-
-**Demo Mode**: Public access with comprehensive mock financial data showcasing all features. Authenticated users see their real financial data after Google sign-in.
-
-Originally built using Python, Flask, Google Apps Script, and Google Sheets, the system has since been fully rebuilt using React, Firebase, and modern cloud-native tooling.
+Budget Calendar is a personal financial forecasting app for checking-balance planning. It combines Monarch-derived balances and recurring transactions, manual transactions, projection logic, and Google Calendar sync so upcoming bills, income, and projected balance changes stay in one workspace.
 
 ## Live and Admin
-- 🌐 **App URL**: https://budget.theespeys.com
-- 🔥 **Firebase Console**: budgetcalendar-e6538
-- 🚀 **Netlify Dashboard**: budgetcalendar
-- ⏰ **GitHub Actions**: Automated nightly runs at 7:30 AM CT + weekly database backup (Tuesday 12:00 AM CT)
-- 🐍 **Flask API**: https://api.theespeys.com
+- App URL: `https://budget.theespeys.com`
+- Frontend hosting: Netlify
+- Backend: Firebase Auth, Firestore, and Cloud Functions
+- External refresh endpoint: Flask API used by `refreshAccounts`
+- Monitoring:
+  - Netlify build watch: `npm run deploy:watch`
+  - Firebase logs: `firebase functions:log --only <functionName>`
+  - GitHub Actions: `.github/workflows/`
 
 ## Tech Stack
-- ⚛️ **Frontend**: React 18 + Vite + TypeScript + Tailwind CSS
-- 🔥 **Backend**: Firebase (Firestore, Cloud Functions, Auth)
-- 🔐 **Auth**: Firebase Google OAuth (restricted: YOUR_EMAIL, YOUR_EMAIL_2, YOUR_EMAIL_3)
-- 💰 **External API**: Monarch Money unofficial API [(docs)](https://github.com/hammem/monarchmoney)
-- 🚀 **Hosting**: Netlify (frontend), Firebase (backend)
-- ⚙️ **Automation**: GitHub Actions for nightly scheduled jobs
+- Frontend: React 18, Vite, TypeScript, Tailwind CSS
+- Backend: Firebase Functions v1, Firestore, Firebase Auth
+- Forecasting data: Monarch Money unofficial API
+- Calendar sync: Google Calendar API via Firebase Functions
+- Automation: GitHub Actions + Netlify deploy pipeline
 
 ## Quick Start
 ```bash
-git clone https://github.com/bradyespey/budget-calendar
-cd Budget
+git clone https://github.com/bradyespey/budget-calendar.git
+cd BudgetCalendar
 npm install
-
-# Install 1Password CLI (if not already installed)
-brew install --cask 1password-cli
-
-# Set up 1Password Environment (see Environment section below)
 npm run dev
 ```
 
 ## Environment
+Local frontend env is loaded through 1Password Developer Environments.
 
-**All projects use 1Password Developer Environments for local environment variables.** This allows seamless setup on any computer without managing local `.env` files.
-
-### 1Password Setup
-
-1. **Enable 1Password Developer**:
-   - Open 1Password desktop app
-   - Settings → Developer → Turn on "Show 1Password Developer experience"
-
-2. **Create Environment**:
-   - Go to Developer → Environments (Espey Family account)
-   - Create new environment: `Budget Calendar`
-   - Import `.env` file or add variables manually
-
-3. **Install 1Password CLI**:
-   ```bash
-   brew install --cask 1password-cli
-   ```
-
-4. **Run Project**:
-   ```bash
-   npm run dev
-   ```
-   - The `dev` script uses `op run --env-file=.env -- vite` to automatically load variables from 1Password
-   - No local `.env` file needed
-
-### Required Environment Variables
-
-All variables should be stored in your 1Password Environment:
+Required local env placeholders:
 
 ```env
-# Firebase Configuration
-VITE_FIREBASE_API_KEY=YOUR_API_KEY
-VITE_FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
-VITE_FIREBASE_STORAGE_BUCKET=YOUR_PROJECT.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=YOUR_SENDER_ID
-VITE_FIREBASE_APP_ID=YOUR_APP_ID
-
-# Application Configuration
-VITE_ALLOWED_EMAILS=YOUR_EMAIL,YOUR_EMAIL_2,YOUR_EMAIL_3
-VITE_REFRESH_ACCOUNTS_API_URL=https://api.theespeys.com
-VITE_REFRESH_ACCOUNTS_API_AUTH=YOUR_AUTH
-VITE_SITE_URL=https://budget.theespeys.com
-
-# Monarch Money API
-API_AUTH=YOUR_AUTH
-MONARCH_EMAIL=YOUR_EMAIL
-MONARCH_PASSWORD=YOUR_PASSWORD
-MONARCH_MFA_SECRET=YOUR_SECRET
-MONARCH_CHASE_CHECKING_ACCOUNT_ID=YOUR_ACCOUNT_ID
-MONARCH_SAVINGS_CHECKING_ACCOUNT_ID=YOUR_ACCOUNT_ID
-MONARCH_TOKEN=YOUR_TOKEN
-
-# OpenAI Configuration
-VITE_OPENAI_API_KEY=YOUR_OPENAI_KEY
-VITE_OPENAI_MODEL=gpt-4o-mini
-
-# Debug
+VITE_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN=YOUR_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET=YOUR_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID=YOUR_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID=YOUR_FIREBASE_APP_ID
+VITE_ALLOWED_EMAILS=YOUR_ALLOWED_EMAILS
+VITE_REFRESH_ACCOUNTS_API_URL=YOUR_REFRESH_ACCOUNTS_API_URL
+VITE_REFRESH_ACCOUNTS_API_AUTH=YOUR_REFRESH_ACCOUNTS_API_AUTH
+VITE_SITE_URL=YOUR_SITE_URL
 VITE_DEBUG_MODE=true
 ```
 
-## Run Modes (Debug, Headless, Profiles)
-- 🐛 **Debug Mode**: Set `HEADLESS_MODE=False` in Flask API `.env` to see Chrome browser for debugging
-- 👻 **Headless Mode**: Set `HEADLESS_MODE=True` in Flask API `.env` for normal operation (Chrome hidden)
-- 🌐 **Chrome Profiles**: Uses persistent Chrome profile (`chrome_profile/monarch_profile`) for fast Monarch Money login with automatic fallback to credential + TOTP login
+Important notes:
+- Do not expose paid provider keys through `VITE_*`
+- `refreshAccounts` depends on the external refresh API auth/env above
+- `updateBalance` and `refreshTransactions` currently use Firebase runtime config, not browser env vars
+
+Firebase runtime config still required for live Functions:
+
+```bash
+firebase experiments:enable legacyRuntimeConfigCommands
+firebase functions:config:set \
+  monarch.token="YOUR_MONARCH_TOKEN" \
+  monarch.checking_id="YOUR_CHECKING_ACCOUNT_ID" \
+  monarch.savings_id="YOUR_SAVINGS_ACCOUNT_ID"
+```
+
+Google Calendar functions also require runtime config for:
+- `google.service_account_json`
+- dev/prod bills calendar IDs
+- dev/prod balance calendar IDs
+
+## Run Modes
+- Dev app: `npm run dev`
+- Local frontend only: `npm run dev:local`
+- Type check: `npm run type-check`
+- Production build: `npm run build`
 
 ## Scripts and Ops
-- **Development**: `npm run dev` - Start local development server
-- **Build**: `npm run build` - Build for production
-- **Deploy Functions**: `npx firebase deploy --only functions`
-- **Check Automation**: `npm run check:automation` - Quick status check
-- **Manual Trigger**: `gh workflow run budget-nightly.yml`
-- **Backup Trigger**: `gh workflow run backup.yml` - Manual database backup
+- Dev: `npm run dev`
+- Build: `npm run build`
+- Type check: `npm run type-check`
+- Automation check: `npm run check:automation`
+- Trigger nightly workflow: `npm run trigger:nightly`
+- Watch Netlify deploy after push: `npm run deploy:watch`
 
-### Automation Monitoring
-**Quick Check:**
-```bash
-npm run check:automation
-```
-
-**Manual Commands:**
-```bash
-# Check GitHub Actions runs
-gh run list --workflow="budget-nightly.yml"
-
-# View Firebase Functions logs
-firebase functions:log --only runAll
-
-# Trigger manual run
-gh workflow run budget-nightly.yml
-
-# Test function directly
-curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/runAll" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-
-**What the Automation Does (Daily at 7:30 AM CT):**
-1. **Refresh Accounts** - Calls Flask API to refresh Monarch Money accounts
-2. **Update Balance** - Fetches latest Chase balance from Monarch
-3. **Run Projections** - Calculates future balance forecasts
-4. **Sync Calendar** - Updates Google Calendar with bills and projections
-5. **Send Alerts** - Emails success/failure notifications
-
-### Firebase Functions (us-central1)
-**Quick Actions:**
-- **refreshAccounts**: Triggers Monarch account refresh via Flask API
-- **refreshTransactions**: Intelligent refresh of Monarch transactions with smart comparison (create/update/delete only when needed)
-- **updateBalance**: Updates checking, savings, and credit card balances from Monarch API with historical tracking
-- **budgetProjection**: Complete projection calculation with complex scheduling logic and end date support for manual transactions
-- **syncCalendar**: Google Calendar integration with separate bills/balance calendars, intelligent change detection, comma-formatted amounts, improved error handling for service account authentication, and disabled all-day alerts for Balance and Bills events
-- **runAll**: Orchestrates full nightly workflow automation with automatic timestamp updates
-
-**Maintenance:**
-- **validateProjections**: Cross-references Transactions with Upcoming projections to find missing bills, supports all frequency types
-- **clearCalendars**: Clears all events from both dev and prod calendars (bills and balance)
-- **generateIcons**: Creates icons for transactions using brand mapping and AI fallback
-- **resetAllIcons**: Bulk removal of generated icons while preserving custom ones (supports preserveCustom option)
-- **backupIcons**: Saves all custom icons to Firebase storage for backup with proper field mapping
-- **restoreIcons**: Restores icons from Firebase backup with error handling and count reporting
-- **getIconBackupInfo**: Returns backup status and timestamp information
-
-### Flask API Endpoints (api.theespeys.com)
-- **refresh_accounts**: Triggers Monarch account refresh via Selenium
-- **chase_balance**: Fetches and saves latest Chase balance from Monarch
-- **transactions_review**: Returns count of items needing review
-
-### Export Endpoints (Monarch Money Integration)
-- **GET /export/categories**: CSV export of all transaction categories
-- **GET /export/tags**: CSV export of all transaction tags
-- **GET /export/transactions**: CSV export of transactions (configurable date range)
-- **GET /export/all**: JSON export of everything for Custom GPT integration
+Key Functions:
+- `refreshAccounts`: calls the external refresh API
+- `updateBalance`: pulls checking, savings, and credit-card totals from Monarch and stores account snapshots
+- `refreshTransactions`: refreshes recurring Monarch streams into Firestore
+- `budgetProjection`: calculates projected checking balances with business-day adjustments
+- `syncCalendar`: syncs bills and projected balances to Google Calendar
+- `clearCalendars`: clears future events from configured calendars
+- `runAll`: orchestrates the nightly automation flow
 
 ## Deploy
-- **Frontend**: Automatic via GitHub integration to Netlify
-- **Functions**: `npx firebase deploy --only functions` (requires Node.js 20 runtime, configured in `firebase.json`)
-- **Publish Directory**: `dist`
-- **Domains**: budget.theespeys.com (primary), budgetcalendar.netlify.app
-- **Build Monitoring**: `npm run deploy:watch` (pushes to GitHub + watches Netlify build completion)
-- **Google Calendar API**: Must be enabled in Google Cloud Console (project: budgetcalendar-e6538) for calendar sync to work
+- Frontend deploys from GitHub to Netlify
+- Functions deploy separately through Firebase
+
+```bash
+npx firebase deploy --only functions
+```
+
+Build monitoring:
+```bash
+npm run deploy:watch
+```
+
+Important:
+- `deploy:watch` must be read to completion
+- treat any `Build failed` output or error lines as a failed deploy even if the watcher prints a success-style summary
 
 ## App Pages / Routes
-- **Dashboard**: Checking, savings, and credit card balances with historical trend chart, projected future balances, low balance alerts, spending patterns, and comprehensive financial overview
-- **Transactions**: Advanced management with live Monarch data sync, clickable filtering, enhanced search, mobile-optimized layout, comprehensive sorting, sticky headers, clean UI with uniform styling, optimized form performance, category icons, merchant logos, manual icon input, and end date support for manual transactions
-- **Recurring**: Intelligent comparison between Monarch Money recurring transactions and manual bills with exact matching validation, frequency-aware date comparison, and comprehensive sorting functionality
-- **Upcoming**: Calendar view of upcoming bills, income, projected balances with real-time search filtering by transaction name and category
-- **Settings**: Projection settings, theme selection, manual triggers, import/export, maintenance functions with admin timestamps, calendar links, and icon management
+- `/dashboard`: balances, alerts, forecast summary, savings trend, cash flow
+- `/transactions`: recurring dataset, filters, edit/create manual transactions, category management
+- `/upcoming`: 7-day projection view, transaction search, balance-impact vs excluded display
+- `/settings`: projection settings, quick actions, maintenance actions, calendar controls
+- `/login`: restricted sign-in and demo access
 
 ## Directory Map
+```text
+BudgetCalendar/
+├── src/
+│   ├── components/
+│   ├── hooks/
+│   ├── pages/
+│   ├── api/
+│   ├── utils/
+│   └── types/
+├── functions/
+│   └── src/functions/
+├── scripts/
+├── .github/workflows/
+├── docs/
+├── netlify.toml
+└── package.json
 ```
-Budget/
-├── src/                    # React frontend
-│   ├── components/        # UI components (Button, Card, Input, etc)
-│   ├── pages/            # App pages (Dashboard, Transactions, Recurring, Upcoming, Settings)
-│   ├── context/          # Auth and balance context providers
-│   ├── api/              # Firebase function calls and data access
-│   ├── types/            # TypeScript type definitions
-│   └── utils/            # Helper functions and validation
-├── functions/src/         # Firebase Cloud Functions (us-central1)
-├── flask/                 # Flask API server (api.theespeys.com)
-│   ├── app.py            # Main API endpoints
-│   ├── scripts/          # Selenium automation scripts
-│   └── docs/             # Flask-specific documentation
-├── scripts/               # Automation and migration scripts
-├── .github/workflows/     # GitHub Actions automation
-├── netlify.toml          # Netlify configuration
-├── firebase.json         # Firebase configuration
-└── package.json          # Node.js dependencies and scripts
-```
-
-## Historical Context
-- **Platform Migration**: Successfully migrated from Supabase to Firebase in 2024
 
 ## Troubleshooting
-
-### Automation Issues
-**If automation fails:**
-1. Check GitHub Actions logs for workflow issues
-2. Check Firebase Functions logs for function errors
-3. Verify Flask API is running at `api.theespeys.com`
-4. Check Monarch Money credentials and Chrome profile
-
-**Common automation issues:**
-- **Chrome profile expired** - Re-run setup script
-- **Monarch API changes** - Update credentials
-- **Firebase timeout** - Check function memory/timeout settings
-- **Calendar sync fails** - Verify Google Calendar API is enabled in Google Cloud Console and service account has calendar access. Service account JSON must be configured in Firebase Functions config.
-
-### Technical Issues
-- **CORS Issues**: Resolved by using Firebase callable functions (HTTPS onCall)
-- **Function Timeouts**: Large operations use batch processing with 9-minute timeout
-- **Duplicate Events**: Intelligent comparison prevents duplicates, automatic cleanup removes extras
-- **Calendar Clearing**: Fixed pagination and rate limiting - clearCalendars now properly clears all events from today onwards across all 4 calendars in one execution (1.5 min for 105+ events)
-- **Large Syncs**: Fixed rate limiting issues - both clearCalendars and syncCalendar now complete all operations in one pass using proper rate limiting with exponential backoff (no more 10-second timeouts)
-- **Chrome Profile Issues**: Run `setup_chrome_profile.py` to create initial profile for Monarch Money login
-- **Migration Issues**: Use `npm run migrate:dry-run` to test data migration before applying
-- **Monarch API**: Uses GraphQL `Web_GetAllRecurringTransactionItems` with `recurringTransactionStreams` for live amounts, credit card data, merchant logos, category icons, and enhanced transaction metadata
-- **Data Matching**: Zero tolerance amount matching, timezone-safe date comparison, frequency-aware matching with repeats_every logic
-- **Date Range**: Extended queries (today to 1.5 years) capture all yearly transactions, return next immediate upcoming dates matching Monarch UI exactly
-- **Weekend/Holiday Adjustment**: Automatic date adjustment for events - paychecks move to previous business day, bills move to next business day, with US holiday API integration
-- **Performance**: API caching (5-min TTL), React memoization, debounced search, error boundaries prevent app crashes, optimized form state management, fixed infinite Firestore reconnection loop (CPU performance fix)
-- **Loading States**: Fixed infinite loading on Transactions page when using cached data
-- **Monarch Status**: Added reverse matching (bills → Monarch) with visual indicators and status filtering
-- **End Date Support**: Fixed field name mapping between frontend (`end_date`) and database (`endDate`) for proper projection filtering
-- **Node.js Runtime**: Upgraded from Node.js 18 to Node.js 20 (required for Firebase Functions deployment)
-- **Calendar Sync Error Handling**: Improved error logging and handling for Google Calendar API authentication issues, fixed logger serialization errors with URLSearchParams objects
-
-## Supported Transaction Frequencies
-
-The system supports comprehensive frequency types for both manual transactions and Monarch Money imports:
-
-### Core Frequencies
-- **Daily** - Every day
-- **Weekly** - Every week  
-- **Monthly** - Every month
-- **Yearly** - Every year
-- **One-time** - Single occurrence
-
-### Monarch Money Frequencies
-- **Every week** - Weekly recurring
-- **Every 2 weeks** - Bi-weekly recurring
-- **Every 3 weeks** - Every 3 weeks
-- **Every 4 weeks** - Every 4 weeks
-- **Twice a month (1st & 15th)** - Semimonthly
-- **Twice a month (15th & last day)** - Semimonthly mid-end
-- **Every month** - Monthly recurring
-- **Every 2 months** - Every 2 months
-- **Every 3 months** - Every 3 months
-- **Every 4 months** - Every 4 months
-- **Every 6 months** - Every 6 months
-- **Every year** - Yearly recurring
-
-### Custom Intervals
-All frequencies support custom "repeats every" multipliers:
-- **Every 4 months** (monthly × 4)
-- **Every 17 weeks** (weekly × 17)
-- **Every 3 years** (yearly × 3)
-- **Every 2 days** (daily × 2)
-
-### Manual Transaction Features
-- **End Date Support**: Manual transactions can have optional end dates to limit recurring occurrences
-- **Semimonthly Frequencies**: Support for "Twice a month (1st & 15th)" and "Twice a month (15th & last day)" options
-- **Custom Icons**: Manual icon URL input with preview functionality
-- **Form Validation**: Required field validation with proper error handling
-- **Edit Mode**: Full transaction editing with all fields including end dates and custom icons
-
-### Projection Logic
-- **Date Calculations**: Proper handling of end-of-month scenarios (Feb 29th, 30th/31st days)
-- **Weekend/Holiday Adjustment**: Bills move to next business day, paychecks move to previous business day
-- **Cash Flow Calculations**: Accurate monthly/yearly financial summaries for all frequency types
-- **Dynamic Pattern Matching**: Supports unlimited "Every X" intervals using regex pattern matching
-- **Today's Balance**: Today's transactions are displayed but don't affect today's balance projection. Balance projections start from tomorrow, assuming today's transactions have already been processed. Daily refreshes run at 7:30 AM CT, so transactions scheduled for today are assumed to have already cleared by the time projections are calculated.
-
-#### Transaction Filtering for Projections
-The projection system displays ALL transactions for visibility while intelligently filtering which ones affect balance calculations:
-
-**Display vs Balance Calculation:**
-- **ALL transactions appear in Upcoming and Calendar** (for awareness/cancellation)
-- **Only certain transactions affect balance projections** (to prevent double-counting)
-
-**Transactions That Affect Balance:**
-- ✅ **Manual bills** (food budgets, custom estimates) - all occurrences
-- ✅ **Direct checking transactions** (utilities, rent, etc.) - all occurrences
-- ✅ **Monarch credit card payments** - one-time bills (auto-updates with each Monarch refresh)
-- ✅ **Income** (paychecks, deposits) - all occurrences
-
-**Transactions That DON'T Affect Balance:**
-- ❌ **Individual credit card charges** (Spotify, Netflix, etc.) - shown for awareness, but excluded from balance to prevent double-counting
-
-**Account Type Mapping:**
-- `depository` → "Checking" (all depository accounts)
-- `credit` → "Credit Card" (all credit accounts)
-- `Unknown Account` + `Credit Card Payment` → "Checking" (payments come from checking)
-- `Unknown Account` + other categories → "Unknown"
-
-**Credit Card Strategy:**
-- **Display**: All credit card charges appear in Upcoming/Calendar so you can see and cancel/adjust them
-- **Balance**: Only credit card payments affect balance (individual charges don't)
-- **Automation**: Monarch credit card payments are imported as one-time bills; each Monarch refresh creates a new one-time bill for the next statement
-- **No Manual Work**: You see all transactions but balance calculations prevent double-counting automatically
+- Monarch `401` on balance/transaction refresh:
+  - update Firebase runtime config `monarch.token`
+  - verify checking/savings account IDs
+- Calendar actions report auth failures:
+  - verify `google.service_account_json`
+  - verify calendar IDs and calendar sharing with the service account
+- Projection looks off around dates:
+  - re-run `budgetProjection`
+  - confirm recurring transaction dates and checking-impact rules
+- Netlify deploy watcher finishes but site is broken:
+  - read full watcher output and look for `Build failed`
 
 ## AI Handoff
-Read this README, scan the repo, prioritize core functions and env-safe areas, keep env and rules aligned with this file
+Read this README first, then scan `src/`, `functions/src/functions/`, and `scripts/`. Keep paid keys out of browser env vars, preserve the current Firebase runtime config pattern for Monarch and Google Calendar, and prefer minimal changes over new abstractions.
+
+## Links
+- [Projection workflow notes](docs/Apple%20Notes%20Export/Budget%20Projection%20Workflow.md)
+- [Monarch integration notes](docs/Apple%20Notes%20Export/Monarch%20Money%20API%20Integration%20Guide.md)

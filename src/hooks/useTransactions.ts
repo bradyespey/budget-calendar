@@ -3,9 +3,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getBills, createBill, updateBill, deleteBill } from '../api/bills';
 import { getCategories, Category } from '../api/categories';
-import { getRecurringTransactions, RecurringTransaction, refreshRecurringTransactions } from '../api/firebase';
+import { refreshRecurringTransactions } from '../api/firebase';
 import { updateTransactionIcon } from '../api/icons';
-import { Bill } from '../types';
+import { Bill, IconType } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 // Combined transaction interface
@@ -19,18 +19,18 @@ export interface CombinedTransaction {
   account: string;
   source: 'manual' | 'monarch';
   // Manual transaction fields
-  notes?: string;
+  notes?: string | null;
   iconUrl?: string | null;
   iconType?: 'brand' | 'generated' | 'category' | 'custom' | null;
-  end_date?: string;
+  end_date?: string | null;
   // Monarch transaction fields
-  merchantLogoUrl?: string;
-  merchantName?: string;
-  categoryIcon?: string;
-  categoryGroup?: string;
+  merchantLogoUrl?: string | null;
+  merchantName?: string | null;
+  categoryIcon?: string | null;
+  categoryGroup?: string | null;
   accountType?: string;
-  accountSubtype?: string;
-  institutionName?: string;
+  accountSubtype?: string | null;
+  institutionName?: string | null;
   isEditable: boolean;
   // Raw data for editing
   rawFrequency?: string;
@@ -80,7 +80,6 @@ function formatFrequency(frequency: string, repeatsEvery: number = 1): string {
 export function useTransactions() {
   const [combinedTransactions, setCombinedTransactions] = useState<CombinedTransaction[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
-  const [monarchTransactions, setMonarchTransactions] = useState<RecurringTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,7 +98,6 @@ export function useTransactions() {
       ]);
       
       setBills(billsData);
-      setMonarchTransactions([]);
       setCategories(categoriesData);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -183,7 +181,11 @@ export function useTransactions() {
     await fetchData();
   };
 
-  const updateTransactionIconHandler = async (transaction: CombinedTransaction, iconUrl: string, iconType: string) => {
+  const updateTransactionIconHandler = async (
+    transaction: CombinedTransaction,
+    iconUrl: string,
+    iconType: Exclude<IconType, null>
+  ) => {
     if (!transaction.isEditable) return;
     
     const billId = transaction.id.replace('manual-', '');

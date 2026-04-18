@@ -27,7 +27,7 @@ export const updateBalance = functions.region(region).https.onRequest(
       }
       
       // Call Monarch GraphQL API directly
-      const response = await fetch('https://api.monarchmoney.com/graphql', {
+      const response = await fetch('https://api.monarch.com/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,12 +125,16 @@ export const updateBalance = functions.region(region).https.onRequest(
           // Clean up ALL duplicate data points with same balance (one-time cleanup)
           const allHistory = await db.collection('savingsHistory')
             .where('balance', '==', savingsAccount.displayBalance)
-            .orderBy('timestamp', 'desc')
             .get();
           
           // Keep only the latest entry for each unique balance
           if (allHistory.docs.length > 1) {
-            const docsToDelete = allHistory.docs.slice(1); // Keep first (latest), delete rest
+            const sortedDocs = [...allHistory.docs].sort((a, b) => {
+              const aTimestamp = a.data().timestamp?.toDate?.() ?? new Date(a.data().timestamp ?? 0);
+              const bTimestamp = b.data().timestamp?.toDate?.() ?? new Date(b.data().timestamp ?? 0);
+              return bTimestamp.getTime() - aTimestamp.getTime();
+            });
+            const docsToDelete = sortedDocs.slice(1); // Keep first (latest), delete rest
             const batch = db.batch();
             docsToDelete.forEach(doc => batch.delete(doc.ref));
             await batch.commit();

@@ -2,15 +2,83 @@ import * as admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
-import { isWeekend } from "date-fns";
 
 const db = getFirestore();
 const region = 'us-central1';
+const TIMEZONE = 'America/Chicago';
+
+function formatInChicago(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+
+  if (!year || !month || !day) {
+    throw new Error('Failed to format Chicago date');
+  }
+
+  return `${year}-${month}-${day}`;
+}
+
+function chicagoDateFromYMD(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+}
+
+function addDaysToYMD(dateStr: string, days: number): string {
+  const date = chicagoDateFromYMD(dateStr);
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatInChicago(date);
+}
+
+function parseProjectionDate(value: unknown): Date {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return chicagoDateFromYMD(value);
+  }
+
+  return new Date(value as string | number | Date);
+}
+
+function isWeekendUTC(date: Date): boolean {
+  const day = date.getUTCDay();
+  return day === 0 || day === 6;
+}
+
+function getStartingBalance(accounts: any[], manualBalanceOverride: unknown): number {
+  const manualBalance = typeof manualBalanceOverride === 'number'
+    ? manualBalanceOverride
+    : Number(manualBalanceOverride);
+
+  if (!Number.isNaN(manualBalance) && manualBalanceOverride !== null && manualBalanceOverride !== undefined) {
+    return manualBalance;
+  }
+
+  const checkingAccount = accounts.find((account) => {
+    const id = String(account.id ?? '').toLowerCase();
+    const accountType = String(account.accountType ?? '').toLowerCase();
+    const name = String(account.name ?? account.accountName ?? '').toLowerCase();
+
+    return id === 'checking' || accountType === 'checking' || name.includes('checking');
+  });
+
+  if (checkingAccount?.lastBalance !== undefined) {
+    return Number(checkingAccount.lastBalance) || 0;
+  }
+
+  logger.warn('Checking account not found for projections, falling back to first account balance');
+  return Number(accounts[0]?.lastBalance) || 0;
+}
 
 // Holiday and date adjustment logic
 async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
   const holidays = new Set<string>();
-  for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+  for (let year = start.getUTCFullYear(); year <= end.getUTCFullYear(); year++) {
     try {
       const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/US`);
       if (res.ok) {
@@ -26,28 +94,28 @@ async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
 
 function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<string>): Date {
   let d = new Date(date);
-  const dateStr = (d: Date) => d.toISOString().split('T')[0];
+  const dateStr = (dateValue: Date) => formatInChicago(dateValue);
   
   while (true) {
     if (isPaycheck) {
       // Paychecks move to previous weekday (not weekend or holiday)
-      if (isWeekend(d)) {
-        d.setDate(d.getDate() - 1);
+      if (isWeekendUTC(d)) {
+        d.setUTCDate(d.getUTCDate() - 1);
         continue;
       }
       if (holidays.has(dateStr(d))) {
-        d.setDate(d.getDate() - 1);
+        d.setUTCDate(d.getUTCDate() - 1);
         continue;
       }
     } else {
       // Bills move to next weekday (not weekend or holiday)
-      if (isWeekend(d)) {
+      if (isWeekendUTC(d)) {
         // Move to next Monday (or Tuesday if Monday is a holiday)
-        d.setDate(d.getDate() + (8 - d.getDay()) % 7);
+        d.setUTCDate(d.getUTCDate() + ((8 - d.getUTCDay()) % 7));
         continue;
       }
       if (holidays.has(dateStr(d))) {
-        d.setDate(d.getDate() + 1);
+        d.setUTCDate(d.getUTCDate() + 1);
         continue;
       }
     }
@@ -57,7 +125,7 @@ function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<st
 }
 
 function shouldBillOccurOnDate(bill: any, date: Date): boolean {
-  const billDate = new Date(bill.start_date || bill.startDate);
+  const billDate = parseProjectionDate(bill.start_date || bill.startDate);
   const repeatsEvery = Number(bill.repeats_every ?? bill.repeatsEvery ?? 1) || 1;
   
   // Check if the date is before the start date
@@ -67,9 +135,9 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   
   // Check if the date is after the end date (if end_date exists)
   if (bill.end_date || bill.endDate) {
-    const endDate = new Date(bill.end_date || bill.endDate);
+    const endDate = parseProjectionDate(bill.end_date || bill.endDate);
     // Set to end of day for end_date to include the end date itself
-    endDate.setHours(23, 59, 59, 999);
+    endDate.setUTCHours(23, 59, 59, 999);
     if (date > endDate) {
       return false;
     }
@@ -77,7 +145,7 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   
   // One-time bills only occur on their exact start date
   if (bill.frequency === 'one-time') {
-    return billDate.toISOString().split('T')[0] === date.toISOString().split('T')[0];
+    return formatInChicago(billDate) === formatInChicago(date);
   }
   
   if (bill.frequency === 'daily') return true;
@@ -104,11 +172,11 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   }
   
   if (bill.frequency === 'monthly') {
-    const billDay = billDate.getDate();
-    const checkDay = date.getDate();
+    const billDay = billDate.getUTCDate();
+    const checkDay = date.getUTCDate();
     
     // Handle end-of-month scenarios
-    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    const lastDayOfMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
     
     if (billDay > lastDayOfMonth) {
       return checkDay === lastDayOfMonth;
@@ -122,17 +190,17 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
     const monthsMatch = bill.frequency.match(/every_(\d+)_months/);
     if (monthsMatch) {
       const monthInterval = parseInt(monthsMatch[1]);
-      const billDay = billDate.getDate();
-      const checkDay = date.getDate();
+      const billDay = billDate.getUTCDate();
+      const checkDay = date.getUTCDate();
       
       // Calculate months difference
-      const monthsDiff = (date.getFullYear() - billDate.getFullYear()) * 12 + 
-                        (date.getMonth() - billDate.getMonth());
+      const monthsDiff = (date.getUTCFullYear() - billDate.getUTCFullYear()) * 12 + 
+                        (date.getUTCMonth() - billDate.getUTCMonth());
       
       // Check if we're on the right month interval and day
       if (monthsDiff >= 0 && monthsDiff % monthInterval === 0) {
         // Handle end-of-month scenarios
-        const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+        const lastDayOfMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
         
         if (billDay > lastDayOfMonth) {
           return checkDay === lastDayOfMonth;
@@ -144,27 +212,27 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   }
   
   if (bill.frequency === 'Semimonthly_mid_end' || bill.frequency === 'semimonthly_mid_end') {
-    const checkDay = date.getDate();
-    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    const checkDay = date.getUTCDate();
+    const lastDayOfMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
     
     // Semimonthly_mid_end occurs on the 15th and last day of each month
     return checkDay === 15 || checkDay === lastDayOfMonth;
   }
   
   if (bill.frequency === 'semimonthly') {
-    const checkDay = date.getDate();
+    const checkDay = date.getUTCDate();
     
     // Semimonthly occurs on the 1st and 15th of each month
     return checkDay === 1 || checkDay === 15;
   }
   
   if (bill.frequency === 'yearly') {
-    const billDay = billDate.getDate();
-    const checkDay = date.getDate();
+    const billDay = billDate.getUTCDate();
+    const checkDay = date.getUTCDate();
     
     // Handle end-of-month scenarios for yearly bills too (e.g., Feb 29th)
-    if (billDate.getMonth() === date.getMonth()) {
-      const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    if (billDate.getUTCMonth() === date.getUTCMonth()) {
+      const lastDayOfMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
       
       if (billDay > lastDayOfMonth) {
         return checkDay === lastDayOfMonth;
@@ -188,21 +256,14 @@ async function computeProjections(settings: any) {
     logger.info(`Found ${bills.length} bills`);
   
   const accountsSnapshot = await db.collection('accounts').get();
-  let accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-  
-  if (settings.manualBalanceOverride) {
-    accounts = accounts.map(account => ({
-      ...account,
-      lastBalance: settings.manualBalanceOverride
-    }));
-  }
+  const accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
   
   if (accounts.length === 0) {
     logger.warn("No accounts found, cannot compute projections");
     return;
   }
   
-  const currentBalance = accounts[0].lastBalance;
+  const currentBalance = getStartingBalance(accounts, settings.manualBalanceOverride);
   
   // Clear existing projections
   const projectionsRef = db.collection('projections');
@@ -218,31 +279,24 @@ async function computeProjections(settings: any) {
   const projectionDays = settings.projectionDays || 7;
   let runningBalance = currentBalance;
   
-  // Use CST timezone for consistent day calculations
-  // Always use the current CST date as "today" regardless of when the function runs
+  // Use America/Chicago for consistent day calculations, including DST.
   const now = new Date();
-  
-  // Calculate CST time (UTC-6, but we need to be more careful about DST)
-  // For simplicity, we'll use a fixed CST offset and let the user know
-  const cstOffset = -6; // CST is UTC-6
-  const cstTime = new Date(now.getTime() + (cstOffset * 60 * 60 * 1000));
-  const todayCST = cstTime.toISOString().split('T')[0];
+  const todayChicago = formatInChicago(now);
+  const chicagoTodayDate = chicagoDateFromYMD(todayChicago);
   
   logger.info(`Current UTC time: ${now.toISOString()}`);
-  logger.info(`Current CST time: ${cstTime.toISOString()}`);
-  logger.info(`Today CST date: ${todayCST}`);
+  logger.info(`Today Chicago date: ${todayChicago}`);
   logger.info(`Projection days: ${projectionDays}`);
   
   // Fetch holidays for the projection period
-  const endDate = new Date(cstTime);
-  endDate.setDate(endDate.getDate() + projectionDays);
-  const holidays = await fetchUSHolidays(cstTime, endDate);
+  const endDate = chicagoDateFromYMD(addDaysToYMD(todayChicago, projectionDays));
+  const holidays = await fetchUSHolidays(chicagoTodayDate, endDate);
   logger.info(`Fetched ${holidays.size} holidays for projection period`);
   
   // First pass: Calculate all projections and find true highest/lowest/threshold breach
   const projectionDataList = [];
-  let lowest = { balance: currentBalance, date: todayCST };
-  let highest = { balance: currentBalance, date: todayCST };
+  let lowest = { balance: currentBalance, date: todayChicago };
+  let highest = { balance: currentBalance, date: todayChicago };
   let thresholdBreach: { balance: number, date: string } | null = null;
   
   // Pre-compute all bill occurrences with adjustments for the entire projection period
@@ -250,9 +304,7 @@ async function computeProjections(settings: any) {
   
   // Initialize all projection dates
   for (let i = 0; i < projectionDays; i++) {
-    const projectionDate = new Date(cstTime);
-    projectionDate.setDate(projectionDate.getDate() + i);
-    const dateStr = projectionDate.toISOString().split('T')[0];
+    const dateStr = addDaysToYMD(todayChicago, i);
     billOccurrences.set(dateStr, []);
   }
   
@@ -277,13 +329,12 @@ async function computeProjections(settings: any) {
   // NOTE: We process ALL bills for display, but only some affect balance
   for (const bill of bills) {
     for (let i = 0; i < projectionDays; i++) {
-      const checkDate = new Date(cstTime);
-      checkDate.setDate(checkDate.getDate() + i);
+      const checkDate = chicagoDateFromYMD(addDaysToYMD(todayChicago, i));
       
       if (shouldBillOccurOnDate(bill, checkDate)) {
         if (bill.frequency === 'daily') {
           // Daily bills don't get adjusted
-          const dateStr = checkDate.toISOString().split('T')[0];
+          const dateStr = formatInChicago(checkDate);
           if (billOccurrences.has(dateStr)) {
             billOccurrences.get(dateStr)!.push(bill);
           }
@@ -291,7 +342,7 @@ async function computeProjections(settings: any) {
           // Adjust the date for weekends/holidays
           const isPaycheck = bill.category && bill.category.toLowerCase() === 'paycheck';
           const adjustedDate = adjustTransactionDate(checkDate, isPaycheck, holidays);
-          const adjustedDateStr = adjustedDate.toISOString().split('T')[0];
+          const adjustedDateStr = formatInChicago(adjustedDate);
           
           // Add to the adjusted date if it's within our projection period
           if (billOccurrences.has(adjustedDateStr)) {
@@ -304,9 +355,7 @@ async function computeProjections(settings: any) {
   
   // Now process each projection date
   for (let i = 0; i < projectionDays; i++) {
-    const projectionDate = new Date(cstTime);
-    projectionDate.setDate(projectionDate.getDate() + i);
-    const dateStr = projectionDate.toISOString().split('T')[0];
+    const dateStr = addDaysToYMD(todayChicago, i);
     
     // Get the bills for this date (already adjusted)
     const billsToProcess = billOccurrences.get(dateStr) || [];

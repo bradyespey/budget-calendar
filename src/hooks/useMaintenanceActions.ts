@@ -1,19 +1,14 @@
-import { useState } from 'react'
 import { validateProjections } from '../utils/validateProjections'
 import { generateTransactionIcons, resetAllTransactionIcons, backupTransactionIcons, restoreTransactionIcons } from '../api/icons'
 import { clearCalendars } from '../api/firebase'
 import { importBillsFromCSV } from '../utils/importBills'
 import { exportBillsToCSV, downloadSampleCSV } from '../utils/csvExport'
 
-type MaintenanceAction = 'validate' | 'clear' | 'icons' | 'reset-icons' | 'backup-icons' | 'restore-icons' | 'import'
-
 interface UseMaintenanceActionsProps {
-  busy: boolean
   setBusy: (busy: boolean) => void
   showNotification: (message: string, type?: 'success' | 'error') => void
   saveFunctionTimestamp: (functionName: string) => Promise<void>
   saveSettings: () => Promise<void>
-  activeAction: string | null
   setActiveAction: (action: string | null) => void
   backupInfo: any
   setBackupInfo: (info: any) => void
@@ -21,12 +16,10 @@ interface UseMaintenanceActionsProps {
 }
 
 export function useMaintenanceActions({
-  busy,
   setBusy,
   showNotification,
   saveFunctionTimestamp,
   saveSettings,
-  activeAction,
   setActiveAction,
   backupInfo,
   setBackupInfo,
@@ -69,9 +62,9 @@ export function useMaintenanceActions({
     setActiveAction('clear')
     try {
       await saveSettings()
-      await clearCalendars()
+      const result = await clearCalendars()
       await saveFunctionTimestamp('clearCalendars')
-      showNotification('Calendars cleared for both main and test calendars.', 'success')
+      showNotification(result.message || 'Calendars cleared.', 'success')
     } catch (e: any) {
       showNotification(`Error clearing calendars: ${e.message}`, 'error')
     } finally {
@@ -87,7 +80,7 @@ export function useMaintenanceActions({
     try {
       await saveSettings()
       const result = await generateTransactionIcons()
-      await saveFunctionTimestamp('generateTransactionIcons')
+      await saveFunctionTimestamp('generateIcons')
       
       let message = `Icon generation completed: ${result.updatedCount} updated, ${result.skippedCount} skipped`
       if (result.errorCount > 0) {

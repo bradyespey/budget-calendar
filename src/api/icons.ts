@@ -1,6 +1,7 @@
 //src/api/icons.ts
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import type { IconType } from '../types';
 
 const functions = getFunctions();
 
@@ -17,6 +18,7 @@ export interface GenerateIconsResponse {
   skippedCount: number;
   errorCount: number;
   timestamp: string;
+  iconsGenerated?: number;
 }
 
 /**
@@ -26,13 +28,21 @@ export async function generateTransactionIcons(
   request: GenerateIconsRequest = {}
 ): Promise<GenerateIconsResponse> {
   try {
-    const generateIcons = httpsCallable<GenerateIconsRequest, GenerateIconsResponse>(
+    const generateIconsFn = httpsCallable<GenerateIconsRequest, GenerateIconsResponse>(
       functions,
-      'generateTransactionIcons'
+      'generateIcons'
     );
     
-    const result = await generateIcons(request);
-    return result.data;
+    const result = await generateIconsFn(request);
+    return {
+      success: result.data.success,
+      message: result.data.message,
+      processedCount: result.data.processedCount ?? result.data.iconsGenerated ?? 0,
+      updatedCount: result.data.updatedCount ?? result.data.iconsGenerated ?? 0,
+      skippedCount: result.data.skippedCount ?? 0,
+      errorCount: result.data.errorCount ?? 0,
+      timestamp: result.data.timestamp,
+    };
   } catch (error) {
     console.error('Error generating transaction icons:', error);
     throw error;
@@ -45,7 +55,7 @@ export async function generateTransactionIcons(
 export async function updateTransactionIcon(
   billId: string, 
   iconUrl: string, 
-  iconType: 'brand' | 'generated' | 'category' | 'custom'
+  iconType: Exclude<IconType, null>
 ): Promise<void> {
   const { updateBill } = await import('./bills');
   await updateBill(billId, {

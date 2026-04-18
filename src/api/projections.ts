@@ -7,8 +7,7 @@ import {
   where, 
   orderBy 
 } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions, auth } from '../lib/firebaseConfig';
+import { db, auth } from '../lib/firebaseConfig';
 import { Projection } from '../types';
 import { format } from 'date-fns';
 import { generateMockProjections } from './mockData';

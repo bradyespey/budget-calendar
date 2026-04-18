@@ -1,9 +1,7 @@
 //src/components/TransactionsTable.tsx
 
-import { Edit2, Trash2 } from 'lucide-react';
+import { Edit2, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { Button } from './ui/Button';
-import { Card, CardContent } from './ui/Card';
 import { TransactionIcon } from './TransactionIcon';
 import { CombinedTransaction } from '../hooks/useTransactions';
 import { SortField, SortDirection } from '../hooks/useTransactionFilters';
@@ -16,7 +14,50 @@ interface TransactionsTableProps {
   onSort: (field: SortField) => void;
   onEdit: (transaction: CombinedTransaction) => void;
   onDelete: (transaction: CombinedTransaction) => void;
-  onFilterClick: (type: 'frequency' | 'account' | 'category' | 'source', value: string) => void;
+  onFilterClick: (type: 'frequency' | 'account' | 'accountType' | 'category' | 'source', value: string) => void;
+  editMode?: boolean;
+}
+
+function SortIndicator({
+  active,
+  direction,
+}: {
+  active: boolean;
+  direction: SortDirection;
+}) {
+  if (!active) return <ArrowUpDown className="table-sort-icon h-3 w-3" />;
+  return direction === 'asc'
+    ? <ArrowUp className="table-sort-icon h-3 w-3" />
+    : <ArrowDown className="table-sort-icon h-3 w-3" />;
+}
+
+function SortHeader({
+  label,
+  field,
+  sortField,
+  sortDirection,
+  onSort,
+  align = 'left',
+}: {
+  label: string;
+  field: SortField;
+  sortField: SortField;
+  sortDirection: SortDirection;
+  onSort: (field: SortField) => void;
+  align?: 'left' | 'right';
+}) {
+  const active = sortField === field;
+  return (
+    <button
+      type="button"
+      className={`table-sort-button ${align === 'right' ? 'ml-auto' : ''}`}
+      data-active={active}
+      onClick={() => onSort(field)}
+    >
+      {label}
+      <SortIndicator active={active} direction={sortDirection} />
+    </button>
+  );
 }
 
 export function TransactionsTable({
@@ -26,83 +67,72 @@ export function TransactionsTable({
   onSort,
   onEdit,
   onDelete,
-  onFilterClick
+  onFilterClick,
+  editMode = false,
 }: TransactionsTableProps) {
   return (
-    <Card>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto max-h-[80vh]">
-          <table className="w-full min-w-[900px]">
-            <thead className="sticky top-0 z-50">
-              <tr className="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div className="table-shell overflow-hidden">
+      <div className="max-h-[72vh] overflow-x-auto overflow-y-auto">
+        <table className="table-surface min-w-[980px]">
+          <thead className="sticky top-0 z-10 backdrop-blur-xl">
+              <tr className="border-b surface-divider">
                 <th 
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => onSort('name')}
+                  className="px-4 py-3 text-left"
                 >
-                  Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <SortHeader label="Name" field="name" sortField={sortField} sortDirection={sortDirection} onSort={onSort} />
                 </th>
                 <th 
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => onSort('dueDate')}
+                  className="px-4 py-3 text-left"
                 >
-                  Date {sortField === 'dueDate' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <SortHeader label="Date" field="dueDate" sortField={sortField} sortDirection={sortDirection} onSort={onSort} />
                 </th>
-                <th className="text-left px-4 py-3 font-medium">
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">
                   End Date
                 </th>
                 <th 
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => onSort('frequency')}
+                  className="px-4 py-3 text-left"
                 >
-                  Frequency {sortField === 'frequency' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <SortHeader label="Frequency" field="frequency" sortField={sortField} sortDirection={sortDirection} onSort={onSort} />
                 </th>
                 <th 
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => onSort('account')}
+                  className="px-4 py-3 text-left"
                 >
-                  Account {sortField === 'account' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <SortHeader label="Account" field="account" sortField={sortField} sortDirection={sortDirection} onSort={onSort} />
                 </th>
                 <th 
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => onSort('accountType')}
+                  className="px-4 py-3 text-left"
                 >
-                  Account Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <SortHeader label="Account Type" field="accountType" sortField={sortField} sortDirection={sortDirection} onSort={onSort} />
                 </th>
                 <th 
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => onSort('category')}
+                  className="px-4 py-3 text-left"
                 >
-                  Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <SortHeader label="Category" field="category" sortField={sortField} sortDirection={sortDirection} onSort={onSort} />
                 </th>
                 <th 
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => onSort('amount')}
+                  className="px-4 py-3 text-left"
                 >
-                  Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <SortHeader label="Amount" field="amount" sortField={sortField} sortDirection={sortDirection} onSort={onSort} />
                 </th>
                 <th 
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => onSort('source')}
+                  className="px-4 py-3 text-left"
                 >
-                  Source {sortField === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <SortHeader label="Source" field="source" sortField={sortField} sortDirection={sortDirection} onSort={onSort} />
                 </th>
-                <th 
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => onSort('note')}
-                >
-                  Notes {sortField === 'note' && (sortDirection === 'asc' ? '↑' : '↓')}
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Notes" field="notes" sortField={sortField} sortDirection={sortDirection} onSort={onSort} />
                 </th>
-                <th className="text-left px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {transactions.map((transaction) => (
                 <tr
                   key={transaction.id}
-                  className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  className="border-b transition hover:bg-[color:var(--surface-hover)] surface-divider"
                 >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+                  <td className="px-4 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
                       <TransactionIcon
                         transactionName={transaction.name}
                         category={transaction.category}
@@ -110,45 +140,68 @@ export function TransactionsTable({
                         iconType={transaction.source === 'manual' ? transaction.iconType : 'brand'}
                         className="w-8 h-8"
                       />
-                      <span className="font-medium">{transaction.name}</span>
+                        <span className="truncate font-medium text-[color:var(--text)]">{transaction.name}</span>
+                      </div>
+                      {editMode && transaction.isEditable ? (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onEdit(transaction)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--line-strong)] bg-[color:var(--surface)] text-[color:var(--muted)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text)]"
+                            title="Edit transaction"
+                            aria-label={`Edit ${transaction.name}`}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(transaction)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] text-[color:var(--danger)] transition hover:bg-[color:var(--danger)] hover:text-white"
+                            title="Delete transaction"
+                            aria-label={`Delete ${transaction.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap px-4 py-4 text-sm text-[color:var(--text)]">
                     {transaction.dueDate ? format(parseISO(transaction.dueDate), 'MMM d') : '—'}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">
+                  <td className="whitespace-nowrap px-4 py-4 text-sm text-[color:var(--muted)]">
                     {transaction.end_date ? format(parseISO(transaction.end_date), 'MMM d, yyyy') : '—'}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     <span 
-                      className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                      className="pill-chip inline-flex cursor-pointer px-3 py-1.5 text-xs font-semibold transition"
                       onClick={() => onFilterClick('frequency', transaction.frequency)}
                       title={`Filter by ${transaction.frequency}`}
                     >
                       {transaction.frequency}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     <span 
-                      className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                      className="cursor-pointer text-sm font-medium text-[color:var(--text)] transition hover:text-[color:var(--accent)]"
                       onClick={() => onFilterClick('account', transaction.account)}
                       title={`Filter by ${transaction.account}`}
                     >
                       {shortenAccountName(transaction.account)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-4 text-sm text-[color:var(--muted)]">
                     <span 
-                      className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                      className="cursor-pointer transition hover:text-[color:var(--text)]"
                       onClick={() => onFilterClick('accountType', transaction.accountType || '')}
                       title={`Filter by ${transaction.accountType || 'Unknown'}`}
                     >
                       {transaction.accountType || 'Unknown'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-4 text-sm text-[color:var(--muted)]">
                     <span 
-                      className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors flex items-center gap-1"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 transition hover:bg-[color:var(--surface-muted)]"
                       onClick={() => onFilterClick('category', transaction.category)}
                       title={`Filter by ${transaction.category}`}
                     >
@@ -158,14 +211,14 @@ export function TransactionsTable({
                       {capitalize(transaction.category)}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     <span className={transaction.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>
                       {formatCurrency(Math.abs(transaction.amount))}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     <span 
-                      className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity ${
+                      className={`inline-flex cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-opacity ${
                         transaction.source === 'manual' 
                           ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                           : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
@@ -176,43 +229,22 @@ export function TransactionsTable({
                       {transaction.source === 'manual' ? 'Manual' : 'Monarch'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs">
+                  <td className="max-w-xs px-4 py-4 text-sm text-[color:var(--muted)]">
                     <div className="truncate" title={transaction.notes || ''}>
                       {transaction.notes || '—'}
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {transaction.isEditable && (
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => onEdit(transaction)}
-                          size="sm"
-                          variant="outline"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          onClick={() => onDelete(transaction)}
-                          size="sm"
-                          variant="destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+      </div>
+      
+      {transactions.length === 0 && (
+        <div className="px-6 py-12 text-center text-sm text-[color:var(--muted)]">
+          No transactions match the current filters.
         </div>
-        
-        {transactions.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            No transactions found.
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }

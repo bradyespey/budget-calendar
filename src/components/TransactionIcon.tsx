@@ -1,13 +1,12 @@
 //src/components/TransactionIcon.tsx
 
-import React from 'react';
 import { findTransactionIcon } from '../utils/iconMapping';
 
 interface TransactionIconProps {
   transactionName: string;
   category: string;
-  iconUrl?: string;
-  iconType?: 'brand' | 'generated' | 'category' | 'custom';
+  iconUrl?: string | null;
+  iconType?: 'brand' | 'generated' | 'category' | 'custom' | null;
   className?: string;
 }
 
@@ -18,10 +17,12 @@ export function TransactionIcon({
   iconType,
   className = "w-8 h-8" 
 }: TransactionIconProps) {
+  const normalizedCategory = category.toLowerCase();
+
   // Use provided icon if available, otherwise find one
   const icon = iconUrl && iconType 
     ? { iconUrl, iconType }
-    : findTransactionIcon(transactionName, category);
+    : findTransactionIcon(transactionName, normalizedCategory);
 
   if (!icon) {
       // Fallback to a simple circle
@@ -110,13 +111,13 @@ export function TransactionIcon({
       'other': 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'
     };
     
-    const colorClass = categoryColors[category as keyof typeof categoryColors] || categoryColors['other'];
+    const colorClass = categoryColors[normalizedCategory as keyof typeof categoryColors] || categoryColors['other'];
     
     return (
       <div className={`${className} flex items-center justify-center rounded-full shadow-md ${colorClass}`}>
         <img 
           src={icon.iconUrl} 
-          alt={`${category} icon`}
+          alt={`${normalizedCategory} icon`}
           className="w-5 h-5 object-contain"
           style={{ 
             filter: 'brightness(1.1) contrast(1.1)',

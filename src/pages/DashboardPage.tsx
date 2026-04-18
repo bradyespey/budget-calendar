@@ -1,7 +1,7 @@
 //src/pages/DashboardPage.tsx
 
 import type { ComponentType } from 'react'
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import {
   Wallet,
   PiggyBank,
@@ -18,7 +18,6 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardContent } from '../components/ui/Card'
-import { SavingsChart } from '../components/SavingsChart'
 import { getHighLowProjections } from '../api/projections'
 import { getBills } from '../api/bills'
 import { getSavingsBalance, getSavingsHistory, getCreditCardDebt } from '../api/accounts'
@@ -27,6 +26,11 @@ import { format, parseISO } from 'date-fns'
 import { useBalance } from '../context/BalanceContext'
 import { useAuth } from '../context/AuthContext'
 import { getFunctionTimestamps, getSettings, getMonthlyCashFlow } from '../api/firebase'
+
+const SavingsChart = lazy(async () => {
+  const module = await import('../components/SavingsChart')
+  return { default: module.SavingsChart }
+})
 
 interface CategoryAverage {
   monthly: number
@@ -437,7 +441,15 @@ export function DashboardPage() {
             <p className="mb-4 text-sm leading-7 text-[color:var(--muted)]">
               Track your savings growth over time. Updates when you click "Update Balances" or during nightly automation.
             </p>
-            <SavingsChart data={savingsHistory} />
+            <Suspense
+              fallback={
+                <div className="flex h-[250px] items-center justify-center rounded-[20px] border border-[color:var(--line)] bg-[color:var(--surface-muted)] text-sm text-[color:var(--muted)]">
+                  Loading savings trend…
+                </div>
+              }
+            >
+              <SavingsChart data={savingsHistory} />
+            </Suspense>
           </CardContent>
         </Card>
       )}

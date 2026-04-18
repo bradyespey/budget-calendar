@@ -18,10 +18,6 @@ export default defineConfig({
             return 'vendor-firebase'
           }
 
-          if (id.includes('recharts') || id.includes('d3-')) {
-            return 'vendor-charts'
-          }
-
           if (id.includes('react-router')) {
             return 'vendor-router'
           }

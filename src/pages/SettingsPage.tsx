@@ -13,7 +13,7 @@ import {
 } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import {
-  refreshAccountsViaFlask,
+  refreshMonarchAccounts,
   refreshChaseBalanceInDb,
   getLastSyncTime,
 } from '../api/accounts'
@@ -208,7 +208,7 @@ export function SettingsPage() {
     setActiveAction('refresh');
     try {
       await saveSettings();
-      await refreshAccountsViaFlask();
+      await refreshMonarchAccounts();
       await saveFunctionTimestampLocal('refreshAccounts');
       showNotification('Accounts refreshed.', 'success');
     } catch (e: any) {
@@ -371,21 +371,15 @@ export function SettingsPage() {
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('all');
-    setRunAllStep('Step 1/7: Refreshing Accounts...');
+    setRunAllStep('Step 1/6: Refreshing Accounts...');
     try {
-      // 1. Refresh Accounts (ignore errors)
-      try {
-        await saveSettings();
-        await refreshAccountsViaFlask();
-        await saveFunctionTimestampLocal('refreshAccounts');
-      } catch (e) {
-        // ignore error
-      }
-      // 2. Wait 60 seconds
-      setRunAllStep('Step 2/7: Waiting 60 seconds for account refresh...');
-      await new Promise(res => setTimeout(res, 60000));
-      // 3. Update Balance (ignore errors)
-      setRunAllStep('Step 3/7: Updating Balance...');
+      // 1. Refresh Accounts - this waits for checking/savings sync to complete.
+      await saveSettings();
+      await refreshMonarchAccounts();
+      await saveFunctionTimestampLocal('refreshAccounts');
+
+      // 2. Update Balance (ignore errors)
+      setRunAllStep('Step 2/6: Updating Balance...');
       try {
         await saveSettings();
         const bal = await refreshChaseBalanceInDb();
@@ -396,8 +390,8 @@ export function SettingsPage() {
       } catch (e) {
         // ignore error
       }
-      // 4. Refresh Transactions (ignore errors)
-      setRunAllStep('Step 4/7: Refreshing Transactions...');
+      // 3. Refresh Transactions (ignore errors)
+      setRunAllStep('Step 3/6: Refreshing Transactions...');
       try {
         await saveSettings();
         await refreshRecurringTransactions();
@@ -405,8 +399,8 @@ export function SettingsPage() {
       } catch (e) {
         // ignore error
       }
-      // 5. Budget Projection (must finish)
-      setRunAllStep('Step 5/7: Running Budget Projection...');
+      // 4. Budget Projection (must finish)
+      setRunAllStep('Step 4/6: Running Budget Projection...');
       try {
         await saveSettings();
         await triggerManualRecalculation();
@@ -418,8 +412,8 @@ export function SettingsPage() {
         setRunAllStep(null);
         return;
       }
-      // 6. Sync Calendar (must finish)
-      setRunAllStep('Step 6/7: Syncing Calendar...');
+      // 5. Sync Calendar (must finish)
+      setRunAllStep('Step 5/6: Syncing Calendar...');
       try {
         await saveSettings();
         
@@ -433,8 +427,8 @@ export function SettingsPage() {
         setRunAllStep(null);
         return;
       }
-      // 6. Refresh Recurring Transactions (ignore errors)
-      setRunAllStep('Step 7/7: Final cleanup...');
+      // 6. Final cleanup (optional)
+      setRunAllStep('Step 6/6: Final cleanup...');
       try {
         // Legacy cleanup - can be removed in future update
         // const storeRecurring = httpsCallable(functions, 'storeRecurringTransactions');

@@ -4,8 +4,233 @@ import * as functions from "firebase-functions/v1";
 
 const db = getFirestore();
 const region = 'us-central1';
+const monarchApiUrl = 'https://api.monarch.com/graphql';
+const pollDelayMs = 5000;
+const maxWaitMs = 180000;
 
-export const refreshAccounts = functions.region(region).https.onRequest(
+type MonarchAccount = {
+  id: string;
+  displayName?: string;
+  syncDisabled?: boolean;
+  deactivatedAt?: string | null;
+  isManual?: boolean;
+  hasSyncInProgress?: boolean;
+  credential?: {
+    id?: string;
+    updateRequired?: boolean;
+    disconnectedFromDataProviderAt?: string | null;
+  } | null;
+};
+
+type GraphQLError = {
+  message?: string;
+};
+
+type GraphQLResponse<T> = {
+  data?: T;
+  errors?: GraphQLError[];
+};
+
+const accountsQuery = `
+  query ForceRefreshAccountsQuery {
+    accounts {
+      id
+      displayName
+      syncDisabled
+      deactivatedAt
+      isManual
+      hasSyncInProgress
+      credential {
+        id
+        updateRequired
+        disconnectedFromDataProviderAt
+      }
+    }
+  }
+`;
+
+const refreshMutation = `
+  mutation Common_ForceRefreshAccountsMutation($input: ForceRefreshAccountsInput!) {
+    forceRefreshAccounts(input: $input) {
+      success
+      errors {
+        message
+        code
+        fieldErrors {
+          field
+          messages
+        }
+      }
+    }
+  }
+`;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getGraphQLErrorMessage(errors?: GraphQLError[]): string | null {
+  if (!errors?.length) {
+    return null;
+  }
+  return errors.map(error => error.message || 'Unknown Monarch GraphQL error').join('; ');
+}
+
+async function monarchGraphQL<T>(
+  monarchToken: string,
+  operationName: string,
+  query: string,
+  variables: Record<string, unknown> = {}
+): Promise<T> {
+  const response = await fetch(monarchApiUrl, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Client-Platform': 'web',
+      'Content-Type': 'application/json',
+      'Authorization': `Token ${monarchToken}`
+    },
+    body: JSON.stringify({ operationName, query, variables })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Monarch API error: ${response.status}`);
+  }
+
+  const payload = await response.json() as GraphQLResponse<T>;
+  const graphqlError = getGraphQLErrorMessage(payload.errors);
+  if (graphqlError) {
+    throw new Error(graphqlError);
+  }
+
+  if (!payload.data) {
+    throw new Error('Monarch API returned no data');
+  }
+
+  return payload.data;
+}
+
+async function getAccounts(monarchToken: string): Promise<MonarchAccount[]> {
+  const data = await monarchGraphQL<{ accounts: MonarchAccount[] }>(
+    monarchToken,
+    'ForceRefreshAccountsQuery',
+    accountsQuery
+  );
+  return data.accounts || [];
+}
+
+function getRefreshableTargetIds(accounts: MonarchAccount[], configuredIds: string[]): string[] {
+  const configuredIdSet = new Set(configuredIds.map(String).filter(Boolean));
+  return accounts
+    .filter(account => configuredIdSet.has(String(account.id)))
+    .filter(account => !account.isManual && !account.syncDisabled && !account.deactivatedAt && account.credential)
+    .map(account => String(account.id));
+}
+
+async function requestAccountsRefresh(monarchToken: string, accountIds: string[]): Promise<void> {
+  const data = await monarchGraphQL<{
+    forceRefreshAccounts: {
+      success: boolean;
+      errors?: Array<{ message?: string }>;
+    };
+  }>(
+    monarchToken,
+    'Common_ForceRefreshAccountsMutation',
+    refreshMutation,
+    { input: { accountIds } }
+  );
+
+  const result = data.forceRefreshAccounts;
+  if (!result?.success) {
+    const message = result?.errors?.map(error => error.message || 'Unknown refresh error').join('; ');
+    throw new Error(message || 'Monarch account refresh request failed');
+  }
+}
+
+async function waitForTargetAccounts(monarchToken: string, accountIds: string[]): Promise<{
+  attempts: number;
+  waitedMs: number;
+  remainingIds: string[];
+}> {
+  const startedAt = Date.now();
+  let attempts = 0;
+  let remainingIds = accountIds;
+
+  while (Date.now() - startedAt <= maxWaitMs) {
+    attempts += 1;
+    const accounts = await getAccounts(monarchToken);
+    const accountMap = new Map(accounts.map(account => [String(account.id), account]));
+    remainingIds = accountIds.filter(accountId => accountMap.get(accountId)?.hasSyncInProgress);
+
+    logger.info(`Monarch refresh poll ${attempts}: ${remainingIds.length}/${accountIds.length} target accounts still refreshing`);
+
+    if (remainingIds.length === 0) {
+      return {
+        attempts,
+        waitedMs: Date.now() - startedAt,
+        remainingIds
+      };
+    }
+
+    await sleep(pollDelayMs);
+  }
+
+  return {
+    attempts,
+    waitedMs: Date.now() - startedAt,
+    remainingIds
+  };
+}
+
+export async function refreshConfiguredMonarchAccounts(): Promise<{
+  refreshedAccountCount: number;
+  pollAttempts: number;
+  waitedMs: number;
+}> {
+  const monarchToken = functions.config().monarch?.token;
+  const checkingId = functions.config().monarch?.checking_id;
+  const savingsId = functions.config().monarch?.savings_id;
+
+  if (!monarchToken || !checkingId) {
+    throw new Error('Monarch refresh config not configured');
+  }
+
+  const configuredIds = [checkingId, savingsId].filter(Boolean).map(String);
+  const accounts = await getAccounts(monarchToken);
+  const targetAccountIds = getRefreshableTargetIds(accounts, configuredIds);
+
+  if (targetAccountIds.length === 0) {
+    throw new Error('No refreshable checking or savings accounts found in Monarch');
+  }
+
+  logger.info(`Requesting Monarch refresh for ${targetAccountIds.length} target accounts`);
+  await requestAccountsRefresh(monarchToken, targetAccountIds);
+  const refreshStatus = await waitForTargetAccounts(monarchToken, targetAccountIds);
+
+  if (refreshStatus.remainingIds.length > 0) {
+    throw new Error(`Timed out waiting for Monarch refresh to complete after ${refreshStatus.waitedMs}ms`);
+  }
+
+  try {
+    await db.doc('admin/functionTimestamps').set({
+      refreshAccounts: Timestamp.now()
+    }, { merge: true });
+    logger.info('Updated refreshAccounts timestamp');
+  } catch (timestampError) {
+    logger.warn('Failed to update timestamp:', timestampError);
+  }
+
+  return {
+    refreshedAccountCount: targetAccountIds.length,
+    pollAttempts: refreshStatus.attempts,
+    waitedMs: refreshStatus.waitedMs
+  };
+}
+
+export const refreshAccounts = functions
+  .region(region)
+  .runWith({ timeoutSeconds: 240, memory: '512MB' })
+  .https.onRequest(
   async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -17,43 +242,12 @@ export const refreshAccounts = functions.region(region).https.onRequest(
     }
 
     try {
-      const apiAuth = functions.config().api?.auth;
-      if (!apiAuth) {
-        res.status(500).json({ error: 'API_AUTH not configured' });
-        return;
-      }
-      
-      const response = await Promise.race([
-        fetch('https://api.theespeys.com/refresh_accounts?sync=1', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${Buffer.from(apiAuth).toString('base64')}`
-          }
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 3 minutes')), 180000))
-      ]) as Response;
-      
-      if (!response.ok) {
-        res.status(500).json({ error: `API error: ${response.status}` });
-        return;
-      }
-      
-      const result = await response.json();
-      
-      // Update function timestamp
-      try {
-        await db.doc('admin/functionTimestamps').set({
-          refreshAccounts: Timestamp.now()
-        }, { merge: true });
-        logger.info('Updated refreshAccounts timestamp');
-      } catch (timestampError) {
-        logger.warn('Failed to update timestamp:', timestampError);
-      }
+      const refreshResult = await refreshConfiguredMonarchAccounts();
       
       res.status(200).json({ 
         success: true, 
-        message: "Account refresh completed",
-        data: result,
+        message: "Monarch account refresh completed",
+        data: refreshResult,
         timestamp: new Date().toISOString()
       });
       

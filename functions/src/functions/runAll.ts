@@ -1,6 +1,7 @@
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
 import { getFirestore } from "firebase-admin/firestore";
+import { refreshConfiguredMonarchAccounts } from "./refreshAccounts";
 
 const db = getFirestore();
 const region = 'us-central1';
@@ -35,26 +36,35 @@ export const runAll = functions
     // Step 1: Refresh accounts (must be first - takes ~1 minute)
     try {
       logger.info("🔄 Step 1: Refreshing accounts...");
-      const refreshResponse = await Promise.race([
-        fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshAccounts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 3 minutes')), 180000))
-      ]) as Response;
-      
-      if (!refreshResponse.ok) {
-        throw new Error(`HTTP ${refreshResponse.status}`);
-      }
+      const refreshResult = await refreshConfiguredMonarchAccounts();
       
       results.refreshAccounts.success = true;
-      logger.info("✅ Account refresh completed");
+      logger.info("✅ Account refresh completed", refreshResult);
       
     } catch (error) {
       results.refreshAccounts.error = error instanceof Error ? error.message : 'Unknown error';
       logger.error("❌ Account refresh failed:", error);
-      // Continue with other steps even if this fails
+
+      results.updateBalance.error = 'Skipped because account refresh did not complete';
+      results.refreshTransactions.error = 'Skipped because account refresh did not complete';
+      results.budgetProjection.error = 'Skipped because account refresh did not complete';
+      results.syncCalendar.error = 'Skipped because account refresh did not complete';
+
+      const stepDetails = Object.entries(results).map(([step, result]) => ({
+        step,
+        success: result.success,
+        error: result.error
+      }));
+
+      res.status(500).json({
+        success: false,
+        message: 'Run all stopped because account refresh did not complete',
+        successCount: 0,
+        totalSteps: Object.keys(results).length,
+        results: stepDetails,
+        timestamp: new Date().toISOString(),
+      });
+      return;
     }
     
     // Step 2: Update balance (depends on refreshed accounts)

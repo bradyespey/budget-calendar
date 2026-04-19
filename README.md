@@ -29,9 +29,9 @@ npm run dev
 ```
 
 ## Environment
-Local frontend env is loaded through 1Password Developer Environments.
+Copy `.env.example` to `.env` and fill in values. See `.env.example` for all required variables.
 
-Required local env placeholders:
+Variable reference:
 
 ```env
 VITE_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY
@@ -70,14 +70,12 @@ Google Calendar functions also require runtime config for:
 
 ## Run Modes
 - Dev app: `npm run dev`
-- Local frontend only: `npm run dev:local`
 - Local functions emulator: `cd functions && npm run serve`
 - Type check: `npm run type-check`
 - Production build: `npm run build`
 
 Development environment loading:
-- `npm run dev` uses `dotenv -e .env -- vite` so Vite receives the 1Password-provided `.env` values as process env
-- Use `npm run dev:local` only when environment variables are already available in the shell
+- `npm run dev` runs plain `vite` — Vite loads `.env` automatically from the project root
 
 Local function testing:
 - Create `functions/.runtimeconfig.json` from Firebase runtime config before starting the emulator

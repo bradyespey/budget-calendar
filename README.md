@@ -8,7 +8,6 @@ Budget Calendar is a personal financial forecasting app for checking-balance pla
 - App URL: `https://budget.theespeys.com`
 - Frontend hosting: Netlify
 - Backend: Firebase Auth, Firestore, and Cloud Functions
-- External refresh endpoint: Flask API used by `refreshAccounts`
 - Monitoring:
   - Netlify build watch: `npm run deploy:watch`
   - Firebase logs: `firebase functions:log --only <functionName>`
@@ -42,16 +41,17 @@ VITE_FIREBASE_STORAGE_BUCKET=YOUR_FIREBASE_STORAGE_BUCKET
 VITE_FIREBASE_MESSAGING_SENDER_ID=YOUR_FIREBASE_MESSAGING_SENDER_ID
 VITE_FIREBASE_APP_ID=YOUR_FIREBASE_APP_ID
 VITE_ALLOWED_EMAILS=YOUR_ALLOWED_EMAILS
-VITE_REFRESH_ACCOUNTS_API_URL=YOUR_REFRESH_ACCOUNTS_API_URL
-VITE_REFRESH_ACCOUNTS_API_AUTH=YOUR_REFRESH_ACCOUNTS_API_AUTH
 VITE_SITE_URL=YOUR_SITE_URL
 VITE_DEBUG_MODE=true
+VITE_FIREBASE_FUNCTIONS_BASE_URL=http://127.0.0.1:5001/budgetcalendar-e6538/us-central1
 ```
 
 Important notes:
 - Do not expose paid provider keys through `VITE_*`
-- `refreshAccounts` depends on the external refresh API auth/env above
-- `updateBalance` and `refreshTransactions` currently use Firebase runtime config, not browser env vars
+- `refreshAccounts`, `updateBalance`, and `refreshTransactions` use Firebase runtime config, not browser env vars
+- `refreshAccounts` calls Monarch directly, requests checking/savings refresh, and waits until those configured accounts are done syncing before returning success
+- Localhost calls deployed Firebase Functions by default so dev and production use the same backend
+- `VITE_FIREBASE_FUNCTIONS_BASE_URL` is optional and only needed for explicit emulator testing
 
 Firebase runtime config still required for live Functions:
 
@@ -71,8 +71,18 @@ Google Calendar functions also require runtime config for:
 ## Run Modes
 - Dev app: `npm run dev`
 - Local frontend only: `npm run dev:local`
+- Local functions emulator: `cd functions && npm run serve`
 - Type check: `npm run type-check`
 - Production build: `npm run build`
+
+Development environment loading:
+- `npm run dev` uses `dotenv -e .env -- vite` so Vite receives the 1Password-provided `.env` values as process env
+- Use `npm run dev:local` only when environment variables are already available in the shell
+
+Local function testing:
+- Create `functions/.runtimeconfig.json` from Firebase runtime config before starting the emulator
+- Keep `functions/.runtimeconfig.json` local only; it contains secrets and is gitignored
+- Set `VITE_FIREBASE_FUNCTIONS_BASE_URL=http://127.0.0.1:5001/budgetcalendar-e6538/us-central1` only when intentionally testing the local emulator
 
 ## Scripts and Ops
 - Dev: `npm run dev`
@@ -83,13 +93,13 @@ Google Calendar functions also require runtime config for:
 - Watch Netlify deploy after push: `npm run deploy:watch`
 
 Key Functions:
-- `refreshAccounts`: calls the external refresh API
+- `refreshAccounts`: calls Monarch directly to refresh configured checking/savings accounts and waits for those syncs to complete
 - `updateBalance`: pulls checking, savings, and credit-card totals from Monarch and stores account snapshots
 - `refreshTransactions`: refreshes recurring Monarch streams into Firestore; maps Monarch account types to Checking/Credit Card; Unknown account type + negative amount is reclassified as Credit Card (CC charges without a real account don't affect balance projection)
 - `budgetProjection`: calculates projected checking balances with business-day adjustments; excludes Credit Card and unknown-account-type expenses from balance (those are covered by CC payment bills); writes monthly cash flow summary (category averages and bills/income by frequency) to `monthlyCashFlow/current`
 - `syncCalendar`: syncs bills and projected balances to Google Calendar
 - `clearCalendars`: clears future events from configured calendars
-- `runAll`: orchestrates the nightly automation flow
+- `runAll`: orchestrates the nightly automation flow; it stops if `refreshAccounts` does not complete, so balance/transaction updates only run after checking/savings refresh finishes
 
 ## Deploy
 - Frontend deploys from GitHub to Netlify

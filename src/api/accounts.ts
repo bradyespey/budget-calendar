@@ -12,6 +12,17 @@ import { db, auth } from '../lib/firebaseConfig';
 import type { Account } from "../types";
 import { MOCK_ACCOUNTS } from './mockData';
 
+const deployedFunctionsBaseUrl = 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net';
+const localFunctionsBaseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined;
+
+const getFunctionUrl = (functionName: string): string => {
+  const baseUrl = import.meta.env.DEV && localFunctionsBaseUrl
+    ? localFunctionsBaseUrl
+    : deployedFunctionsBaseUrl;
+
+  return `${baseUrl.replace(/\/$/, '')}/${functionName}`;
+};
+
 // Helper function to convert Firestore timestamp to Date
 const timestampToDate = (timestamp: any): Date => {
   if (timestamp?.toDate) {
@@ -137,25 +148,27 @@ export async function getLastSyncTime(): Promise<Date | null> {
 }
 
 /**
- * Triggers account refresh via Flask API through Firebase Cloud Function
+ * Triggers Monarch account refresh through Firebase Cloud Function
  * @throws Error if refresh fails
  */
-export async function refreshAccountsViaFlask(): Promise<void> {
-  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshAccounts', {
+export async function refreshMonarchAccounts(): Promise<void> {
+  const response = await fetch(getFunctionUrl('refreshAccounts'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({})
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to refresh accounts: ${response.status}`);
+    const message = await response.text();
+    throw new Error(`Failed to refresh Monarch accounts: ${response.status}${message ? ` - ${message}` : ''}`);
   }
 
   const result = await response.json();
-  
-  const data = result.data as { success: boolean; message: string };
-  if (!data.success) {
-    throw new Error(data.message || 'Account refresh failed');
+  const success = result.success ?? result.data?.success;
+  const message = result.message ?? result.data?.message;
+
+  if (!success) {
+    throw new Error(message || 'Account refresh failed');
   }
 }
 

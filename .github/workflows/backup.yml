@@ -25,6 +25,7 @@ jobs:
         run: npm install firebase-admin
 
       - name: Run Backup Script
+        id: run_backup
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
@@ -45,7 +46,14 @@ jobs:
             echo "No changes in data to backup."
           fi
 
-
-
-
+      - name: Log backup to AdminPanel
+        if: always()
+        env:
+          BACKUP_LOG_KEY: ${{ secrets.BACKUP_LOG_KEY }}
+        run: |
+          STATUS=$([[ "${{ steps.run_backup.outcome }}" == "success" ]] && echo "success" || echo "failure")
+          curl -s -X POST https://admin.theespeys.com/.netlify/functions/backup-log \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $BACKUP_LOG_KEY" \
+            -d "{\"runType\":\"db-backup\",\"scriptName\":\"backup.yml\",\"status\":\"$STATUS\",\"message\":\"BudgetCalendar weekly Firestore backup\"}"
 

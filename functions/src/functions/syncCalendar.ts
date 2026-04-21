@@ -5,6 +5,11 @@ import { google } from "googleapis";
 
 const db = getFirestore();
 const region = 'us-central1';
+const noEventReminders = { useDefault: false, overrides: [] };
+
+function hasEventReminders(event: any): boolean {
+  return event.reminders?.useDefault !== false || (event.reminders?.overrides?.length ?? 0) > 0;
+}
 
 async function getCalendarAuth() {
   const serviceAccountJson = functions.config().google?.service_account_json;
@@ -213,7 +218,7 @@ export const syncCalendar = functions
                 description: `Amount: ${bill.amount < 0 ? '-' : ''}$${billAmountFormatted}\nCategory: ${bill.category || 'Unknown'}`,
                 start: { date: projDate },
                 end: { date: projDate },
-                reminders: { useDefault: false }
+                reminders: noEventReminders
               };
               
               await withRateLimit(async () => {
@@ -221,7 +226,8 @@ export const syncCalendar = functions
                   // Check if bill event needs updating
                   const needsUpdate = 
                     existingBillEvent.summary !== desiredBillEvent.summary ||
-                    existingBillEvent.description !== desiredBillEvent.description;
+                    existingBillEvent.description !== desiredBillEvent.description ||
+                    hasEventReminders(existingBillEvent);
                   
                   if (needsUpdate) {
                     await calendar.events.update({
@@ -270,7 +276,7 @@ export const syncCalendar = functions
             description: `Projected balance: $${balanceAmountFormatted}\nBills due: ${projection.bills?.length || 0}`,
             start: { date: projDate },
             end: { date: projDate },
-            reminders: { useDefault: false }
+            reminders: noEventReminders
           };
           
           await withRateLimit(async () => {
@@ -278,7 +284,8 @@ export const syncCalendar = functions
               // Check if balance event needs updating
               const needsUpdate = 
                 existingBalanceEvent.summary !== desiredBalanceEvent.summary ||
-                existingBalanceEvent.description !== desiredBalanceEvent.description;
+                existingBalanceEvent.description !== desiredBalanceEvent.description ||
+                hasEventReminders(existingBalanceEvent);
               
               if (needsUpdate) {
                 await calendar.events.update({

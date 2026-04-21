@@ -12,6 +12,7 @@ Budget Calendar is a personal financial forecasting app for checking-balance pla
   - Netlify build watch: `npm run deploy:watch`
   - Firebase logs: `firebase functions:log --only <functionName>`
   - GitHub Actions: `.github/workflows/`
+  - Weekly backup status logging: `.github/workflows/backup.yml`
 
 ## Tech Stack
 - Frontend: React 18, Vite, TypeScript, Tailwind CSS
@@ -68,6 +69,11 @@ Google Calendar functions also require runtime config for:
 - dev/prod bills calendar IDs
 - dev/prod balance calendar IDs
 
+GitHub Actions secrets required for weekly encrypted backups:
+- `FIREBASE_SERVICE_ACCOUNT`
+- `BACKUP_ENCRYPTION_KEY`
+- `BACKUP_LOG_KEY`
+
 ## Run Modes
 - Dev app: `npm run dev`
 - Local functions emulator: `cd functions && npm run serve`
@@ -95,9 +101,12 @@ Key Functions:
 - `updateBalance`: pulls checking, savings, and credit-card totals from Monarch and stores account snapshots
 - `refreshTransactions`: refreshes recurring Monarch streams into Firestore; maps Monarch account types to Checking/Credit Card; Unknown account type + negative amount is reclassified as Credit Card (CC charges without a real account don't affect balance projection)
 - `budgetProjection`: calculates projected checking balances with business-day adjustments; excludes Credit Card and unknown-account-type expenses from balance (those are covered by CC payment bills); writes monthly cash flow summary (category averages and bills/income by frequency) to `monthlyCashFlow/current`
-- `syncCalendar`: syncs bills and projected balances to Google Calendar
+- `syncCalendar`: syncs bills and projected balances to Google Calendar as all-day events with event reminders disabled
 - `clearCalendars`: clears future events from configured calendars
 - `runAll`: orchestrates the nightly automation flow; it stops if `refreshAccounts` does not complete, so balance/transaction updates only run after checking/savings refresh finishes
+
+Automation:
+- `.github/workflows/backup.yml`: runs the encrypted Firestore backup weekly or manually, commits changed backup data, and posts the run status to AdminPanel
 
 ## Deploy
 - Frontend deploys from GitHub to Netlify

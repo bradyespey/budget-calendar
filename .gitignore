@@ -50,7 +50,10 @@ firebase-debug.log
 logs/
 
 # Netlify
-.netlify/
+.netlify
+!.netlify/
+.netlify/*
+!.netlify/state.json
 
 # OS generated files
 .DS_Store

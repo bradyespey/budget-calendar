@@ -6,7 +6,7 @@ const db = getFirestore();
 const region = 'us-central1';
 const monarchApiUrl = 'https://api.monarch.com/graphql';
 const pollDelayMs = 5000;
-const maxWaitMs = 180000;
+const maxWaitMs = 300000;
 
 type MonarchAccount = {
   id: string;
@@ -187,9 +187,9 @@ export async function refreshConfiguredMonarchAccounts(): Promise<{
   pollAttempts: number;
   waitedMs: number;
 }> {
-  const monarchToken = functions.config().monarch?.token;
-  const checkingId = functions.config().monarch?.checking_id;
-  const savingsId = functions.config().monarch?.savings_id;
+  const monarchToken = process.env.MONARCH_TOKEN;
+  const checkingId = process.env.MONARCH_CHECKING_ID;
+  const savingsId = process.env.MONARCH_SAVINGS_ID;
 
   if (!monarchToken || !checkingId) {
     throw new Error('Monarch refresh config not configured');
@@ -229,7 +229,7 @@ export async function refreshConfiguredMonarchAccounts(): Promise<{
 
 export const refreshAccounts = functions
   .region(region)
-  .runWith({ timeoutSeconds: 240, memory: '512MB' })
+  .runWith({ timeoutSeconds: 360, memory: '512MB' })
   .https.onRequest(
   async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');

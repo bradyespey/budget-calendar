@@ -89,7 +89,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
     }
 
     try {
-      const monarchToken = functions.config().monarch?.token;
+      const monarchToken = process.env.MONARCH_TOKEN;
       if (!monarchToken) {
         res.status(500).json({ error: 'Monarch token not configured' });
         return;

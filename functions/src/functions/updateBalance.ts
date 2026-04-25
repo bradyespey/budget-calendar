@@ -17,9 +17,9 @@ export const updateBalance = functions.region(region).https.onRequest(
     }
 
     try {
-      const monarchToken = functions.config().monarch?.token;
-      const checkingId = functions.config().monarch?.checking_id;
-      const savingsId = functions.config().monarch?.savings_id;
+      const monarchToken = process.env.MONARCH_TOKEN;
+      const checkingId = process.env.MONARCH_CHECKING_ID;
+      const savingsId = process.env.MONARCH_SAVINGS_ID;
       
       if (!monarchToken || !checkingId) {
         res.status(500).json({ error: 'Monarch credentials not configured' });

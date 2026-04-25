@@ -12,7 +12,7 @@ function hasEventReminders(event: any): boolean {
 }
 
 async function getCalendarAuth() {
-  const serviceAccountJson = functions.config().google?.service_account_json;
+  const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!serviceAccountJson) {
     throw new Error('Google service account not configured');
   }
@@ -65,24 +65,18 @@ export const syncCalendar = functions
       logger.info(`Starting calendar sync for environment: ${env}`);
       
       // Check Google service account configuration
-      const googleConfig = functions.config().google;
-      if (!googleConfig) {
-        logger.error('Google configuration not found in Firebase Functions config');
-        throw new Error('Google service account not configured. Run: firebase functions:config:set google.service_account_json="..."');
+      if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+        logger.error('Google service account not configured');
+        throw new Error('Google service account not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON env var.');
       }
-      
-      if (!googleConfig.service_account_json) {
-        logger.error('Google service_account_json not found in config');
-        throw new Error('Google service account JSON not configured. Run: firebase functions:config:set google.service_account_json="..."');
-      }
-      
+
       logger.info('Google service account configuration found');
-      
+
       const auth = await getCalendarAuth();
       const calendar = google.calendar({ version: 'v3', auth });
-      
-      const billsCalendarId = env === 'prod' ? googleConfig?.prod_bills_calendar_id : googleConfig?.dev_bills_calendar_id;
-      const balanceCalendarId = env === 'prod' ? googleConfig?.prod_balance_calendar_id : googleConfig?.dev_balance_calendar_id;
+
+      const billsCalendarId = env === 'prod' ? process.env.GOOGLE_PROD_BILLS_CALENDAR_ID : process.env.GOOGLE_DEV_BILLS_CALENDAR_ID;
+      const balanceCalendarId = env === 'prod' ? process.env.GOOGLE_PROD_BALANCE_CALENDAR_ID : process.env.GOOGLE_DEV_BALANCE_CALENDAR_ID;
       
       logger.info(`Calendar IDs - Bills: ${billsCalendarId ? 'configured' : 'MISSING'}, Balance: ${balanceCalendarId ? 'configured' : 'MISSING'}`);
       

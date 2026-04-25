@@ -7,7 +7,7 @@ const db = getFirestore();
 const region = 'us-central1';
 
 async function getCalendarAuth() {
-  const serviceAccountJson = functions.config().google?.service_account_json;
+  const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!serviceAccountJson) {
     throw new Error('Google service account not configured');
   }
@@ -41,11 +41,10 @@ export const clearCalendars = functions
       const auth = await getCalendarAuth();
       const calendar = google.calendar({ version: 'v3', auth });
       
-      const googleConfig = functions.config().google;
-      const devBillsCalendarId = googleConfig?.dev_bills_calendar_id;
-      const devBalanceCalendarId = googleConfig?.dev_balance_calendar_id;
-      const prodBillsCalendarId = googleConfig?.prod_bills_calendar_id;
-      const prodBalanceCalendarId = googleConfig?.prod_balance_calendar_id;
+      const devBillsCalendarId = process.env.GOOGLE_DEV_BILLS_CALENDAR_ID;
+      const devBalanceCalendarId = process.env.GOOGLE_DEV_BALANCE_CALENDAR_ID;
+      const prodBillsCalendarId = process.env.GOOGLE_PROD_BILLS_CALENDAR_ID;
+      const prodBalanceCalendarId = process.env.GOOGLE_PROD_BALANCE_CALENDAR_ID;
       
       // Get current date in CST (start of today)
       const now = new Date();

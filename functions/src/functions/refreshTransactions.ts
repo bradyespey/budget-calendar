@@ -321,8 +321,10 @@ export const refreshTransactions = functions.region(region).https.onRequest(
 
       // Update function timestamp
       try {
+        const timestamp = admin.firestore.Timestamp.now();
         await admin.firestore().doc('admin/functionTimestamps').set({
-          refreshTransactions: admin.firestore.Timestamp.now()
+          refreshTransactions: timestamp,
+          refreshRecurringTransactions: timestamp
         }, { merge: true });
         logger.info('Updated refreshTransactions timestamp');
       } catch (timestampError) {

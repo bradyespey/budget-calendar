@@ -15,6 +15,17 @@ import {
 import { httpsCallable } from 'firebase/functions';
 import { db, functions, auth } from '../lib/firebaseConfig';
 
+const deployedFunctionsBaseUrl = 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net';
+const localFunctionsBaseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined;
+
+const getFunctionUrl = (functionName: string): string => {
+  const baseUrl = import.meta.env.DEV && localFunctionsBaseUrl
+    ? localFunctionsBaseUrl
+    : deployedFunctionsBaseUrl;
+
+  return `${baseUrl.replace(/\/$/, '')}/${functionName}`;
+};
+
 // Type definitions
 export interface Account {
   id: string;
@@ -272,7 +283,7 @@ export async function refreshRecurringTransactions(): Promise<{
   deletedCount?: number;
 }> {
   // Call the main refresh function with accurate Monarch data
-  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/refreshTransactions', {
+  const response = await fetch(getFunctionUrl('refreshTransactions'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({})
@@ -361,14 +372,27 @@ export async function getFunctionTimestamps(): Promise<Record<string, Date>> {
       timestamps[key] = (value as Timestamp).toDate();
     }
   });
+
+  if (timestamps.refreshTransactions && !timestamps.refreshRecurringTransactions) {
+    timestamps.refreshRecurringTransactions = timestamps.refreshTransactions;
+  }
   
   return timestamps;
 }
 
 export async function saveFunctionTimestamp(functionName: string): Promise<void> {
   const timestampsRef = doc(db, 'admin', 'functionTimestamps');
+  const timestamp = Timestamp.now();
+  const updates: Record<string, Timestamp> = {
+    [functionName]: timestamp
+  };
+
+  if (functionName === 'refreshRecurringTransactions') {
+    updates.refreshTransactions = timestamp;
+  }
+
   await setDoc(timestampsRef, {
-    [functionName]: Timestamp.now()
+    ...updates
   }, { merge: true });
 }
 
@@ -384,7 +408,7 @@ export async function refreshAccounts(): Promise<any> {
 }
 
 export async function runBudgetProjection(): Promise<any> {
-  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/budgetProjection', {
+  const response = await fetch(getFunctionUrl('budgetProjection'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({})
@@ -399,7 +423,7 @@ export async function runBudgetProjection(): Promise<any> {
 }
 
 export async function clearCalendars(): Promise<any> {
-  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/clearCalendars', {
+  const response = await fetch(getFunctionUrl('clearCalendars'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({})
@@ -416,7 +440,7 @@ export async function clearCalendars(): Promise<any> {
 
 
 export async function syncCalendar(env: 'dev' | 'prod' = 'dev'): Promise<any> {
-  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/syncCalendar', {
+  const response = await fetch(getFunctionUrl('syncCalendar'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ env })
@@ -428,6 +452,21 @@ export async function syncCalendar(env: 'dev' | 'prod' = 'dev'): Promise<any> {
 
   const result = await response.json();
   return result; // Return the result directly, not result.data
+}
+
+export async function runAll(): Promise<any> {
+  const response = await fetch(getFunctionUrl('runAll'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+
+  if (!response.ok) {
+    const errorMessage = await getFunctionError(response, `Failed to run all actions: ${response.status}`);
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
 }
 
 // UTILITY FUNCTIONS

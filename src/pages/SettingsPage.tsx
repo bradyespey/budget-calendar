@@ -18,7 +18,7 @@ import {
   getLastSyncTime,
 } from '../api/accounts'
 import { triggerManualRecalculation } from '../api/projections'
-import { syncCalendar, getSettings, updateSettings, getFunctionTimestamps, saveFunctionTimestamp, refreshRecurringTransactions } from '../api/firebase'
+import { syncCalendar, getSettings, updateSettings, getFunctionTimestamps, saveFunctionTimestamp, refreshRecurringTransactions, runAll } from '../api/firebase'
 import { useBalance } from '../context/BalanceContext'
 import { useTheme } from '../components/ThemeProvider'
 import { useLocation } from 'react-router-dom'
@@ -79,6 +79,7 @@ export function SettingsPage() {
   // State for function last run timestamps
   const [functionTimestamps, setFunctionTimestamps] = useState<{
     refreshAccounts?: Date;
+    refreshTransactions?: Date;
     refreshRecurringTransactions?: Date;
     updateBalance?: Date;
     budgetProjection?: Date;
@@ -115,6 +116,12 @@ export function SettingsPage() {
   async function saveFunctionTimestampLocal(functionName: string) {
     const now = new Date();
     const newTimestamps = { ...functionTimestamps, [functionName]: now };
+    if (functionName === 'refreshRecurringTransactions') {
+      newTimestamps.refreshTransactions = now;
+    }
+    if (functionName === 'refreshTransactions') {
+      newTimestamps.refreshRecurringTransactions = now;
+    }
     setFunctionTimestamps(newTimestamps);
     
     // Save to Firestore
@@ -335,9 +342,23 @@ export function SettingsPage() {
       });
     } catch (error) {
       console.error('Error saving settings:', error);
+      if (isPermissionError(error)) {
+        console.warn('Settings save skipped because Firestore rules rejected the browser write.');
+        return;
+      }
+
       showNotification('Error saving settings.', 'error');
       throw error;
     }
+  }
+
+  function isPermissionError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    const code = typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : '';
+
+    return code.includes('permission-denied') || message.includes('Missing or insufficient permissions');
   }
 
   function showNotification(message: string, type: 'success' | 'error' = 'success') {
@@ -371,74 +392,40 @@ export function SettingsPage() {
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('all');
-    setRunAllStep('Step 1/6: Refreshing Accounts...');
+    setRunAllStep('Running server workflow...');
     try {
-      // 1. Refresh Accounts - this waits for checking/savings sync to complete.
       await saveSettings();
-      await refreshMonarchAccounts();
-      await saveFunctionTimestampLocal('refreshAccounts');
+      const result = await runAll();
+      const now = new Date();
+      const timestampUpdates: Partial<typeof functionTimestamps> = {
+        runAll: now
+      };
 
-      // 2. Update Balance (ignore errors)
-      setRunAllStep('Step 2/6: Updating Balance...');
-      try {
-        await saveSettings();
-        const bal = await refreshChaseBalanceInDb();
-        const freshSync = await getLastSyncTime();
-        if (freshSync) setLastSync(freshSync);
-        await setBalance(bal);
-        await saveFunctionTimestampLocal('updateBalance');
-      } catch (e) {
-        // ignore error
-      }
-      // 3. Refresh Transactions (ignore errors)
-      setRunAllStep('Step 3/6: Refreshing Transactions...');
-      try {
-        await saveSettings();
-        await refreshRecurringTransactions();
-        await saveFunctionTimestampLocal('refreshRecurringTransactions');
-      } catch (e) {
-        // ignore error
-      }
-      // 4. Budget Projection (must finish)
-      setRunAllStep('Step 4/6: Running Budget Projection...');
-      try {
-        await saveSettings();
-        await triggerManualRecalculation();
-        await saveFunctionTimestampLocal('budgetProjection');
-      } catch (e: any) {
-        showNotification('Error running Budget Projection: ' + (e.message || e), 'error');
-        setBusy(false);
-        setActiveAction(null);
-        setRunAllStep(null);
-        return;
-      }
-      // 5. Sync Calendar (must finish)
-      setRunAllStep('Step 5/6: Syncing Calendar...');
-      try {
-        await saveSettings();
-        
-        // Call Firebase Cloud Function
-        await syncCalendar(calendarMode);
-        await saveFunctionTimestampLocal('syncCalendar');
-      } catch (e: any) {
-        showNotification('Error syncing calendar: ' + (e.message || e), 'error');
-        setBusy(false);
-        setActiveAction(null);
-        setRunAllStep(null);
-        return;
-      }
-      // 6. Final cleanup (optional)
-      setRunAllStep('Step 6/6: Final cleanup...');
-      try {
-        // Legacy cleanup - can be removed in future update
-        // const storeRecurring = httpsCallable(functions, 'storeRecurringTransactions');
-        // await storeRecurring({});
-        // await saveFunctionTimestampLocal('storeRecurringTransactions');
-      } catch (e) {
-        // ignore error - this is optional
-      }
+      result.results?.forEach((stepResult: { step?: string; success?: boolean }) => {
+        if (!stepResult.success || !stepResult.step) return;
+
+        if (stepResult.step === 'refreshTransactions') {
+          timestampUpdates.refreshTransactions = now;
+          timestampUpdates.refreshRecurringTransactions = now;
+          return;
+        }
+
+        timestampUpdates[stepResult.step as keyof typeof functionTimestamps] = now;
+      });
+
+      setFunctionTimestamps(previous => ({
+        ...previous,
+        ...timestampUpdates
+      }));
       await saveFunctionTimestampLocal('runAll');
-      showNotification('All actions completed successfully.', 'success');
+      await loadFunctionTimestamps();
+
+      const warning = result.results?.find((step: { warning?: string }) => step.warning)?.warning;
+      const message = warning
+        ? `All actions completed with warning: ${warning}`
+        : result.message || 'All actions completed successfully.';
+
+      showNotification(message, result.success === false ? 'error' : 'success');
     } catch (e: any) {
       showNotification('Error running all actions: ' + (e.message || e), 'error');
     } finally {

@@ -22,6 +22,7 @@ import { syncCalendar, getSettings, updateSettings, getFunctionTimestamps, saveF
 import { useBalance } from '../context/BalanceContext'
 import { useTheme } from '../components/ThemeProvider'
 import { useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { CategoryManagement } from '../components/CategoryManagement'
 import { getIconBackupInfo } from '../api/icons'
 import { QuickActionButtons } from '../components/QuickActions'
@@ -62,6 +63,8 @@ export function SettingsPage() {
   const [busy, setBusy] = useState(false)
   const [backupInfo, setBackupInfo] = useState<{ hasBackup: boolean; backupCount?: number; timestamp?: string; message: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { session } = useAuth()
+  const isDemo = !session.isAuthenticated
   const { setBalance, setLastSync } = useBalance()
   const { theme } = useTheme()
   const [localProjectionDays, setLocalProjectionDays] = useState<number | null>(null)
@@ -134,6 +137,7 @@ export function SettingsPage() {
 
   // Initialize maintenance actions hook
   const maintenanceActions = useMaintenanceActions({
+    isDemo,
     setBusy,
     showNotification,
     saveFunctionTimestamp: saveFunctionTimestampLocal,
@@ -210,6 +214,7 @@ export function SettingsPage() {
   }, [location.pathname]);
 
   async function handleRefreshAccounts() {
+    if (isDemo) { showNotification('Accounts refreshed.', 'success'); return; }
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('refresh');
@@ -227,6 +232,7 @@ export function SettingsPage() {
   }
 
   async function handleUpdateBalance() {
+    if (isDemo) { showNotification('All account balances updated successfully', 'success'); return; }
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('balance');
@@ -247,6 +253,7 @@ export function SettingsPage() {
   }
 
   async function handleRecalculate() {
+    if (isDemo) { showNotification('Budget projections recalculated.', 'success'); return; }
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('projection');
@@ -264,6 +271,7 @@ export function SettingsPage() {
   }
 
   async function handleSyncCalendar() {
+    if (isDemo) { showNotification('Calendar sync completed.', 'success'); return; }
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('calendar');
@@ -289,6 +297,7 @@ export function SettingsPage() {
   }
 
   async function handleRefreshTransactions() {
+    if (isDemo) { showNotification('Transactions refreshed.', 'success'); return; }
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('transactions');
@@ -313,6 +322,7 @@ export function SettingsPage() {
 
 
   async function handleSave() {
+    if (isDemo) { showNotification('Settings saved!', 'success'); return; }
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('save');
@@ -389,6 +399,7 @@ export function SettingsPage() {
 
 
   async function handleAllActions() {
+    if (isDemo) { showNotification('All actions completed successfully.', 'success'); return; }
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('all');

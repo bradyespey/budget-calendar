@@ -26,20 +26,25 @@ export const runAll = functions
     logger.info("Starting run all workflow - sequential execution with timeout handling");
     
     const results = {
-      refreshAccounts: { success: false, error: null as string | null },
-      updateBalance: { success: false, error: null as string | null },
-      refreshTransactions: { success: false, error: null as string | null },
-      budgetProjection: { success: false, error: null as string | null },
-      syncCalendar: { success: false, error: null as string | null }
+      refreshAccounts: { success: false, error: null as string | null, warning: null as string | null },
+      updateBalance: { success: false, error: null as string | null, warning: null as string | null },
+      refreshTransactions: { success: false, error: null as string | null, warning: null as string | null },
+      budgetProjection: { success: false, error: null as string | null, warning: null as string | null },
+      syncCalendar: { success: false, error: null as string | null, warning: null as string | null }
     };
     
-    // Step 1: Refresh accounts (must be first - takes ~1 minute)
+    // Step 1: Refresh accounts
     try {
       logger.info("🔄 Step 1: Refreshing accounts...");
-      const refreshResult = await refreshConfiguredMonarchAccounts();
+      const refreshResult = await refreshConfiguredMonarchAccounts({ continueAfterTimeout: true });
       
       results.refreshAccounts.success = true;
-      logger.info("✅ Account refresh completed", refreshResult);
+      if (refreshResult.timedOut) {
+        results.refreshAccounts.warning = `Monarch refresh still in progress after ${refreshResult.waitedMs}ms; continued with available account data`;
+        logger.warn("⚠️ Account refresh timed out; continuing workflow", refreshResult);
+      } else {
+        logger.info("✅ Account refresh completed", refreshResult);
+      }
       
     } catch (error) {
       results.refreshAccounts.error = error instanceof Error ? error.message : 'Unknown error';
@@ -53,7 +58,8 @@ export const runAll = functions
       const stepDetails = Object.entries(results).map(([step, result]) => ({
         step,
         success: result.success,
-        error: result.error
+        error: result.error,
+        warning: result.warning
       }));
 
       res.status(500).json({
@@ -171,7 +177,8 @@ export const runAll = functions
     const stepDetails = Object.entries(results).map(([step, result]) => ({
       step,
       success: result.success,
-      error: result.error
+      error: result.error,
+      warning: result.warning
     }));
     
     logger.info(`Run all workflow completed: ${successCount}/${totalSteps} steps successful`);

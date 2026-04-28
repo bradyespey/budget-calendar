@@ -11,9 +11,17 @@ async function getCalendarAuth() {
   if (!serviceAccountJson) {
     throw new Error('Google service account not configured');
   }
+
+  let credentials;
+  try {
+    credentials = JSON.parse(serviceAccountJson);
+  } catch (parseError) {
+    logger.error('Failed to parse service account JSON:', parseError);
+    throw new Error('Invalid service account JSON format. Must be valid JSON string.');
+  }
   
   const auth = new google.auth.GoogleAuth({
-    credentials: serviceAccountJson,
+    credentials,
     scopes: ['https://www.googleapis.com/auth/calendar'],
   });
 

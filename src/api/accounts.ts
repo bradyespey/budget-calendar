@@ -137,14 +137,25 @@ export async function getLastSyncTime(): Promise<Date | null> {
   if (!auth.currentUser) {
     return new Date();
   }
-  const accountRef = doc(db, 'accounts', 'checking');
-  const accountDoc = await getDoc(accountRef);
-  
-  if (!accountDoc.exists() || !accountDoc.data().lastSynced) {
-    return null;
+
+  try {
+    const accountRef = doc(db, 'accounts', 'checking');
+    const accountDoc = await getDoc(accountRef);
+    
+    if (!accountDoc.exists() || !accountDoc.data().lastSynced) {
+      return null;
+    }
+    
+    return timestampToDate(accountDoc.data().lastSynced);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('Missing or insufficient permissions')) {
+      console.warn('Could not read last sync time because Firestore rules rejected the browser read.');
+      return new Date();
+    }
+
+    throw error;
   }
-  
-  return timestampToDate(accountDoc.data().lastSynced);
 }
 
 /**
@@ -178,7 +189,7 @@ export async function refreshMonarchAccounts(): Promise<void> {
  *    Now calls the function and returns persisted balances.
  */
 export async function refreshBalancesInDb(): Promise<{ checking: number; savings?: number; creditCards?: number }> {
-  const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/updateBalance', {
+  const response = await fetch(getFunctionUrl('updateBalance'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({})

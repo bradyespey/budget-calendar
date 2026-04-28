@@ -103,7 +103,7 @@ Key Functions:
 - `budgetProjection`: calculates projected checking balances with business-day adjustments; excludes Credit Card and unknown-account-type expenses from balance (those are covered by CC payment bills); writes monthly cash flow summary (category averages and bills/income by frequency) to `monthlyCashFlow/current`
 - `syncCalendar`: syncs bills and projected balances to Google Calendar as all-day events with event reminders disabled
 - `clearCalendars`: clears future events from configured calendars
-- `runAll`: orchestrates the nightly automation flow; it stops if `refreshAccounts` does not complete, so balance/transaction updates only run after checking/savings refresh finishes
+- `runAll`: orchestrates the nightly automation flow; it requests a Monarch account refresh first, but if Monarch is still syncing after the wait window, it records a warning and continues with the balance, transaction, projection, and calendar steps using available account data
 
 Automation:
 - `.github/workflows/backup.yml`: runs the encrypted Firestore backup weekly or manually, commits changed backup data, and posts the run status to AdminPanel

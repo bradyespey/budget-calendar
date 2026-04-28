@@ -5,6 +5,7 @@ import { importBillsFromCSV } from '../utils/importBills'
 import { exportBillsToCSV, downloadSampleCSV } from '../utils/csvExport'
 
 interface UseMaintenanceActionsProps {
+  isDemo?: boolean
   setBusy: (busy: boolean) => void
   showNotification: (message: string, type?: 'success' | 'error') => void
   saveFunctionTimestamp: (functionName: string) => Promise<void>
@@ -16,6 +17,7 @@ interface UseMaintenanceActionsProps {
 }
 
 export function useMaintenanceActions({
+  isDemo,
   setBusy,
   showNotification,
   saveFunctionTimestamp,
@@ -29,6 +31,7 @@ export function useMaintenanceActions({
   const scrollToTop = () => setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0)
 
   const handleValidateProjections = async () => {
+    if (isDemo) { showNotification('Projections validated. No issues found.', 'success'); return; }
     scrollToTop()
     setBusy(true)
     setActiveAction('validate')
@@ -57,6 +60,7 @@ export function useMaintenanceActions({
   }
 
   const handleClearCalendars = async () => {
+    if (isDemo) { showNotification('Calendars cleared.', 'success'); return; }
     scrollToTop()
     setBusy(true)
     setActiveAction('clear')
@@ -74,6 +78,7 @@ export function useMaintenanceActions({
   }
 
   const handleGenerateIcons = async () => {
+    if (isDemo) { showNotification('Icon generation completed.', 'success'); return; }
     scrollToTop()
     setBusy(true)
     setActiveAction('icons')
@@ -97,6 +102,7 @@ export function useMaintenanceActions({
   }
 
   const handleResetAllIcons = async () => {
+    if (isDemo) { showNotification('Icons reset.', 'success'); return; }
     if (!confirm('Reset all transaction icons? This will remove all generated and custom icons. Brand icons will still be detected automatically.')) {
       return
     }
@@ -124,6 +130,7 @@ export function useMaintenanceActions({
   }
 
   const handleBackupIcons = async () => {
+    if (isDemo) { showNotification('Icons backed up.', 'success'); return; }
     scrollToTop()
     setBusy(true)
     setActiveAction('backup-icons')
@@ -149,6 +156,7 @@ export function useMaintenanceActions({
   }
 
   const handleRestoreIcons = async () => {
+    if (isDemo) { showNotification('Icons restored.', 'success'); return; }
     if (!backupInfo?.hasBackup) {
       showNotification('No backup available. Please backup icons first.', 'error')
       return
@@ -181,6 +189,7 @@ export function useMaintenanceActions({
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isDemo) { showNotification('Bills imported.', 'success'); return; }
     scrollToTop()
     setBusy(true)
     setActiveAction('import')
@@ -204,6 +213,7 @@ export function useMaintenanceActions({
   }
 
   const handleExportCSV = async () => {
+    if (isDemo) { showNotification('CSV exported.', 'success'); return; }
     try {
       await exportBillsToCSV()
     } catch (error: any) {

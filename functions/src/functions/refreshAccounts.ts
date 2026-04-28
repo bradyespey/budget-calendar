@@ -182,10 +182,14 @@ async function waitForTargetAccounts(monarchToken: string, accountIds: string[])
   };
 }
 
-export async function refreshConfiguredMonarchAccounts(): Promise<{
+export async function refreshConfiguredMonarchAccounts(options: {
+  continueAfterTimeout?: boolean;
+} = {}): Promise<{
   refreshedAccountCount: number;
   pollAttempts: number;
   waitedMs: number;
+  timedOut: boolean;
+  remainingAccountIds: string[];
 }> {
   const monarchToken = process.env.MONARCH_TOKEN;
   const checkingId = process.env.MONARCH_CHECKING_ID;
@@ -208,6 +212,21 @@ export async function refreshConfiguredMonarchAccounts(): Promise<{
   const refreshStatus = await waitForTargetAccounts(monarchToken, targetAccountIds);
 
   if (refreshStatus.remainingIds.length > 0) {
+    if (options.continueAfterTimeout) {
+      logger.warn(
+        `Monarch refresh still in progress after ${refreshStatus.waitedMs}ms; continuing workflow`,
+        { remainingAccountIds: refreshStatus.remainingIds }
+      );
+
+      return {
+        refreshedAccountCount: targetAccountIds.length,
+        pollAttempts: refreshStatus.attempts,
+        waitedMs: refreshStatus.waitedMs,
+        timedOut: true,
+        remainingAccountIds: refreshStatus.remainingIds
+      };
+    }
+
     throw new Error(`Timed out waiting for Monarch refresh to complete after ${refreshStatus.waitedMs}ms`);
   }
 
@@ -223,7 +242,9 @@ export async function refreshConfiguredMonarchAccounts(): Promise<{
   return {
     refreshedAccountCount: targetAccountIds.length,
     pollAttempts: refreshStatus.attempts,
-    waitedMs: refreshStatus.waitedMs
+    waitedMs: refreshStatus.waitedMs,
+    timedOut: false,
+    remainingAccountIds: []
   };
 }
 

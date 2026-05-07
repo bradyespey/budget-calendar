@@ -80,34 +80,57 @@ async function monarchGraphQL<T>(
   monarchToken: string,
   operationName: string,
   query: string,
-  variables: Record<string, unknown> = {}
+  variables: Record<string, unknown> = {},
+  retries = 3,
+  retryDelayMs = 10000
 ): Promise<T> {
-  const response = await fetch(monarchApiUrl, {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Client-Platform': 'web',
-      'Content-Type': 'application/json',
-      'Authorization': `Token ${monarchToken}`
-    },
-    body: JSON.stringify({ operationName, query, variables })
-  });
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    throw new Error(`Monarch API error: ${response.status}`);
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch(monarchApiUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Client-Platform': 'web',
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${monarchToken}`
+        },
+        body: JSON.stringify({ operationName, query, variables })
+      });
+    } catch (fetchError) {
+      lastError = fetchError instanceof Error ? fetchError : new Error(String(fetchError));
+      logger.warn(`Monarch API fetch error (attempt ${attempt}/${retries}):`, lastError.message);
+      if (attempt < retries) await sleep(retryDelayMs);
+      continue;
+    }
+
+    if (response.status >= 500 && response.status < 600) {
+      lastError = new Error(`Monarch API error: ${response.status}`);
+      logger.warn(`Monarch API ${response.status} (attempt ${attempt}/${retries}), retrying...`);
+      if (attempt < retries) await sleep(retryDelayMs);
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Monarch API error: ${response.status}`);
+    }
+
+    const payload = await response.json() as GraphQLResponse<T>;
+    const graphqlError = getGraphQLErrorMessage(payload.errors);
+    if (graphqlError) {
+      throw new Error(graphqlError);
+    }
+
+    if (!payload.data) {
+      throw new Error('Monarch API returned no data');
+    }
+
+    return payload.data;
   }
 
-  const payload = await response.json() as GraphQLResponse<T>;
-  const graphqlError = getGraphQLErrorMessage(payload.errors);
-  if (graphqlError) {
-    throw new Error(graphqlError);
-  }
-
-  if (!payload.data) {
-    throw new Error('Monarch API returned no data');
-  }
-
-  return payload.data;
+  throw lastError ?? new Error('Monarch API request failed after retries');
 }
 
 async function getAccounts(monarchToken: string): Promise<MonarchAccount[]> {

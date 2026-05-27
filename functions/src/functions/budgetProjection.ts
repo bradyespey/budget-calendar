@@ -248,7 +248,7 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
 
 async function computeProjections(settings: any) {
   try {
-    logger.info("Starting computeProjections with settings:", settings);
+    logger.info("Starting computeProjections");
     
     const billsSnapshot = await db.collection('bills').get();
     const bills = billsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];

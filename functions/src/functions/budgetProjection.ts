@@ -60,13 +60,17 @@ function formatAlertDate(dateStr: string): string {
   }).format(chicagoDateFromYMD(dateStr));
 }
 
-async function sendLowBalanceAlert(lowest: LowBalancePoint, threshold: number): Promise<void> {
+async function sendLowBalanceAlert(
+  thresholdBreach: LowBalancePoint | null,
+  lowest: LowBalancePoint,
+  threshold: number
+): Promise<void> {
   const alertDocRef = db.doc(LOW_BALANCE_ALERT_DOC);
-  const signature = `${lowest.date}:${threshold}`;
+  const signature = `v2:${thresholdBreach?.date}:${lowest.date}:${threshold}`;
   const alertDoc = await alertDocRef.get();
   const alertState = alertDoc.data();
 
-  if (lowest.balance >= threshold) {
+  if (!thresholdBreach || lowest.balance >= threshold) {
     if (alertState?.activeBreach) {
       await alertDocRef.set({
         activeBreach: false,
@@ -96,8 +100,10 @@ async function sendLowBalanceAlert(lowest: LowBalancePoint, threshold: number): 
     return;
   }
 
-  const formattedDate = formatAlertDate(lowest.date);
-  const formattedBalance = formatCurrency(lowest.balance);
+  const formattedBreachDate = formatAlertDate(thresholdBreach.date);
+  const formattedBreachBalance = formatCurrency(thresholdBreach.balance);
+  const formattedLowestDate = formatAlertDate(lowest.date);
+  const formattedLowestBalance = formatCurrency(lowest.balance);
   const formattedThreshold = formatCurrency(threshold);
   const dashboardUrl = `${siteUrl.replace(/\/$/, '')}/dashboard`;
   const response = await fetch('https://api.resend.com/emails', {
@@ -109,8 +115,8 @@ async function sendLowBalanceAlert(lowest: LowBalancePoint, threshold: number): 
     body: JSON.stringify({
       from: fromEmail,
       to: [alertEmail],
-      subject: `Budget Calendar low balance: ${formattedBalance} on ${formattedDate}`,
-      text: `Budget Calendar low balance alert\n\nYour next projected low point is ${formattedBalance} on ${formattedDate}, below your ${formattedThreshold} alert threshold.\n\nReview your forecast: ${dashboardUrl}`,
+      subject: `Budget Calendar alert: below ${formattedThreshold} on ${formattedBreachDate}`,
+      text: `Budget Calendar low balance alert\n\nYour balance is first projected to fall below your ${formattedThreshold} alert threshold on ${formattedBreachDate}, when it reaches ${formattedBreachBalance}.\n\nThe lowest projected balance in the current forecast is ${formattedLowestBalance} on ${formattedLowestDate}.\n\nReview your forecast: ${dashboardUrl}`,
       html: `
         <div style="background:#f4f7fb;padding:32px 16px;font-family:Arial,sans-serif;color:#172033;">
           <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e3e9f2;border-radius:16px;overflow:hidden;">
@@ -119,13 +125,18 @@ async function sendLowBalanceAlert(lowest: LowBalancePoint, threshold: number): 
               <h1 style="margin:8px 0 0;font-size:24px;line-height:1.25;">Low balance forecast</h1>
             </div>
             <div style="padding:28px;">
-              <p style="margin:0 0 20px;font-size:16px;line-height:1.6;">Your next projected low point is below your alert threshold.</p>
+              <p style="margin:0 0 20px;font-size:16px;line-height:1.6;">Your forecast is projected to cross below your low balance threshold.</p>
               <div style="background:#fff5f3;border:1px solid #ffd3cc;border-radius:12px;padding:18px 20px;margin-bottom:20px;">
-                <div style="font-size:13px;font-weight:700;color:#9f2d20;text-transform:uppercase;letter-spacing:0.06em;">Projected low point</div>
-                <div style="margin-top:6px;font-size:30px;font-weight:700;color:#8a2419;">${formattedBalance}</div>
-                <div style="margin-top:4px;font-size:15px;color:#5f2d28;">${formattedDate}</div>
+                <div style="font-size:13px;font-weight:700;color:#9f2d20;text-transform:uppercase;letter-spacing:0.06em;">First day below threshold</div>
+                <div style="margin-top:6px;font-size:30px;font-weight:700;color:#8a2419;">${formattedBreachBalance}</div>
+                <div style="margin-top:4px;font-size:15px;color:#5f2d28;">${formattedBreachDate}</div>
               </div>
-              <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#4b5565;">Your current alert threshold is <strong>${formattedThreshold}</strong>. Review the upcoming transactions and forecast to see what is driving the low point.</p>
+              <div style="background:#f4f7fb;border:1px solid #e3e9f2;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+                <div style="font-size:13px;font-weight:700;color:#4b5565;text-transform:uppercase;letter-spacing:0.06em;">Lowest point in current forecast</div>
+                <div style="margin-top:6px;font-size:22px;font-weight:700;color:#172033;">${formattedLowestBalance}</div>
+                <div style="margin-top:4px;font-size:15px;color:#4b5565;">${formattedLowestDate}</div>
+              </div>
+              <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#4b5565;">Your current alert threshold remains <strong>${formattedThreshold}</strong>. Review the upcoming transactions and forecast to see what is driving the change.</p>
               <a href="${dashboardUrl}" style="display:inline-block;background:#173b68;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:13px 20px;border-radius:9px;">Review Budget Calendar</a>
             </div>
           </div>
@@ -543,7 +554,7 @@ async function computeProjections(settings: any) {
   });
 
   try {
-    await sendLowBalanceAlert(lowest, Number(settings.balanceThreshold) || 0);
+    await sendLowBalanceAlert(thresholdBreach, lowest, Number(settings.balanceThreshold) || 0);
   } catch (error) {
     logger.error('Failed to send low balance alert:', error);
   }

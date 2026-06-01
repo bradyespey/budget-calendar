@@ -113,7 +113,7 @@ Key Functions:
 - `runAll`: orchestrates the nightly automation flow; it requests a Monarch account refresh first, but if Monarch is still syncing after the wait window, it records a warning and continues with the balance, transaction, projection, and calendar steps using available account data
 
 Automation:
-- `.github/workflows/budget-nightly.yml`: runs the complete `runAll` refresh daily at `8:00 AM America/Chicago`, including daylight-saving adjustments
+- `.github/workflows/budget-nightly.yml`: runs the complete `runAll` refresh daily at `8:15 AM America/Chicago`, including daylight-saving adjustments. The off-hour minute reduces the chance of GitHub Actions queue delays that commonly affect schedules at the start of an hour.
 - `.github/workflows/backup.yml`: runs the encrypted Firestore backup weekly or manually, commits changed backup data, and posts the run status to AdminPanel
 
 ## Deploy

@@ -51,4 +51,4 @@ echo "  • Manual trigger (Local): npm run trigger:nightly"
 echo "  • Individual function test: npm run dev → Settings → Run All Actions"
 
 echo ""
-echo "✨ Automation runs daily at 8:00 AM America/Chicago"
+echo "✨ Automation runs daily at 8:15 AM America/Chicago"

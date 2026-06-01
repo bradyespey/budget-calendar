@@ -66,7 +66,7 @@ async function sendLowBalanceAlert(
   threshold: number
 ): Promise<void> {
   const alertDocRef = db.doc(LOW_BALANCE_ALERT_DOC);
-  const signature = `v2:${thresholdBreach?.date}:${lowest.date}:${threshold}`;
+  const signature = `v3:${thresholdBreach?.date}:${lowest.date}:${threshold}`;
   const alertDoc = await alertDocRef.get();
   const alertState = alertDoc.data();
 
@@ -115,7 +115,7 @@ async function sendLowBalanceAlert(
     body: JSON.stringify({
       from: fromEmail,
       to: [alertEmail],
-      subject: `Budget Calendar alert: below ${formattedThreshold} on ${formattedBreachDate}`,
+      subject: 'Budget Calendar Low Balance Alert',
       text: `Budget Calendar low balance alert\n\nYour balance is first projected to fall below your ${formattedThreshold} alert threshold on ${formattedBreachDate}, when it reaches ${formattedBreachBalance}.\n\nThe lowest projected balance in the current forecast is ${formattedLowestBalance} on ${formattedLowestDate}.\n\nReview your forecast: ${dashboardUrl}`,
       html: `
         <div style="background:#f4f7fb;padding:32px 16px;font-family:Arial,sans-serif;color:#172033;">

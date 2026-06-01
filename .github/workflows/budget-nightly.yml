@@ -2,7 +2,8 @@ name: Budget Nightly Automation
 
 on:
   schedule:
-    - cron: '30 12 * * *'  # 7:30 AM CT
+    - cron: '0 8 * * *'
+      timezone: 'America/Chicago'
   workflow_dispatch:  # Allow manual trigger
 
 jobs:

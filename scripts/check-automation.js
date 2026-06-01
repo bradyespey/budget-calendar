@@ -79,4 +79,4 @@ console.log('  • View Firebase logs: firebase functions:log --only nightlyBudg
 console.log('  • Manual trigger: gh workflow run budget-nightly.yml');
 console.log('  • Test function: curl -X POST "https://us-central1-budgetcalendar-e6538.cloudfunctions.net/nightlyBudgetUpdate" -H "Content-Type: application/json" -d "{}"');
 
-console.log('\n' + chalk.green('✨ Automation is running daily at 8:00 AM America/Chicago'));
+console.log('\n' + chalk.green('✨ Automation is running daily at 8:15 AM America/Chicago'));

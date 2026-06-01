@@ -72,7 +72,7 @@ export function TransactionsTable({
 }: TransactionsTableProps) {
   return (
     <div className="table-shell overflow-hidden">
-      <div className="max-h-[72vh] overflow-x-auto overflow-y-auto">
+      <div className="max-h-[72vh] overflow-x-auto overflow-y-auto rounded-[15px]">
         <table className="table-surface min-w-[980px]">
           <thead className="sticky top-0 z-10 backdrop-blur-xl">
               <tr className="border-b surface-divider">

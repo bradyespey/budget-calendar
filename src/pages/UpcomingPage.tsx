@@ -212,12 +212,11 @@ export function UpcomingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-5">
       {/* Header */}
       <PageHeader
-        className="mb-24 lg:mb-28"
         eyebrow="Upcoming"
-        title={`Upcoming Bills: ${searchTerm ? `${filteredDays.length} of ${upcomingDays.length}` : upcomingDays.length}-Day Projection`}
+        title={`${searchTerm ? `${filteredDays.length} of ${upcomingDays.length}` : upcomingDays.length}-Day Forecast`}
         subtitle={
           [
             budgetProjectionTimestamp && `Projections: ${formatTimestamp(budgetProjectionTimestamp)}`,
@@ -225,7 +224,6 @@ export function UpcomingPage() {
             lastProjected && `Last projected: ${formatTimestamp(lastProjected)}`,
           ].filter(Boolean).join(' • ')
         }
-        description="Search the forecast by merchant or category and review the checking balance day by day. Credit card charges still appear for visibility, but they stay out of the checking-balance math because the monthly credit card payment already includes them."
         helpSections={[
           {
             title: 'Display',

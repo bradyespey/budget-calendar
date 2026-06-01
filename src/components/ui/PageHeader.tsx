@@ -44,21 +44,21 @@ export function PageHeader({
   stats,
 }: PageHeaderProps) {
   return (
-    <div className={clsx('relative z-20 mb-6 sm:mb-8', className)}>
-      <div className="surface-card relative z-20 overflow-visible p-5 sm:p-6 lg:p-7">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+    <div className={clsx('relative z-20 mb-5', className)}>
+      <div className="surface-panel relative z-20 overflow-visible p-5 sm:p-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">
-            {eyebrow && <p className="eyebrow mb-3">{eyebrow}</p>}
-            <h1 className="display-copy overflow-visible pb-3 text-[2.35rem] leading-[1.24] sm:text-[2.9rem] text-[color:var(--text)]">
+            {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
+            <h1 className="display-copy overflow-visible pb-1 text-[2.3rem] leading-[1.16] sm:text-[2.9rem] text-[color:var(--text)]">
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-3 text-sm font-semibold text-[color:var(--accent)]">
+              <p className="mt-2 text-xs font-semibold text-[color:var(--accent)]">
                 {subtitle}
               </p>
             )}
             {description && (
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-[color:var(--muted)] sm:text-base">
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">
                 {description}
               </p>
             )}
@@ -72,7 +72,7 @@ export function PageHeader({
         {stats && stats.length > 0 && (
           <div
             className={clsx(
-              'mt-6 grid gap-3 sm:grid-cols-2',
+              'mt-5 grid gap-2 sm:grid-cols-2',
               stats.length >= 5 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'
             )}
           >
@@ -80,12 +80,12 @@ export function PageHeader({
               <div
                 key={`${stat.label}-${stat.value}`}
                 className={clsx(
-                  'stat-card border px-3 py-3.5',
+                  'flex min-h-[92px] flex-col items-center justify-center rounded-[13px] border px-3 py-3 text-center',
                   toneStyles[stat.tone || 'neutral']
                 )}
               >
-                <p className="eyebrow mb-2 text-current opacity-80">{stat.label}</p>
-                <p className="display-copy text-[1.45rem] leading-[1.18] text-[color:var(--text)]">{stat.value}</p>
+                <p className="eyebrow mb-2 text-[0.8rem] text-current opacity-90">{stat.label}</p>
+                <p className="text-[1.35rem] font-bold leading-[1.1] text-[color:var(--text)]">{stat.value}</p>
               </div>
             ))}
           </div>

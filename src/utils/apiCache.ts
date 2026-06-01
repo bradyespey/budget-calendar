@@ -10,6 +10,7 @@ class APICache {
   private defaultTTL = 5 * 60 * 1000; // 5 minutes
 
   set<T>(key: string, data: T, ttl?: number): void {
+    this.cleanup();
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
@@ -50,8 +51,3 @@ class APICache {
 }
 
 export const apiCache = new APICache();
-
-// Cleanup expired entries every 10 minutes
-setInterval(() => {
-  apiCache.cleanup();
-}, 10 * 60 * 1000);

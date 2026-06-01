@@ -26,7 +26,6 @@ export function TransactionsPage() {
     refreshing,
     error,
     setError,
-    fetchData,
     handleRefresh,
     createTransaction,
     updateTransaction,
@@ -180,7 +179,6 @@ export function TransactionsPage() {
 
   // Effects - Load data on mount only
   useEffect(() => {
-    fetchData();
     loadTimestamp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -227,13 +225,12 @@ export function TransactionsPage() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Header */}
         <PageHeader
           eyebrow="Transactions"
           title="Transactions"
           subtitle={refreshTransactionsTimestamp ? formatTimestamp(refreshTransactionsTimestamp) : undefined}
-          description="Recurring bills and income from Monarch and manual entries."
           helpSections={[
             {
               title: 'Quick Tips',

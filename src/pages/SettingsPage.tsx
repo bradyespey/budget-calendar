@@ -199,7 +199,6 @@ export function SettingsPage() {
     
     async function initializeData() {
       await fetchSettings();
-      await loadFunctionTimestamps();
       
       // Load show timestamps preference from localStorage
       const showTimestampsStored = localStorage.getItem('showTimestamps') === 'true';
@@ -465,13 +464,11 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-5">
       {/* Header */}
       <PageHeader
-        className="mb-24 lg:mb-28"
         eyebrow="Settings"
         title="Settings"
-        description="Adjust projection behavior, run manual automation steps, manage transaction metadata, and keep your workspace theme and calendars aligned."
         actions={(
           <Button
             onClick={handleSave}
@@ -544,7 +541,6 @@ export function SettingsPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Quick Actions</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-200">Manual triggers for account updates and calculations.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500 dark:text-gray-400">Show timestamps</span>
@@ -587,9 +583,6 @@ export function SettingsPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Budget Projection Settings</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-200">
-              Configure how far ahead to project balances and set low balance alerts.
-            </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -673,9 +666,6 @@ export function SettingsPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Maintenance Actions</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-200">
-              Data management, validation, and maintenance tools for your budget system.
-            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>

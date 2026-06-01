@@ -374,13 +374,12 @@ export function DashboardPage() {
 
   // ── UI ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <PageHeader
         eyebrow="Dashboard"
-        title="Financial Dashboard"
+        title="Overview"
         subtitle={refreshAccountsTimestamp ? formatTimestamp(refreshAccountsTimestamp) : 'Live account summary'}
-        description="Keep checking, savings, debt, and monthly cash flow in one place while the current projection window highlights the next pressure point."
         helpSections={[
           {
             title: 'Quick Overview',
@@ -403,26 +402,24 @@ export function DashboardPage() {
       
       {/* Row 1: Account Balances */}
       <div>
-        <h2 className="section-display mb-5 text-[2rem] text-[color:var(--text)]">Account Balances</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+        <h2 className="section-display mb-3 text-[1.65rem] text-[color:var(--text)]">Accounts</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {accountSummaryCards.map((card) => {
             const Icon = card.icon
             return (
               <Card key={card.label}>
-                <CardContent className="p-5">
-                  <div className="stat-card flex items-start gap-4 p-4 sm:p-5">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${card.iconBg} ${card.iconTone}`}>
+                <CardContent className="flex items-start gap-3 p-4">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${card.iconBg} ${card.iconTone}`}>
                       <Icon size={22} />
                     </div>
                     <div className="min-w-0">
-                      <p className="eyebrow mb-2">{card.label}</p>
-                      <p className="display-copy text-[2rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
-                      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{card.detail}</p>
+                      <p className="eyebrow mb-1">{card.label}</p>
+                      <p className="display-copy text-[1.7rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
+                      <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">{card.detail}</p>
                       {card.supporting ? (
                         <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]/85">{card.supporting}</p>
                       ) : null}
                     </div>
-                  </div>
                 </CardContent>
               </Card>
             )
@@ -432,26 +429,24 @@ export function DashboardPage() {
 
       {/* Row 2: Projected Balances */}
       <div>
-        <h2 className="section-display mb-5 text-[2rem] text-[color:var(--text)]">Projected Balances</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+        <h2 className="section-display mb-3 text-[1.65rem] text-[color:var(--text)]">Forecast</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {projectionSummaryCards.map((card) => {
             const Icon = card.icon
             return (
               <Card key={card.label}>
-                <CardContent className="p-5">
-                  <div className="stat-card flex items-start gap-4 p-4 sm:p-5">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${card.iconBg} ${card.iconTone}`}>
+                <CardContent className="flex items-start gap-3 p-4">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${card.iconBg} ${card.iconTone}`}>
                       <Icon size={22} />
                     </div>
                     <div className="min-w-0">
-                      <p className="eyebrow mb-2">{card.label}</p>
-                      <p className="display-copy text-[2rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
-                      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{card.detail}</p>
+                      <p className="eyebrow mb-1">{card.label}</p>
+                      <p className="display-copy text-[1.7rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
+                      <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">{card.detail}</p>
                       {card.supporting ? (
                         <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]/85">{card.supporting}</p>
                       ) : null}
                     </div>
-                  </div>
                 </CardContent>
               </Card>
             )
@@ -461,26 +456,24 @@ export function DashboardPage() {
 
       {/* Row 3: Monthly Cash Flow */}
       <div>
-        <h2 className="section-display mb-5 text-[2rem] text-[color:var(--text)]">Monthly Cash Flow</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+        <h2 className="section-display mb-3 text-[1.65rem] text-[color:var(--text)]">Monthly Flow</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {monthlySummaryCards.map((card) => {
             const Icon = card.icon
             return (
               <Card key={card.label}>
-                <CardContent className="p-5">
-                  <div className="stat-card flex items-start gap-4 p-4 sm:p-5">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${card.iconBg} ${card.iconTone}`}>
+                <CardContent className="flex items-start gap-3 p-4">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${card.iconBg} ${card.iconTone}`}>
                       <Icon size={22} />
                     </div>
                     <div className="min-w-0">
-                      <p className="eyebrow mb-2">{card.label}</p>
-                      <p className="display-copy text-[2rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
-                      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{card.detail}</p>
+                      <p className="eyebrow mb-1">{card.label}</p>
+                      <p className="display-copy text-[1.7rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
+                      <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">{card.detail}</p>
                       {card.supporting ? (
                         <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]/85">{card.supporting}</p>
                       ) : null}
                     </div>
-                  </div>
                 </CardContent>
               </Card>
             )

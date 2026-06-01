@@ -49,25 +49,31 @@ VITE_FIREBASE_FUNCTIONS_BASE_URL=http://127.0.0.1:5001/budgetcalendar-e6538/us-c
 
 Important notes:
 - Do not expose paid provider keys through `VITE_*`
-- `refreshAccounts`, `updateBalance`, and `refreshTransactions` use Firebase runtime config, not browser env vars
+- `refreshAccounts`, `updateBalance`, and `refreshTransactions` use server-side Firebase Functions env vars, not browser env vars
 - `refreshAccounts` calls Monarch directly, requests checking/savings refresh, and waits until those configured accounts are done syncing before returning success
 - Localhost calls deployed Firebase Functions by default so dev and production use the same backend
 - `VITE_FIREBASE_FUNCTIONS_BASE_URL` is optional and only needed for explicit emulator testing
 
-Firebase runtime config still required for live Functions:
+Firebase Functions env vars required for live Functions:
 
 ```bash
-firebase experiments:enable legacyRuntimeConfigCommands
-firebase functions:config:set \
-  monarch.token="YOUR_MONARCH_TOKEN" \
-  monarch.checking_id="YOUR_CHECKING_ACCOUNT_ID" \
-  monarch.savings_id="YOUR_SAVINGS_ACCOUNT_ID"
+MONARCH_TOKEN=
+MONARCH_CHECKING_ID=
+MONARCH_SAVINGS_ID=
 ```
 
-Google Calendar functions also require runtime config for:
-- `google.service_account_json`
+Google Calendar functions also require:
+- `GOOGLE_SERVICE_ACCOUNT_JSON`
 - dev/prod bills calendar IDs
 - dev/prod balance calendar IDs
+
+Low balance email alerts also require:
+- `RESEND_API_KEY`
+- `LOW_BALANCE_ALERT_EMAIL` — notification recipient, currently `bradyjennytx@gmail.com`
+- `RESEND_FROM_EMAIL` — recommended sender: `Budget Calendar <comments@theespeys.com>`
+- `BUDGET_CALENDAR_SITE_URL`
+
+Keep local values in `functions/.env`. Firebase deploy reads that local file for the Functions environment. The shared Resend key is stored in 1Password under `Private` → `Resend` → `Email Sending API key`.
 
 GitHub Actions secrets required for weekly encrypted backups:
 - `FIREBASE_SERVICE_ACCOUNT`
@@ -84,8 +90,8 @@ Development environment loading:
 - `npm run dev` runs plain `vite` — Vite loads `.env` automatically from the project root
 
 Local function testing:
-- Create `functions/.runtimeconfig.json` from Firebase runtime config before starting the emulator
-- Keep `functions/.runtimeconfig.json` local only; it contains secrets and is gitignored
+- Fill in the local `functions/.env` values before starting the emulator
+- Keep `functions/.env` local only; it contains secrets and is gitignored
 - Set `VITE_FIREBASE_FUNCTIONS_BASE_URL=http://127.0.0.1:5001/budgetcalendar-e6538/us-central1` only when intentionally testing the local emulator
 
 ## Scripts and Ops
@@ -100,7 +106,7 @@ Key Functions:
 - `refreshAccounts`: calls Monarch directly to refresh configured checking/savings accounts and waits for those syncs to complete
 - `updateBalance`: pulls checking, savings, and credit-card totals from Monarch and stores account snapshots
 - `refreshTransactions`: refreshes recurring Monarch streams into Firestore; maps Monarch account types to Checking/Credit Card; Unknown account type + negative amount is reclassified as Credit Card (CC charges without a real account don't affect balance projection)
-- `budgetProjection`: calculates projected checking balances with business-day adjustments; excludes Credit Card and unknown-account-type expenses from balance (those are covered by CC payment bills); writes monthly cash flow summary (category averages and bills/income by frequency) to `monthlyCashFlow/current`
+- `budgetProjection`: calculates projected checking balances with business-day adjustments; excludes Credit Card and unknown-account-type expenses from balance (those are covered by CC payment bills); writes monthly cash flow summary (category averages and bills/income by frequency) to `monthlyCashFlow/current`; sends one Resend email when the next projected low point changes below the configured threshold
 - `syncCalendar`: syncs bills and projected balances to Google Calendar as all-day events with event reminders disabled
 - `clearCalendars`: clears future events from configured calendars
 - `runAll`: orchestrates the nightly automation flow; it requests a Monarch account refresh first, but if Monarch is still syncing after the wait window, it records a warning and continues with the balance, transaction, projection, and calendar steps using available account data

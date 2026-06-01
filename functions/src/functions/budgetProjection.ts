@@ -6,6 +6,13 @@ import * as functions from "firebase-functions/v1";
 const db = getFirestore();
 const region = 'us-central1';
 const TIMEZONE = 'America/Chicago';
+const DEFAULT_SITE_URL = 'https://budget.theespeys.com';
+const LOW_BALANCE_ALERT_DOC = 'admin/lowBalanceAlert';
+
+type LowBalancePoint = {
+  balance: number;
+  date: string;
+};
 
 function formatInChicago(date: Date): string {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -35,6 +42,111 @@ function addDaysToYMD(dateStr: string, days: number): string {
   const date = chicagoDateFromYMD(dateStr);
   date.setUTCDate(date.getUTCDate() + days);
   return formatInChicago(date);
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
+}
+
+function formatAlertDate(dateStr: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(chicagoDateFromYMD(dateStr));
+}
+
+async function sendLowBalanceAlert(lowest: LowBalancePoint, threshold: number): Promise<void> {
+  const alertDocRef = db.doc(LOW_BALANCE_ALERT_DOC);
+  const signature = `${lowest.date}:${threshold}`;
+  const alertDoc = await alertDocRef.get();
+  const alertState = alertDoc.data();
+
+  if (lowest.balance >= threshold) {
+    if (alertState?.activeBreach) {
+      await alertDocRef.set({
+        activeBreach: false,
+        activeSignature: null,
+        clearedAt: new Date(),
+      }, { merge: true });
+      logger.info('Low balance alert state cleared');
+    }
+    return;
+  }
+
+  if (alertState?.activeSignature === signature) {
+    logger.info(`Low balance alert already sent for ${lowest.date}`);
+    return;
+  }
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const alertEmail = process.env.LOW_BALANCE_ALERT_EMAIL;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Budget Calendar <comments@theespeys.com>';
+  const siteUrl = process.env.BUDGET_CALENDAR_SITE_URL || DEFAULT_SITE_URL;
+
+  if (!resendApiKey || !alertEmail) {
+    logger.warn('Low balance alert skipped because Resend configuration is incomplete', {
+      resendApiKeyConfigured: Boolean(resendApiKey),
+      alertEmailConfigured: Boolean(alertEmail),
+    });
+    return;
+  }
+
+  const formattedDate = formatAlertDate(lowest.date);
+  const formattedBalance = formatCurrency(lowest.balance);
+  const formattedThreshold = formatCurrency(threshold);
+  const dashboardUrl = `${siteUrl.replace(/\/$/, '')}/dashboard`;
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [alertEmail],
+      subject: `Budget Calendar low balance: ${formattedBalance} on ${formattedDate}`,
+      text: `Budget Calendar low balance alert\n\nYour next projected low point is ${formattedBalance} on ${formattedDate}, below your ${formattedThreshold} alert threshold.\n\nReview your forecast: ${dashboardUrl}`,
+      html: `
+        <div style="background:#f4f7fb;padding:32px 16px;font-family:Arial,sans-serif;color:#172033;">
+          <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e3e9f2;border-radius:16px;overflow:hidden;">
+            <div style="background:#173b68;padding:24px 28px;color:#ffffff;">
+              <div style="font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.82;">Budget Calendar</div>
+              <h1 style="margin:8px 0 0;font-size:24px;line-height:1.25;">Low balance forecast</h1>
+            </div>
+            <div style="padding:28px;">
+              <p style="margin:0 0 20px;font-size:16px;line-height:1.6;">Your next projected low point is below your alert threshold.</p>
+              <div style="background:#fff5f3;border:1px solid #ffd3cc;border-radius:12px;padding:18px 20px;margin-bottom:20px;">
+                <div style="font-size:13px;font-weight:700;color:#9f2d20;text-transform:uppercase;letter-spacing:0.06em;">Projected low point</div>
+                <div style="margin-top:6px;font-size:30px;font-weight:700;color:#8a2419;">${formattedBalance}</div>
+                <div style="margin-top:4px;font-size:15px;color:#5f2d28;">${formattedDate}</div>
+              </div>
+              <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#4b5565;">Your current alert threshold is <strong>${formattedThreshold}</strong>. Review the upcoming transactions and forecast to see what is driving the low point.</p>
+              <a href="${dashboardUrl}" style="display:inline-block;background:#173b68;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:13px 20px;border-radius:9px;">Review Budget Calendar</a>
+            </div>
+          </div>
+        </div>
+      `,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Resend low balance alert failed with HTTP ${response.status}`);
+  }
+
+  await alertDocRef.set({
+    activeBreach: true,
+    activeSignature: signature,
+    lastSentAt: new Date(),
+    projectedBalance: lowest.balance,
+    projectedDate: lowest.date,
+    threshold,
+  }, { merge: true });
+  logger.info(`Sent low balance alert for ${lowest.date}`);
 }
 
 function parseProjectionDate(value: unknown): Date {
@@ -429,6 +541,12 @@ async function computeProjections(settings: any) {
     lastUpdated: new Date(),
     projectionDays: projectionDays
   });
+
+  try {
+    await sendLowBalanceAlert(lowest, Number(settings.balanceThreshold) || 0);
+  } catch (error) {
+    logger.error('Failed to send low balance alert:', error);
+  }
   
   logger.info(`Completed projections for ${projectionDays} days and Monthly Cash Flow calculation`);
   } catch (error) {

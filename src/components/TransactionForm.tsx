@@ -9,24 +9,50 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { FREQUENCY_OPTIONS } from '../utils/transactionUtils';
 
 export type FormMode = 'create' | 'edit' | 'view';
+type IconType = 'brand' | 'generated' | 'category' | 'custom' | null;
+
+interface TransactionFormData {
+  name: string;
+  category: string;
+  amount: number;
+  frequency: string;
+  repeats_every: number | string;
+  start_date: string;
+  end_date?: string;
+  notes: string;
+  iconUrl?: string | null;
+  iconType?: IconType;
+  accountType?: string;
+}
+
+type TransactionSubmitData = Omit<TransactionFormData, 'repeats_every' | 'end_date'> & {
+  repeats_every: number;
+  end_date: string | null;
+  iconUrl: string | null;
+  iconType: IconType;
+};
 
 interface TransactionFormProps {
   mode: FormMode;
-  initialData?: {
-    name: string;
-    category: string;
-    amount: number;
-    frequency: string;
-    repeats_every: number | string;
-    start_date: string;
-    end_date?: string;
-    notes: string;
-    iconUrl?: string;
-    iconType?: 'brand' | 'generated' | 'category' | 'custom' | null;
-    accountType?: string;
-  };
-  onSubmit: (data: any) => Promise<void>;
+  initialData?: TransactionFormData;
+  onSubmit: (data: TransactionSubmitData) => Promise<void>;
   onCancel: () => void;
+}
+
+function formatAmountInput(value: number | string) {
+  if (value === '' || value === 0) return '';
+  const numericValue = typeof value === 'number' ? value : Number(value.replace(/,/g, ''));
+  if (!Number.isFinite(numericValue) || numericValue === 0) return '';
+
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(numericValue));
+}
+
+function parseAmountInput(value: string) {
+  const numericValue = Number(value.replace(/,/g, ''));
+  return Number.isFinite(numericValue) ? numericValue : 0;
 }
 
 export function TransactionForm({ mode, initialData, onSubmit, onCancel }: TransactionFormProps) {
@@ -245,13 +271,14 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
                     </span>
                     <input
                       name="amount"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={Math.abs(formData.amount) || ''}
+                      type="text"
+                      inputMode="decimal"
+                      value={formatAmountInput(formData.amount)}
                       onChange={(e) => {
-                        const numValue = parseFloat(e.target.value) || 0;
-                        setFormData(prev => ({ ...prev, amount: numValue }));
+                        const sanitizedValue = e.target.value
+                          .replace(/[^\d.]/g, '')
+                          .replace(/(\..*)\./g, '$1');
+                        setFormData(prev => ({ ...prev, amount: parseAmountInput(sanitizedValue) }));
                       }}
                       required
                       placeholder="0.00"
@@ -407,4 +434,3 @@ export function TransactionForm({ mode, initialData, onSubmit, onCancel }: Trans
     </div>
   );
 }
-

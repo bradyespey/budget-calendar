@@ -8,7 +8,6 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
 } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
@@ -20,7 +19,6 @@ import {
 import { triggerManualRecalculation } from '../api/projections'
 import { syncCalendar, getSettings, updateSettings, getFunctionTimestamps, saveFunctionTimestamp, refreshRecurringTransactions, runAll } from '../api/firebase'
 import { useBalance } from '../context/BalanceContext'
-import { useTheme } from '../components/ThemeProvider'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { CategoryManagement } from '../components/CategoryManagement'
@@ -28,7 +26,6 @@ import { getIconBackupInfo } from '../api/icons'
 import { QuickActionButtons } from '../components/QuickActions'
 import { MaintenanceActions } from '../components/MaintenanceActions'
 import { useMaintenanceActions } from '../hooks/useMaintenanceActions'
-import { ThemeToggleMenu } from '../components/ThemeToggleMenu'
 
 type CurrencyInputProps = React.ComponentProps<typeof Input> & {
   value: string;
@@ -59,6 +56,10 @@ export function CurrencyInput({ value, setValue, ...props }: CurrencyInputProps)
   );
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export function SettingsPage() {
   const [busy, setBusy] = useState(false)
   const [backupInfo, setBackupInfo] = useState<{ hasBackup: boolean; backupCount?: number; timestamp?: string; message: string } | null>(null)
@@ -66,7 +67,6 @@ export function SettingsPage() {
   const { session } = useAuth()
   const isDemo = !session.isAuthenticated
   const { setBalance, setLastSync } = useBalance()
-  const { theme } = useTheme()
   const [localProjectionDays, setLocalProjectionDays] = useState<number | null>(null)
   const [localBalanceThreshold, setLocalBalanceThreshold] = useState<number>(1000)
   const [saveMessage] = useState('')
@@ -222,8 +222,8 @@ export function SettingsPage() {
       await refreshMonarchAccounts();
       await saveFunctionTimestampLocal('refreshAccounts');
       showNotification('Accounts refreshed.', 'success');
-    } catch (e: any) {
-      showNotification(`Error refreshing accounts: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showNotification(`Error refreshing accounts: ${getErrorMessage(e, 'Refresh failed')}`, 'error');
     } finally {
       setBusy(false);
       setActiveAction(null);
@@ -243,8 +243,8 @@ export function SettingsPage() {
       await setBalance(bal);
       await saveFunctionTimestampLocal('updateBalance');
       showNotification(`All account balances updated successfully`, 'success');
-    } catch (e: any) {
-      showNotification(`Error updating account balances: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showNotification(`Error updating account balances: ${getErrorMessage(e, 'Balance update failed')}`, 'error');
     } finally {
       setBusy(false);
       setActiveAction(null);
@@ -261,7 +261,7 @@ export function SettingsPage() {
       await triggerManualRecalculation();
       await saveFunctionTimestampLocal('budgetProjection');
       showNotification('Budget projections recalculated.', 'success');
-    } catch (e: any) {
+    } catch (e: unknown) {
       showNotification('Error recalculating projections.', 'error');
     } finally {
       setBusy(false);
@@ -287,8 +287,8 @@ export function SettingsPage() {
       } else {
         showNotification(`Calendar sync failed: ${result.message}`, 'error');
       }
-    } catch (e: any) {
-      showNotification(`Error syncing calendar: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showNotification(`Error syncing calendar: ${getErrorMessage(e, 'Calendar sync failed')}`, 'error');
     } finally {
       setBusy(false);
       setActiveAction(null);
@@ -311,8 +311,8 @@ export function SettingsPage() {
         `Transactions refreshed. Stored ${result.storedCount ?? 0} transactions${typeof result.deletedCount === 'number' ? ` and deleted ${result.deletedCount}` : ''}.`,
         'success'
       );
-    } catch (e: any) {
-      showNotification(`Error refreshing transactions: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showNotification(`Error refreshing transactions: ${getErrorMessage(e, 'Transaction refresh failed')}`, 'error');
     } finally {
       setBusy(false);
       setActiveAction(null);
@@ -394,6 +394,7 @@ export function SettingsPage() {
     if (stored) {
       setShowTimestamps(JSON.parse(stored));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -436,8 +437,8 @@ export function SettingsPage() {
         : result.message || 'All actions completed successfully.';
 
       showNotification(message, result.success === false ? 'error' : 'success');
-    } catch (e: any) {
-      showNotification('Error running all actions: ' + (e.message || e), 'error');
+    } catch (e: unknown) {
+      showNotification(`Error running all actions: ${getErrorMessage(e, 'Run all failed')}`, 'error');
     } finally {
       setBusy(false);
       setActiveAction(null);
@@ -467,6 +468,7 @@ export function SettingsPage() {
     <div className="mx-auto max-w-6xl space-y-5">
       {/* Header */}
       <PageHeader
+        className="sticky top-3 z-30 bg-[color:var(--bg)]/95 pb-3 backdrop-blur-xl"
         eyebrow="Settings"
         title="Settings"
         actions={(
@@ -512,7 +514,6 @@ export function SettingsPage() {
           { label: 'Projection days', value: `${localProjectionDays ?? 7}`, tone: 'accent' },
           { label: 'Low balance alert', value: `$${localBalanceThreshold.toLocaleString()}`, tone: 'danger' },
           { label: 'Calendar target', value: calendarMode === 'prod' ? 'Main' : 'Test', tone: 'warning' },
-          { label: 'Theme', value: theme.charAt(0).toUpperCase() + theme.slice(1), tone: 'success' },
         ]}
       />
       
@@ -689,69 +690,36 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Category Management Card - spans full width */}
-      <CategoryManagement showNotification={showNotification} />
-      
-      {/* Theme Settings and Calendar Links - side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>Theme Settings</CardTitle>
-            <CardDescription>
-              Choose your preferred appearance theme for the application.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between gap-4">
-              <div className="text-sm text-[color:var(--muted)]">
-                Current theme: <span className="font-semibold text-[color:var(--text)]">{theme.charAt(0).toUpperCase() + theme.slice(1)}</span>
-              </div>
-              <ThemeToggleMenu align="end" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>Calendar Links</CardTitle>
-            <CardDescription>
-              Quick access to your Google Calendars for budget tracking.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div>
+      <CategoryManagement
+        showNotification={showNotification}
+        sidePanel={(
+          <div className="grid gap-4">
+            <section className="rounded-[18px] border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4">
+              <p className="eyebrow mb-3">Calendar Links</p>
+              <div className="grid gap-2">
                 <a
                   href="https://calendar.google.com/calendar/u/0/r/agenda"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-11 items-center gap-2 rounded-full border border-[color:var(--line-strong)] bg-[color:var(--surface)] px-5 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface-hover)]"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[color:var(--line-strong)] bg-[color:var(--surface)] px-4 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface-hover)]"
                 >
                   <Calendar className="h-4 w-4" />
                   Test Calendar
                 </a>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Development/testing calendar for budget events
-                </p>
-              </div>
-              <div>
                 <a
                   href="https://calendar.google.com/calendar/u/1/r/agenda"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-11 items-center gap-2 rounded-full border border-[color:var(--line-strong)] bg-[color:var(--surface)] px-5 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface-hover)]"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[color:var(--line-strong)] bg-[color:var(--surface)] px-4 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface-hover)]"
                 >
                   <Calendar className="h-4 w-4" />
                   Main Calendar
                 </a>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Production calendar for live budget tracking
-                </p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </section>
+          </div>
+        )}
+      />
       
       {/* Hidden file input for CSV import */}
       <input

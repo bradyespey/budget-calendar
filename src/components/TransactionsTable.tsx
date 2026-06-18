@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns';
 import { TransactionIcon } from './TransactionIcon';
 import { CombinedTransaction } from '../hooks/useTransactions';
 import { SortField, SortDirection } from '../hooks/useTransactionFilters';
-import { formatCurrency, capitalize, shortenAccountName } from '../utils/transactionUtils';
+import { formatCurrency, capitalize, shortenAccountName, formatFrequencyLabel } from '../utils/transactionUtils';
 
 interface TransactionsTableProps {
   transactions: CombinedTransaction[];
@@ -130,7 +130,7 @@ export function TransactionsTable({
                   key={transaction.id}
                   className="border-b transition hover:bg-[color:var(--surface-hover)] surface-divider"
                 >
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
                       <TransactionIcon
@@ -166,22 +166,22 @@ export function TransactionsTable({
                       ) : null}
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-sm text-[color:var(--text)]">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-[color:var(--text)]">
                     {transaction.dueDate ? format(parseISO(transaction.dueDate), 'MMM d') : '—'}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-sm text-[color:var(--muted)]">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-[color:var(--muted)]">
                     {transaction.end_date ? format(parseISO(transaction.end_date), 'MMM d, yyyy') : '—'}
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-3">
                     <span 
-                      className="pill-chip inline-flex cursor-pointer px-3 py-1.5 text-xs font-semibold transition"
+                      className="inline-flex cursor-pointer whitespace-nowrap text-sm font-semibold text-[color:var(--text)] underline-offset-4 transition hover:text-[color:var(--accent)] hover:underline"
                       onClick={() => onFilterClick('frequency', transaction.frequency)}
                       title={`Filter by ${transaction.frequency}`}
                     >
-                      {transaction.frequency}
+                      {formatFrequencyLabel(transaction.frequency)}
                     </span>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-3">
                     <span 
                       className="cursor-pointer text-sm font-medium text-[color:var(--text)] transition hover:text-[color:var(--accent)]"
                       onClick={() => onFilterClick('account', transaction.account)}
@@ -190,7 +190,7 @@ export function TransactionsTable({
                       {shortenAccountName(transaction.account)}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-sm text-[color:var(--muted)]">
+                  <td className="px-4 py-3 text-sm text-[color:var(--muted)]">
                     <span 
                       className="cursor-pointer transition hover:text-[color:var(--text)]"
                       onClick={() => onFilterClick('accountType', transaction.accountType || '')}
@@ -199,7 +199,7 @@ export function TransactionsTable({
                       {transaction.accountType || 'Unknown'}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-sm text-[color:var(--muted)]">
+                  <td className="px-4 py-3 text-sm text-[color:var(--muted)]">
                     <span 
                       className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 transition hover:bg-[color:var(--surface-muted)]"
                       onClick={() => onFilterClick('category', transaction.category)}
@@ -211,12 +211,12 @@ export function TransactionsTable({
                       {capitalize(transaction.category)}
                     </span>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-3">
                     <span className={transaction.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>
                       {formatCurrency(Math.abs(transaction.amount))}
                     </span>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-3">
                     <span 
                       className={`inline-flex cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-opacity ${
                         transaction.source === 'manual' 
@@ -229,7 +229,7 @@ export function TransactionsTable({
                       {transaction.source === 'manual' ? 'Manual' : 'Monarch'}
                     </span>
                   </td>
-                  <td className="max-w-xs px-4 py-4 text-sm text-[color:var(--muted)]">
+                  <td className="max-w-xs px-4 py-3 text-sm text-[color:var(--muted)]">
                     <div className="truncate" title={transaction.notes || ''}>
                       {transaction.notes || '—'}
                     </div>

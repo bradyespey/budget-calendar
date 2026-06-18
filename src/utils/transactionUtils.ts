@@ -24,6 +24,21 @@ export const FREQUENCY_OPTIONS = [
   { value: 'one-time', label: 'One-time' },
 ];
 
+export function formatFrequencyLabel(frequency: string): string {
+  const frequencyOption = FREQUENCY_OPTIONS.find((option) => option.value === frequency);
+  if (frequencyOption) {
+    if (frequency === 'semimonthly' || frequency === 'semimonthly_mid_end') return 'Twice monthly';
+    return frequencyOption.label;
+  }
+
+  const everyWeeks = frequency.match(/^every_(\d+)_weeks$/);
+  if (everyWeeks) return `Every ${everyWeeks[1]} weeks`;
+
+  const everyMonths = frequency.match(/^every_(\d+)_months$/);
+  if (everyMonths) return `Every ${everyMonths[1]} months`;
+
+  return capitalize(frequency.replace(/_/g, ' '));
+}
 
 export function shortenAccountName(accountName: string): string {
   const accountMappings: Record<string, string> = {

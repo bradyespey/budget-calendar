@@ -2,7 +2,7 @@
 **Scope**: This README replaces prior selected overview docs
 
 ## Overview
-Budget Calendar is a personal financial forecasting app for checking-balance planning. It combines Monarch-derived balances and recurring transactions, manual transactions, projection logic, and Google Calendar sync so upcoming bills, income, and projected balance changes stay in one workspace.
+Budget Calendar is a personal financial forecasting app for checking-balance planning. It combines Monarch-derived balances and recurring transactions, manual transactions, projection logic, and Google Calendar sync so future bills, income, and projected balance changes stay in one workspace.
 
 ## Live and Admin
 - App URL: `https://budget.theespeys.com`
@@ -134,9 +134,9 @@ Important:
 - treat any `Build failed` output or error lines as a failed deploy even if the watcher prints a success-style summary
 
 ## App Pages / Routes
-- `/dashboard`: balances, alerts, forecast summary, savings trend; category averages (client-side, all bills, clickable → filtered transactions); bills/income summary by frequency (daily/weekly/biweekly/semimonthly/monthly/yearly/one-time)
+- `/dashboard`: balances, alerts, forecast summary, balance projection chart, savings trend; category averages (client-side, all bills, clickable → filtered transactions); bills/income summary by frequency (daily/weekly/biweekly/semimonthly/monthly/yearly/one-time)
 - `/transactions`: Recurring Bills & Income — Monarch entries are read-only (categories and details sync from Monarch); manual transactions can be created and edited freely
-- `/upcoming`: 7-day projection view, transaction search, balance-impact vs excluded display; CC charges shown as excluded (covered by CC payment bill)
+- `/calendar`: projection calendar, transaction search, balance-impact vs excluded display; CC charges shown as excluded (covered by CC payment bill)
 - `/settings`: projection settings, quick actions, maintenance actions, calendar controls
 - `/login`: restricted sign-in and demo access
 

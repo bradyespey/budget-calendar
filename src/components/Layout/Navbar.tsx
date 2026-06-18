@@ -17,7 +17,6 @@ import { useBalance } from '../../context/BalanceContext';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 import { useState, useEffect } from 'react';
 import { getHighLowProjections } from '../../api/projections';
-import { ThemeToggleMenu } from '../ThemeToggleMenu';
 
 interface NavbarProps {
   onTransactionsClick?: () => void;
@@ -63,7 +62,7 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
   const navLinks = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/transactions', label: 'Transactions', icon: WalletCards },
-    { path: '/upcoming', label: 'Upcoming', icon: CalendarDays },
+    { path: '/calendar', label: 'Calendar', icon: CalendarDays },
     { path: '/settings', label: 'Settings', icon: Settings2 },
   ];
 
@@ -108,18 +107,13 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
   return (
     <>
       <aside className="hidden lg:block lg:w-[252px] lg:flex-shrink-0">
-        <div className="surface-card sticky top-4 flex h-[calc(100vh-2rem)] flex-col overflow-y-auto overscroll-contain p-4">
+        <div className="sticky top-4 flex h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[24px] border border-[color:var(--line)] bg-[color:var(--surface)] px-4 py-5 shadow-[var(--shadow-soft)] backdrop-blur-xl">
           <div>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[color:var(--accent-soft)] text-[color:var(--accent)]">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[color:var(--accent-soft)] text-[color:var(--accent)]">
                 <WalletCards size={21} />
               </div>
-
-              <ThemeToggleMenu align="end" />
-            </div>
-
-            <div className="mt-5">
-              <Link to="/dashboard" className="display-copy block text-[1.78rem] leading-[1.02] text-[color:var(--text)]">
+              <Link to="/dashboard" className="display-copy block text-[1.72rem] leading-[1.02] text-[color:var(--text)]">
                 Budget Calendar
               </Link>
             </div>
@@ -132,17 +126,17 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
             </div>
           )}
 
-          <div className="surface-panel mt-5 grid gap-4 p-4">{statusCards}</div>
+          <div className="mt-5 grid gap-4 rounded-[20px] border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4">{statusCards}</div>
 
-          <nav className="mt-5 flex flex-1 flex-col gap-1">
+          <nav className="mt-5 flex flex-1 flex-col gap-1.5">
             {navLinks.map(({ path, label, icon: Icon }) => (
               <Link
                 key={path}
                 to={path}
-                className={`flex items-center gap-3 rounded-[13px] border px-3 py-2.5 text-sm font-semibold transition ${
+                className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-semibold transition ${
                   isActive(path)
-                    ? 'border-[color:var(--accent)] bg-[color:var(--accent-soft)] text-[color:var(--accent)]'
-                    : 'border-transparent text-[color:var(--muted)] hover:border-[color:var(--line)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text)]'
+                    ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent)] shadow-[inset_0_0_0_1px_var(--accent)]'
+                    : 'text-[color:var(--muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text)]'
                 }`}
                 onClick={() => {
                   if (path === '/transactions' && onTransactionsClick) {
@@ -159,12 +153,12 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
           <div className="mt-4">
             <div>
               {session.isAuthenticated ? (
-                <Button variant="outline" size="md" onClick={signOut} className="w-full">
+                <Button variant="outline" size="md" onClick={signOut} className="w-full rounded-full">
                   <LogOut size={16} />
                   Sign Out
                 </Button>
               ) : (
-                <Button variant="primary" size="md" onClick={handleSignIn} className="w-full">
+                <Button variant="primary" size="md" onClick={handleSignIn} className="w-full rounded-full">
                   <LogIn size={16} />
                   Sign In
                 </Button>
@@ -175,17 +169,12 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
       </aside>
 
       <div className="w-full lg:hidden">
-        <div className="surface-card mb-5 w-full space-y-4 p-4 sm:p-5">
+        <div className="mb-5 w-full space-y-4 rounded-[24px] border border-[color:var(--line)] bg-[color:var(--surface)] p-4 shadow-[var(--shadow-soft)] backdrop-blur-xl sm:p-5">
           <div>
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[color:var(--accent-soft)] text-[color:var(--accent)]">
                 <WalletCards size={24} />
               </div>
-
-              <ThemeToggleMenu align="end" />
-            </div>
-
-            <div className="mt-4">
               <Link to="/dashboard" className="display-copy block text-[1.98rem] leading-[1.02] text-[color:var(--text)]">
                 Budget Calendar
               </Link>

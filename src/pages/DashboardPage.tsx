@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardContent } from '../components/ui/Card'
-import { getHighLowProjections } from '../api/projections'
+import { getHighLowProjections, getProjections } from '../api/projections'
 import { getBills } from '../api/bills'
 import { getSavingsBalance, getSavingsHistory, getCreditCardDebt } from '../api/accounts'
 import { Bill, Projection } from '../types'
@@ -31,6 +31,11 @@ import { getFunctionTimestamps, getSettings, getMonthlyCashFlow } from '../api/f
 const SavingsChart = lazy(async () => {
   const module = await import('../components/SavingsChart')
   return { default: module.SavingsChart }
+})
+
+const ProjectedBalanceChart = lazy(async () => {
+  const module = await import('../components/ProjectedBalanceChart')
+  return { default: module.ProjectedBalanceChart }
 })
 
 interface CategoryAverage {
@@ -52,6 +57,11 @@ interface BillsSummary {
   semimonthly: BillsIncome
   monthly: BillsIncome
   yearly: BillsIncome
+}
+
+interface DashboardSettings {
+  balanceThreshold?: number
+  projectionDays?: number
 }
 
 interface SummaryCard {
@@ -139,10 +149,11 @@ export function DashboardPage() {
   const [refreshAccountsTimestamp, setRefreshAccountsTimestamp] = useState<Date | null>(null)
   const [savingsBalance, setSavingsBalance] = useState<number | null>(null)
   const [savingsHistory, setSavingsHistory] = useState<Array<{ balance: number; timestamp: Date }>>([])
+  const [balanceProjections, setBalanceProjections] = useState<Projection[]>([])
   const [creditCardDebt, setCreditCardDebt] = useState<number | null>(null)
   const [projectionDays, setProjectionDays] = useState<number>(7)
   const [thresholdBreach, setThresholdBreach] = useState<{ date: string; balance: number } | null>(null)
-  const [settings, setSettings] = useState<any>(null)
+  const [settings, setSettings] = useState<DashboardSettings | null>(null)
 
   const { balance: checkingBalance, lastSync } = useBalance()
   const { session } = useAuth()
@@ -188,9 +199,10 @@ export function DashboardPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const [billsData, highLowData, savings, history, creditCards, settings, monthlyCashFlow] = await Promise.all([
+        const [billsData, highLowData, projections, savings, history, creditCards, settings, monthlyCashFlow] = await Promise.all([
           getBills(),
           getHighLowProjections(),
+          getProjections(),
           getSavingsBalance(),
           getSavingsHistory(),
           getCreditCardDebt(),
@@ -199,6 +211,7 @@ export function DashboardPage() {
         ])
         setBills(billsData)
         setHighLow(highLowData)
+        setBalanceProjections(projections)
         setSavingsBalance(savings)
         setSavingsHistory(history)
         setCreditCardDebt(creditCards)
@@ -358,6 +371,12 @@ export function DashboardPage() {
     }
   }
 
+  const summarySections = [
+    { title: 'Accounts', cards: accountSummaryCards },
+    { title: 'Forecast', cards: projectionSummaryCards },
+    { title: 'Monthly Flow', cards: monthlySummaryCards },
+  ]
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -400,98 +419,70 @@ export function DashboardPage() {
         ]}
       />
       
-      {/* Row 1: Account Balances */}
-      <div>
-        <h2 className="section-display mb-3 text-[1.65rem] text-[color:var(--text)]">Accounts</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {accountSummaryCards.map((card) => {
-            const Icon = card.icon
-            return (
-              <Card key={card.label}>
-                <CardContent className="flex items-start gap-3 p-4">
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${card.iconBg} ${card.iconTone}`}>
-                      <Icon size={22} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="eyebrow mb-1">{card.label}</p>
-                      <p className="display-copy text-[1.7rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
-                      <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">{card.detail}</p>
-                      {card.supporting ? (
-                        <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]/85">{card.supporting}</p>
-                      ) : null}
-                    </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      </div>
+      <Card>
+        <CardContent className="p-4 sm:p-5">
+          <div className="grid gap-5 xl:grid-cols-3">
+            {summarySections.map((section) => (
+              <section key={section.title} className="min-w-0">
+                <h2 className="section-display mb-3 text-[1.35rem] text-[color:var(--text)]">{section.title}</h2>
+                <div className="grid gap-2">
+                  {section.cards.map((card) => {
+                    const Icon = card.icon
+                    return (
+                      <div
+                        key={card.label}
+                        className="flex min-w-0 items-start gap-3 rounded-[16px] border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-3"
+                      >
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] ${card.iconBg} ${card.iconTone}`}>
+                          <Icon size={19} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="eyebrow mb-1 text-[0.64rem]">{card.label}</p>
+                          <p className="display-copy text-[1.45rem] leading-tight text-[color:var(--text)]">{card.value}</p>
+                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--muted)]">{card.detail}</p>
+                          {card.supporting ? (
+                            <p className="mt-1 text-xs leading-5 text-[color:var(--muted)]">{card.supporting}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Row 2: Projected Balances */}
-      <div>
-        <h2 className="section-display mb-3 text-[1.65rem] text-[color:var(--text)]">Forecast</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {projectionSummaryCards.map((card) => {
-            const Icon = card.icon
-            return (
-              <Card key={card.label}>
-                <CardContent className="flex items-start gap-3 p-4">
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${card.iconBg} ${card.iconTone}`}>
-                      <Icon size={22} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="eyebrow mb-1">{card.label}</p>
-                      <p className="display-copy text-[1.7rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
-                      <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">{card.detail}</p>
-                      {card.supporting ? (
-                        <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]/85">{card.supporting}</p>
-                      ) : null}
-                    </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Row 3: Monthly Cash Flow */}
-      <div>
-        <h2 className="section-display mb-3 text-[1.65rem] text-[color:var(--text)]">Monthly Flow</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {monthlySummaryCards.map((card) => {
-            const Icon = card.icon
-            return (
-              <Card key={card.label}>
-                <CardContent className="flex items-start gap-3 p-4">
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${card.iconBg} ${card.iconTone}`}>
-                      <Icon size={22} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="eyebrow mb-1">{card.label}</p>
-                      <p className="display-copy text-[1.7rem] leading-[1.12] text-[color:var(--text)]">{card.value}</p>
-                      <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">{card.detail}</p>
-                      {card.supporting ? (
-                        <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]/85">{card.supporting}</p>
-                      ) : null}
-                    </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      </div>
+      <Card>
+        <CardContent className="p-4 sm:p-5">
+          <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <h3 className="section-display text-[1.45rem] text-[color:var(--text)]">Balance Projection</h3>
+            <p className="text-xs text-[color:var(--muted)]">Projected checking balance from today through the forecast window.</p>
+          </div>
+          <Suspense
+            fallback={
+              <div className="flex h-[220px] items-center justify-center rounded-[16px] border border-[color:var(--line)] bg-[color:var(--surface-muted)] text-sm text-[color:var(--muted)]">
+                Loading balance projection…
+              </div>
+            }
+          >
+            <ProjectedBalanceChart data={balanceProjections} />
+          </Suspense>
+        </CardContent>
+      </Card>
 
       {/* Savings Trend Chart */}
       {savingsBalance !== null && (
         <Card>
-          <CardContent className="p-6">
-            <h3 className="section-display text-[1.8rem] text-[color:var(--text)]">Savings Trend</h3>
-            <p className="mb-4 text-sm leading-7 text-[color:var(--muted)]">
-              Track your savings growth over time. Updates when you click "Update Balances" or during nightly automation.
-            </p>
+          <CardContent className="p-4 sm:p-5">
+            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <h3 className="section-display text-[1.45rem] text-[color:var(--text)]">Savings Trend</h3>
+              <p className="text-xs text-[color:var(--muted)]">Updates from balance refreshes and nightly automation.</p>
+            </div>
             <Suspense
               fallback={
-                <div className="flex h-[250px] items-center justify-center rounded-[20px] border border-[color:var(--line)] bg-[color:var(--surface-muted)] text-sm text-[color:var(--muted)]">
+                <div className="flex h-[220px] items-center justify-center rounded-[16px] border border-[color:var(--line)] bg-[color:var(--surface-muted)] text-sm text-[color:var(--muted)]">
                   Loading savings trend…
                 </div>
               }
@@ -502,17 +493,17 @@ export function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Category Averages */}
         <Card>
-          <CardContent className="p-6">
-            <h3 className="section-display text-[1.8rem] text-[color:var(--text)]">Category Averages</h3>
-            <div className="table-shell mt-4 overflow-x-auto">
+          <CardContent className="p-4 sm:p-5">
+            <h3 className="section-display text-[1.45rem] text-[color:var(--text)]">Category Averages</h3>
+            <div className="table-shell mt-3 overflow-x-auto">
               <table className="table-surface min-w-[400px]">
                 <thead>
                   <tr className="border-b surface-divider">
                     <th 
-                      className="px-4 py-4 text-left"
+                      className="px-4 py-3 text-left"
                     >
                       <button type="button" className="table-sort-button" data-active={sortField === 'category'} onClick={() => handleSort('category')}>
                         Category
@@ -520,7 +511,7 @@ export function DashboardPage() {
                       </button>
                     </th>
                     <th 
-                      className="px-4 py-4 text-right"
+                      className="px-4 py-3 text-right"
                     >
                       <button type="button" className="table-sort-button ml-auto" data-active={sortField === 'monthly'} onClick={() => handleSort('monthly')}>
                         Monthly
@@ -528,7 +519,7 @@ export function DashboardPage() {
                       </button>
                     </th>
                     <th 
-                      className="px-4 py-4 text-right"
+                      className="px-4 py-3 text-right"
                     >
                       <button type="button" className="table-sort-button ml-auto" data-active={sortField === 'yearly'} onClick={() => handleSort('yearly')}>
                         Yearly
@@ -561,11 +552,11 @@ export function DashboardPage() {
                         onClick={() => navigate('/transactions', { state: { category: averages.displayName } })}
                         title={`View ${averages.displayName} transactions`}
                       >
-                        <td className="px-4 py-4 text-[color:var(--text)] text-[color:var(--accent)] hover:underline">{averages.displayName}</td>
-                        <td className="px-4 py-4 text-right text-[color:var(--text)]">
+                        <td className="px-4 py-3 text-[color:var(--accent)] hover:underline">{averages.displayName}</td>
+                        <td className="px-4 py-3 text-right text-[color:var(--text)]">
                           {formatCurrency(averages.monthly)}
                         </td>
-                        <td className="px-4 py-4 text-right text-[color:var(--text)]">
+                        <td className="px-4 py-3 text-right text-[color:var(--text)]">
                           {formatCurrency(averages.yearly)}
                         </td>
                       </tr>
@@ -578,78 +569,78 @@ export function DashboardPage() {
 
         {/* Bills/Income Summary */}
         <Card>
-          <CardContent className="p-6">
-            <h3 className="section-display text-[1.8rem] text-[color:var(--text)]">Bills/Income Summary</h3>
-            <div className="table-shell mt-4 overflow-x-auto">
+          <CardContent className="p-4 sm:p-5">
+            <h3 className="section-display text-[1.45rem] text-[color:var(--text)]">Bills/Income Summary</h3>
+            <div className="table-shell mt-3 overflow-x-auto">
               <table className="table-surface min-w-[400px]">
                 <thead>
                   <tr className="border-b surface-divider">
-                    <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">Type</th>
-                    <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">Bills</th>
-                    <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">Income</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">Type</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">Bills</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">Income</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="border-b surface-divider">
-                    <td className="px-4 py-4 text-[color:var(--text)]">Daily</td>
-                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
+                    <td className="px-4 py-3 text-[color:var(--text)]">Daily</td>
+                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.daily.bills)}
                     </td>
-                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.daily.income)}
                     </td>
                   </tr>
                   <tr className="border-b surface-divider">
-                    <td className="px-4 py-4 text-[color:var(--text)]">Weekly</td>
-                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
+                    <td className="px-4 py-3 text-[color:var(--text)]">Weekly</td>
+                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.weekly.bills)}
                     </td>
-                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.weekly.income)}
                     </td>
                   </tr>
                   <tr className="border-b surface-divider">
-                    <td className="px-4 py-4 text-[color:var(--text)]">Biweekly</td>
-                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
+                    <td className="px-4 py-3 text-[color:var(--text)]">Biweekly</td>
+                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency((billsSummary.biweekly ?? { bills: 0 }).bills)}
                     </td>
-                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
                       {formatCurrency((billsSummary.biweekly ?? { income: 0 }).income)}
                     </td>
                   </tr>
                   <tr className="border-b surface-divider">
-                    <td className="px-4 py-4 text-[color:var(--text)]">Semimonthly</td>
-                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
+                    <td className="px-4 py-3 text-[color:var(--text)]">Semimonthly</td>
+                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency((billsSummary.semimonthly ?? { bills: 0 }).bills)}
                     </td>
-                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
                       {formatCurrency((billsSummary.semimonthly ?? { income: 0 }).income)}
                     </td>
                   </tr>
                   <tr className="border-b surface-divider">
-                    <td className="px-4 py-4 text-[color:var(--text)]">Monthly</td>
-                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
+                    <td className="px-4 py-3 text-[color:var(--text)]">Monthly</td>
+                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.monthly.bills)}
                     </td>
-                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.monthly.income)}
                     </td>
                   </tr>
                   <tr className="border-b surface-divider">
-                    <td className="px-4 py-4 text-[color:var(--text)]">Yearly</td>
-                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
+                    <td className="px-4 py-3 text-[color:var(--text)]">Yearly</td>
+                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.yearly.bills)}
                     </td>
-                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.yearly.income)}
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-4 text-[color:var(--text)]">One-Time</td>
-                    <td className="px-4 py-4 text-right text-red-600 dark:text-red-400">
+                    <td className="px-4 py-3 text-[color:var(--text)]">One-Time</td>
+                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">
                       -{formatCurrency(billsSummary.oneTime.bills)}
                     </td>
-                    <td className="px-4 py-4 text-right text-green-600 dark:text-green-400">
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.oneTime.income)}
                     </td>
                   </tr>

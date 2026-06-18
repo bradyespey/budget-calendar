@@ -1,6 +1,7 @@
 //src/components/CategoryManagement.tsx
 
 import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { Edit2, Trash2, Check, X, Plus } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -15,9 +16,14 @@ import {
 
 interface CategoryManagementProps {
   showNotification: (message: string, type: 'success' | 'error') => void;
+  sidePanel?: ReactNode;
 }
 
-export function CategoryManagement({ showNotification }: CategoryManagementProps) {
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+export function CategoryManagement({ showNotification, sidePanel }: CategoryManagementProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -28,6 +34,7 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
 
   useEffect(() => {
     fetchCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const scrollToTop = () => {
@@ -99,8 +106,8 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
       setError('');
       showNotification('Category updated successfully', 'success');
       scrollToTop();
-    } catch (error: any) {
-      setError(error.message || 'Failed to update category');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Failed to update category'));
     }
   };
 
@@ -116,9 +123,9 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
       await fetchCategories();
       showNotification('Category deleted successfully', 'success');
       scrollToTop();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('CategoryManagement: Delete failed with error:', error);
-      showNotification(error.message || 'Failed to delete category', 'error');
+      showNotification(getErrorMessage(error, 'Failed to delete category'), 'error');
       scrollToTop();
     }
   };
@@ -137,8 +144,8 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
       setError('');
       showNotification('Category added successfully', 'success');
       scrollToTop();
-    } catch (error: any) {
-      setError(error.message || 'Failed to add category');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Failed to add category'));
     }
   };
 
@@ -166,12 +173,12 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
   return (
     <div className="col-span-2">
       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
+        <CardHeader className="py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle>Manual Transaction Categories</CardTitle>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Manage your manual transaction categories. Categories in use cannot be deleted. Recurring transaction categories pull from Monarch.
+              <p className="mt-1 text-sm text-[color:var(--muted)]">
+                Manual-only categories. Recurring categories still come from Monarch.
               </p>
             </div>
             {!isAdding && (
@@ -187,7 +194,7 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-5">
           {/* Add new category form */}
           {isAdding && (
             <div className="mb-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
@@ -230,39 +237,40 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
           )}
 
           {/* Categories table */}
-          {categories.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400">
-                No categories found. Add one to get started.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
+          <div className={sidePanel ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]' : ''}>
+            {categories.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 dark:text-gray-400">
+                  No categories found. Add one to get started.
+                </p>
+              </div>
+            ) : (
+            <div className="table-shell max-h-[430px] overflow-y-auto">
               {/* Table Header */}
-              <div className="hidden bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sm:block">
-                <div className="grid grid-cols-12 gap-4 px-6 py-3">
-                  <div className="col-span-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <div className="sticky top-0 z-10 hidden border-b surface-divider bg-[color:var(--surface-muted)] backdrop-blur-xl sm:block">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3">
+                  <div className="col-span-5 text-left text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">
                     Category Name
                   </div>
-                  <div className="col-span-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="col-span-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">
                     Usage
                   </div>
-                  <div className="col-span-5 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="col-span-4 text-right text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">
                     Actions
                   </div>
                 </div>
               </div>
 
               {/* Table Body */}
-              <div className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+              <div className="divide-y surface-divider">
                 {categories.map((category) => (
                   <div
                     key={category.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150"
+                    className="transition-colors duration-150 hover:bg-[color:var(--surface-hover)]"
                   >
                     {editingId === category.id ? (
                       // Edit mode
-                      <div className="space-y-3 px-4 py-4 sm:grid sm:grid-cols-12 sm:gap-4 sm:space-y-0 sm:px-6">
+                      <div className="space-y-3 px-4 py-3 sm:grid sm:grid-cols-12 sm:gap-4 sm:space-y-0 sm:px-6">
                         <div className="sm:col-span-7 flex items-center">
                           <Input
                             value={editingName}
@@ -301,15 +309,15 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                       </div>
                     ) : (
                       // View mode
-                      <div className="space-y-3 px-4 py-4 sm:grid sm:grid-cols-12 sm:gap-4 sm:space-y-0 sm:px-6">
-                        <div className="sm:col-span-4 flex items-center">
-                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">
+                      <div className="space-y-3 px-4 py-3 sm:grid sm:grid-cols-12 sm:gap-4 sm:space-y-0">
+                        <div className="sm:col-span-5 flex items-center">
+                          <span className="text-sm font-semibold capitalize text-[color:var(--text)]">
                             {category.name}
                           </span>
                         </div>
                         <div className="sm:col-span-3 flex items-center">
                           {typeof category.transaction_count === 'number' && (
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                               category.transaction_count === 0 
                                 ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                                 : 'bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200'
@@ -321,13 +329,13 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                             </span>
                           )}
                         </div>
-                        <div className="sm:col-span-5 flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+                        <div className="sm:col-span-4 flex flex-wrap items-center justify-start gap-2 sm:justify-end">
                           <Button
                             onClick={() => handleStartEdit(category)}
                             variant="outline"
                             size="sm"
                             leftIcon={<Edit2 size={14} />}
-                            className="min-w-[92px] justify-center"
+                            className="min-w-[82px] justify-center"
                           >
                             Edit
                           </Button>
@@ -340,7 +348,7 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
                               category.transaction_count === 0
                                 ? 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900 border-red-200 dark:border-red-800'
                                 : 'text-gray-400 cursor-not-allowed opacity-50'
-                            } min-w-[92px] justify-center`}
+                            } min-w-[82px] justify-center`}
                             disabled={category.transaction_count !== 0}
                             title={category.transaction_count !== 0 ? `Cannot delete: ${category.transaction_count} transaction(s) using this category` : 'Delete category'}
                           >
@@ -354,13 +362,15 @@ export function CategoryManagement({ showNotification }: CategoryManagementProps
               </div>
 
               {/* Table Footer */}
-              <div className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-3">
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="border-t surface-divider bg-[color:var(--surface-muted)] px-4 py-3">
+                <div className="text-sm text-[color:var(--muted)]">
                   {categories.length} categor{categories.length === 1 ? 'y' : 'ies'} total
                 </div>
               </div>
             </div>
-          )}
+            )}
+            {sidePanel ? <div className="min-w-0">{sidePanel}</div> : null}
+          </div>
         </CardContent>
       </Card>
     </div>

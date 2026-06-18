@@ -7,7 +7,7 @@ interface MaintenanceActionsProps {
   showTimestamps: boolean
   functionTimestamps: Record<string, Date>
   formatTimestamp: (date?: Date) => string
-  backupInfo: any
+  backupInfo: { hasBackup: boolean; backupCount?: number; timestamp?: string; message: string } | null
   onValidateProjections: () => void
   onClearCalendars: () => void
   onGenerateIcons: () => void
@@ -42,7 +42,7 @@ export function MaintenanceActions({
           <Button onClick={onValidateProjections} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
             {busy && activeAction === 'validate' ? <Loader className="animate-spin" size={18} /> : <CheckCircle2 size={18} />} Validate Projections
           </Button>
-          <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Ensures all Transactions match up with what's expected for the Upcoming page and shows missing bills that need to be fixed</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Ensures all Transactions match up with what's expected for the Calendar page and shows missing bills that need to be fixed</p>
         </div>
         <div className="space-y-2">
           <Button onClick={onClearCalendars} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>

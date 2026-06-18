@@ -43,53 +43,59 @@ export function PageHeader({
   actions,
   stats,
 }: PageHeaderProps) {
+  const hasStats = Boolean(stats?.length)
+  const hasSideMeta = Boolean(subtitle || helpSections || actions)
+
   return (
-    <div className={clsx('relative z-20 mb-5', className)}>
-      <div className="surface-panel relative z-20 overflow-visible p-5 sm:p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0 flex-1">
-            {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-            <h1 className="display-copy overflow-visible pb-1 text-[2.3rem] leading-[1.16] sm:text-[2.9rem] text-[color:var(--text)]">
+    <div className={clsx('relative z-20 mb-4', className)}>
+      <div className="surface-panel relative z-20 overflow-visible px-4 py-3.5 sm:px-5">
+        <div
+          className={clsx(
+            'flex flex-col gap-4',
+            hasStats
+              ? 'xl:grid xl:grid-cols-[minmax(190px,auto)_1fr_minmax(190px,auto)] xl:items-center xl:gap-6'
+              : 'xl:flex-row xl:items-center xl:justify-between xl:gap-6'
+          )}
+        >
+          <div className="min-w-0 shrink-0">
+            {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
+            <h1 className="display-copy overflow-visible pb-0.5 text-[1.85rem] leading-[1.02] sm:text-[2.15rem] text-[color:var(--text)]">
               {title}
             </h1>
-            {subtitle && (
-              <p className="mt-2 text-xs font-semibold text-[color:var(--accent)]">
-                {subtitle}
-              </p>
-            )}
             {description && (
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">
+              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">
                 {description}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-3 self-start">
-            {helpSections && <PageHelpTooltip sections={helpSections} useFixedPosition />}
-            {actions}
+          {hasStats && (
+            <div className="flex min-w-0 flex-wrap items-center gap-3 xl:justify-center">
+              {stats?.map((stat) => (
+                <div
+                  key={`${stat.label}-${stat.value}`}
+                  className={clsx(
+                    'inline-flex min-h-0 items-center gap-2.5 rounded-full border px-3.5 py-1.5',
+                    toneStyles[stat.tone || 'neutral']
+                  )}
+                >
+                  <p className="eyebrow text-[0.58rem] text-current opacity-90">{stat.label}</p>
+                  <p className="whitespace-nowrap text-sm font-bold leading-tight text-[color:var(--text)]">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {hasSideMeta && (
+            <div className="flex min-w-0 flex-wrap items-center gap-3 xl:justify-end">
+              {subtitle && (
+                <p className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-muted)] px-3.5 py-1.5 text-xs font-semibold text-[color:var(--accent)]">
+                  {subtitle}
+                </p>
+              )}
+              {helpSections && <PageHelpTooltip sections={helpSections} useFixedPosition />}
+              {actions}
+            </div>
+          )}
           </div>
-        </div>
-
-        {stats && stats.length > 0 && (
-          <div
-            className={clsx(
-              'mt-5 grid gap-2 sm:grid-cols-2',
-              stats.length >= 5 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'
-            )}
-          >
-            {stats.map((stat) => (
-              <div
-                key={`${stat.label}-${stat.value}`}
-                className={clsx(
-                  'flex min-h-[92px] flex-col items-center justify-center rounded-[13px] border px-3 py-3 text-center',
-                  toneStyles[stat.tone || 'neutral']
-                )}
-              >
-                <p className="eyebrow mb-2 text-[0.8rem] text-current opacity-90">{stat.label}</p>
-                <p className="text-[1.35rem] font-bold leading-[1.1] text-[color:var(--text)]">{stat.value}</p>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

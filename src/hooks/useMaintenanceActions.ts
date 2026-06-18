@@ -11,9 +11,13 @@ interface UseMaintenanceActionsProps {
   saveFunctionTimestamp: (functionName: string) => Promise<void>
   saveSettings: () => Promise<void>
   setActiveAction: (action: string | null) => void
-  backupInfo: any
-  setBackupInfo: (info: any) => void
+  backupInfo: { hasBackup: boolean; backupCount?: number; timestamp?: string; message: string } | null
+  setBackupInfo: (info: { hasBackup: boolean; backupCount?: number; timestamp?: string; message: string } | null) => void
   fileInputRef: React.RefObject<HTMLInputElement>
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
 }
 
 export function useMaintenanceActions({
@@ -51,8 +55,8 @@ export function useMaintenanceActions({
       }
 
       showNotification(message, 'success')
-    } catch (e: any) {
-      showNotification(`Error validating projections: ${e.message}`, 'error')
+    } catch (e: unknown) {
+      showNotification(`Error validating projections: ${getErrorMessage(e, 'Validation failed')}`, 'error')
     } finally {
       setBusy(false)
       setActiveAction(null)
@@ -69,8 +73,8 @@ export function useMaintenanceActions({
       const result = await clearCalendars()
       await saveFunctionTimestamp('clearCalendars')
       showNotification(result.message || 'Calendars cleared.', 'success')
-    } catch (e: any) {
-      showNotification(`Error clearing calendars: ${e.message}`, 'error')
+    } catch (e: unknown) {
+      showNotification(`Error clearing calendars: ${getErrorMessage(e, 'Calendar clear failed')}`, 'error')
     } finally {
       setBusy(false)
       setActiveAction(null)
@@ -93,8 +97,8 @@ export function useMaintenanceActions({
       }
       
       showNotification(message, 'success')
-    } catch (e: any) {
-      showNotification(`Error generating icons: ${e.message}`, 'error')
+    } catch (e: unknown) {
+      showNotification(`Error generating icons: ${getErrorMessage(e, 'Icon generation failed')}`, 'error')
     } finally {
       setBusy(false)
       setActiveAction(null)
@@ -121,8 +125,8 @@ export function useMaintenanceActions({
       }
       
       showNotification(message, 'success')
-    } catch (e: any) {
-      showNotification(`Error resetting icons: ${e.message}`, 'error')
+    } catch (e: unknown) {
+      showNotification(`Error resetting icons: ${getErrorMessage(e, 'Icon reset failed')}`, 'error')
     } finally {
       setBusy(false)
       setActiveAction(null)
@@ -147,8 +151,8 @@ export function useMaintenanceActions({
       })
       
       showNotification(`Backed up ${result.backupCount} icons to Firebase`, 'success')
-    } catch (e: any) {
-      showNotification(`Error backing up icons: ${e.message}`, 'error')
+    } catch (e: unknown) {
+      showNotification(`Error backing up icons: ${getErrorMessage(e, 'Icon backup failed')}`, 'error')
     } finally {
       setBusy(false)
       setActiveAction(null)
@@ -180,8 +184,8 @@ export function useMaintenanceActions({
       }
       
       showNotification(message, 'success')
-    } catch (e: any) {
-      showNotification(`Error restoring icons: ${e.message}`, 'error')
+    } catch (e: unknown) {
+      showNotification(`Error restoring icons: ${getErrorMessage(e, 'Icon restore failed')}`, 'error')
     } finally {
       setBusy(false)
       setActiveAction(null)
@@ -203,8 +207,8 @@ export function useMaintenanceActions({
       const csvData = await file.text()
       const { total, imported } = await importBillsFromCSV(csvData)
       showNotification(`Successfully imported ${imported} of ${total} bills.`, 'success')
-    } catch (error: any) {
-      showNotification(`Error importing CSV: ${error.message}`, 'error')
+    } catch (error: unknown) {
+      showNotification(`Error importing CSV: ${getErrorMessage(error, 'CSV import failed')}`, 'error')
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
       setBusy(false)
@@ -216,8 +220,8 @@ export function useMaintenanceActions({
     if (isDemo) { showNotification('CSV exported.', 'success'); return; }
     try {
       await exportBillsToCSV()
-    } catch (error: any) {
-      showNotification('Error exporting bills: ' + error.message, 'error')
+    } catch (error: unknown) {
+      showNotification(`Error exporting bills: ${getErrorMessage(error, 'CSV export failed')}`, 'error')
     }
   }
 

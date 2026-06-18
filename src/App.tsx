@@ -11,7 +11,7 @@ import { BalanceProvider } from './context/BalanceContext'
 const LoginPage = lazy(async () => ({ default: (await import('./pages/LoginPage')).LoginPage }))
 const DashboardPage = lazy(async () => ({ default: (await import('./pages/DashboardPage')).DashboardPage }))
 const TransactionsPage = lazy(async () => ({ default: (await import('./pages/TransactionsPage')).TransactionsPage }))
-const UpcomingPage = lazy(async () => ({ default: (await import('./pages/UpcomingPage')).UpcomingPage }))
+const CalendarPage = lazy(async () => ({ default: (await import('./pages/CalendarPage')).CalendarPage }))
 const SettingsPage = lazy(async () => ({ default: (await import('./pages/SettingsPage')).SettingsPage }))
 
 function App() {
@@ -29,7 +29,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <ThemeProvider defaultTheme="system" storageKey="theme">
+      <ThemeProvider defaultTheme="light" storageKey="theme">
         <AuthProvider>
           <BalanceProvider>
             <Suspense fallback={routeFallback}>
@@ -56,13 +56,14 @@ function App() {
             }
           />
           <Route
-            path="/upcoming"
+            path="/calendar"
             element={
               <RequireAuth>
-                <Layout><UpcomingPage /></Layout>
+                <Layout><CalendarPage /></Layout>
               </RequireAuth>
             }
           />
+          <Route path="/upcoming" element={<Navigate to="/calendar" replace />} />
           <Route
             path="/settings"
             element={

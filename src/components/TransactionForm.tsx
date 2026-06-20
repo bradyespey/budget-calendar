@@ -25,7 +25,7 @@ interface TransactionFormData {
   accountType?: string;
 }
 
-type TransactionSubmitData = Omit<TransactionFormData, 'repeats_every' | 'end_date'> & {
+export type TransactionSubmitData = Omit<TransactionFormData, 'repeats_every' | 'end_date'> & {
   repeats_every: number;
   end_date: string | null;
   iconUrl: string | null;

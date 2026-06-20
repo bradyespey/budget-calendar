@@ -26,7 +26,7 @@ import { format, parseISO } from 'date-fns'
 import { useNavigate } from 'react-router-dom'
 import { useBalance } from '../context/BalanceContext'
 import { useAuth } from '../context/AuthContext'
-import { getFunctionTimestamps, getSettings, getMonthlyCashFlow } from '../api/firebase'
+import { getFunctionTimestamps, getSettings } from '../api/firebase'
 
 const SavingsChart = lazy(async () => {
   const module = await import('../components/SavingsChart')
@@ -72,6 +72,84 @@ interface SummaryCard {
   iconBg: string
   detail: string
   supporting?: string
+}
+
+function getMonthlyAmount(bill: Bill) {
+  const amount = Number(bill.amount) || 0
+  const frequency = (bill.frequency || 'monthly') as string
+  const repeatsEvery = Number(bill.repeats_every ?? 1) || 1
+
+  switch (frequency) {
+    case 'daily': return (amount * 30.44) / repeatsEvery
+    case 'weekly': return (amount * 52.18) / (12 * repeatsEvery)
+    case 'biweekly': return (amount * 26) / (12 * repeatsEvery)
+    case 'semimonthly':
+    case 'Semimonthly_mid_end':
+    case 'semimonthly_mid_end': return (amount * 2) / repeatsEvery
+    case 'monthly': return amount / repeatsEvery
+    case 'yearly': return amount / (12 * repeatsEvery)
+    case 'one-time': return 0
+    default: {
+      const everyMonths = frequency.match(/every_(\d+)_months/)
+      const everyWeeks = frequency.match(/every_(\d+)_weeks/)
+      if (everyMonths) return amount / (Number(everyMonths[1]) * repeatsEvery)
+      if (everyWeeks) return (amount * 52.18) / (Number(everyWeeks[1]) * 12 * repeatsEvery)
+      return amount / repeatsEvery
+    }
+  }
+}
+
+function computeMonthlyFlow(bills: Bill[]) {
+  const summary: BillsSummary = {
+    oneTime: { bills: 0, income: 0 },
+    daily: { bills: 0, income: 0 },
+    weekly: { bills: 0, income: 0 },
+    biweekly: { bills: 0, income: 0 },
+    semimonthly: { bills: 0, income: 0 },
+    monthly: { bills: 0, income: 0 },
+    yearly: { bills: 0, income: 0 },
+  }
+  let income = 0
+  let billTotal = 0
+
+  for (const bill of bills) {
+    if (bill.isActive === false) continue
+
+    const amount = Number(bill.amount) || 0
+    const monthlyAmount = getMonthlyAmount(bill)
+    const frequency = (bill.frequency || 'monthly') as string
+    const bucket =
+      frequency === 'daily' ? 'daily'
+      : frequency === 'weekly' || frequency.match(/every_(\d+)_weeks/) ? 'weekly'
+      : frequency === 'biweekly' ? 'biweekly'
+      : frequency === 'semimonthly' || frequency === 'Semimonthly_mid_end' || frequency === 'semimonthly_mid_end' ? 'semimonthly'
+      : frequency === 'yearly' ? 'yearly'
+      : frequency === 'one-time' ? 'oneTime'
+      : 'monthly'
+
+    const summaryAmount = bucket === 'oneTime' ? amount : monthlyAmount
+
+    if (summaryAmount >= 0) {
+      summary[bucket].income += Math.abs(summaryAmount)
+    } else {
+      summary[bucket].bills += Math.abs(summaryAmount)
+    }
+
+    if (monthlyAmount >= 0) {
+      income += monthlyAmount
+    } else {
+      billTotal += Math.abs(monthlyAmount)
+    }
+  }
+
+  return {
+    summary,
+    monthlyTotals: {
+      income,
+      bills: billTotal,
+      leftover: income - billTotal,
+    },
+  }
 }
 
 function computeCategoryAverages(bills: Bill[]): Record<string, CategoryAverage> {
@@ -199,7 +277,7 @@ export function DashboardPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const [billsData, highLowData, projections, savings, history, creditCards, settings, monthlyCashFlow] = await Promise.all([
+        const [billsData, highLowData, projections, savings, history, creditCards, settings] = await Promise.all([
           getBills(),
           getHighLowProjections(),
           getProjections(),
@@ -207,8 +285,8 @@ export function DashboardPage() {
           getSavingsHistory(),
           getCreditCardDebt(),
           getSettings(),
-          getMonthlyCashFlow(),
         ])
+        const monthlyFlow = computeMonthlyFlow(billsData)
         setBills(billsData)
         setHighLow(highLowData)
         setBalanceProjections(projections)
@@ -227,16 +305,8 @@ export function DashboardPage() {
         
         // Compute category averages client-side from all bills so every category is included
         setCategoryAverages(computeCategoryAverages(billsData))
-        setBillsSummary(monthlyCashFlow.summary || {
-          oneTime: { bills: 0, income: 0 },
-          daily: { bills: 0, income: 0 },
-          weekly: { bills: 0, income: 0 },
-          biweekly: { bills: 0, income: 0 },
-          semimonthly: { bills: 0, income: 0 },
-          monthly: { bills: 0, income: 0 },
-          yearly: { bills: 0, income: 0 },
-        })
-        setMonthlyTotals(monthlyCashFlow.monthlyTotals || { income: 0, bills: 0, leftover: 0 })
+        setBillsSummary(monthlyFlow.summary)
+        setMonthlyTotals(monthlyFlow.monthlyTotals)
         loadTimestamp()
       } catch (e) {
         console.error('Error fetching dashboard data:', e)
@@ -276,7 +346,7 @@ export function DashboardPage() {
       iconTone: 'text-blue-600 dark:text-blue-400',
       iconBg: 'bg-blue-100 dark:bg-blue-900/50',
       detail: lastSync
-        ? `as of ${format(lastSync, 'MMM d, h:mm a')} • ${refreshAccountsTimestamp ? `Refresh: ${formatTimestamp(refreshAccountsTimestamp)}` : 'Awaiting refresh'}`
+        ? `as of ${format(lastSync, 'MMM d, h:mm a')}`
         : 'Live checking balance',
     },
     {
@@ -286,7 +356,7 @@ export function DashboardPage() {
       iconTone: 'text-emerald-600 dark:text-emerald-400',
       iconBg: 'bg-emerald-100 dark:bg-emerald-900/50',
       detail: lastSync && savingsBalance !== null
-        ? `as of ${format(lastSync, 'MMM d, h:mm a')} • Tracked in savings trend`
+        ? `as of ${format(lastSync, 'MMM d, h:mm a')}`
         : 'Savings account snapshot',
       supporting: savingsBalance === null ? 'Add a savings account ID to enable' : undefined,
     },
@@ -297,7 +367,7 @@ export function DashboardPage() {
       iconTone: 'text-rose-600 dark:text-rose-400',
       iconBg: 'bg-rose-100 dark:bg-rose-900/50',
       detail: lastSync && creditCardDebt !== null
-        ? `as of ${format(lastSync, 'MMM d, h:mm a')} • Used for visibility, not checking projections`
+        ? `as of ${format(lastSync, 'MMM d, h:mm a')}`
         : 'Combined card balance',
     },
   ]
@@ -310,8 +380,8 @@ export function DashboardPage() {
       iconTone: 'text-orange-600 dark:text-orange-400',
       iconBg: 'bg-orange-100 dark:bg-orange-900/50',
       detail: thresholdBreach
-        ? `${format(parseISO(thresholdBreach.date), 'EEEE, MMM d')} • First date below ${formatCurrency(settings?.balanceThreshold ?? 1000)}`
-        : `Stays above ${formatCurrency(settings?.balanceThreshold ?? 1000)} • Alert threshold: ${formatCurrency(settings?.balanceThreshold ?? 1000)}`,
+        ? `${format(parseISO(thresholdBreach.date), 'MMM d')} below ${formatCurrency(settings?.balanceThreshold ?? 1000)}`
+        : `Above ${formatCurrency(settings?.balanceThreshold ?? 1000)}`,
     },
     {
       label: 'Lowest Projected Balance',
@@ -320,7 +390,7 @@ export function DashboardPage() {
       iconTone: 'text-rose-600 dark:text-rose-400',
       iconBg: 'bg-rose-100 dark:bg-rose-900/50',
       detail: highLow.lowest
-        ? `${format(parseISO(highLow.lowest.proj_date), 'EEEE, MMM d')} • Minimum balance over the next ${projectionDays} days`
+        ? `${format(parseISO(highLow.lowest.proj_date), 'MMM d')} • Over ${projectionDays} days`
         : 'No projection yet',
     },
     {
@@ -330,7 +400,7 @@ export function DashboardPage() {
       iconTone: 'text-emerald-600 dark:text-emerald-400',
       iconBg: 'bg-emerald-100 dark:bg-emerald-900/50',
       detail: highLow.highest
-        ? `${format(parseISO(highLow.highest.proj_date), 'EEEE, MMM d')} • Peak balance over the next ${projectionDays} days`
+        ? `${format(parseISO(highLow.highest.proj_date), 'MMM d')} • Over ${projectionDays} days`
         : 'No projection yet',
     },
   ]
@@ -342,7 +412,7 @@ export function DashboardPage() {
       icon: ArrowUpCircle,
       iconTone: 'text-emerald-600 dark:text-emerald-400',
       iconBg: 'bg-emerald-100 dark:bg-emerald-900/50',
-      detail: 'Expected recurring income from all included income sources',
+      detail: 'Recurring income',
     },
     {
       label: 'Total Monthly Bills',
@@ -350,7 +420,7 @@ export function DashboardPage() {
       icon: ArrowDownCircle,
       iconTone: 'text-rose-600 dark:text-rose-400',
       iconBg: 'bg-rose-100 dark:bg-rose-900/50',
-      detail: 'Expected recurring expenses from checking-impact bills and payments',
+      detail: 'Recurring bills and cards',
     },
     {
       label: 'Monthly Leftover',
@@ -358,7 +428,7 @@ export function DashboardPage() {
       icon: Calculator,
       iconTone: 'text-[color:var(--accent)]',
       iconBg: 'bg-[color:var(--accent-soft)]',
-      detail: 'Remaining after bills and food/drinks',
+      detail: 'Income minus bills',
     },
   ]
 

@@ -9,7 +9,7 @@ import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardTitle } from '../components/ui/Card';
 import { TransactionsFilters } from '../components/TransactionsFilters';
 import { TransactionsTable } from '../components/TransactionsTable';
-import { TransactionForm, FormMode } from '../components/TransactionForm';
+import { TransactionForm, FormMode, TransactionSubmitData } from '../components/TransactionForm';
 import { useTransactions, CombinedTransaction } from '../hooks/useTransactions';
 import { useTransactionFilters } from '../hooks/useTransactionFilters';
 import { getFunctionTimestamps } from '../api/firebase';
@@ -75,7 +75,12 @@ export function TransactionsPage() {
     setSelectedTransaction(transaction);
   };
 
-  const handleSubmitForm = async (formData: any) => {
+  const isPermissionError = (error: unknown) => {
+    if (!(error instanceof Error)) return false;
+    return error.message.includes('permission-denied') || error.message.includes('Missing or insufficient permissions');
+  };
+
+  const handleSubmitForm = async (formData: TransactionSubmitData) => {
     try {
       const billData = {
         name: formData.name,
@@ -94,8 +99,8 @@ export function TransactionsPage() {
       if (formMode === 'create') {
         try {
           await createTransaction(billData);
-        } catch (e: any) {
-          if (e.code === 'permission-denied' || e.message?.includes('permission-denied') || e.message?.includes('Missing or insufficient permissions')) {
+        } catch (e: unknown) {
+          if (isPermissionError(e)) {
             // Silently handle permission errors
           } else {
             throw e;
@@ -105,8 +110,8 @@ export function TransactionsPage() {
         try {
           const billId = selectedTransaction.id.replace('manual-', '');
           await updateTransaction(billId, billData);
-        } catch (e: any) {
-          if (e.code === 'permission-denied' || e.message?.includes('permission-denied') || e.message?.includes('Missing or insufficient permissions')) {
+        } catch (e: unknown) {
+          if (isPermissionError(e)) {
             // Silently handle permission errors
           } else {
             throw e;
@@ -129,8 +134,8 @@ export function TransactionsPage() {
     try {
       try {
         await deleteTransaction(transaction);
-      } catch (e: any) {
-        if (e.code === 'permission-denied' || e.message?.includes('permission-denied') || e.message?.includes('Missing or insufficient permissions')) {
+      } catch (e: unknown) {
+        if (isPermissionError(e)) {
           // Silently handle permission errors
         } else {
           throw e;
@@ -180,7 +185,6 @@ export function TransactionsPage() {
   // Effects - Load data on mount only
   useEffect(() => {
     loadTimestamp();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle URL navigation
@@ -191,7 +195,7 @@ export function TransactionsPage() {
     if (location.state?.category) {
       setCategoryFilter(location.state.category);
     }
-  }, [location.state]);
+  }, [location.state, setCategoryFilter]);
 
   // Get initial form data for editing
   const getInitialFormData = () => {
@@ -203,7 +207,7 @@ export function TransactionsPage() {
         amount: selectedTransaction.amount,
         frequency: selectedTransaction.rawFrequency || 'monthly',
         repeats_every: selectedTransaction.repeats_every || 1,
-        start_date: selectedTransaction.dueDate,
+        start_date: selectedTransaction.startDate || selectedTransaction.dueDate,
         end_date: selectedTransaction.end_date || '',
         notes: selectedTransaction.notes || '',
         iconUrl: selectedTransaction.iconUrl || '',

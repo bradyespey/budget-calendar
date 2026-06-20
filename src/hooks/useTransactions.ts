@@ -7,6 +7,7 @@ import { refreshRecurringTransactions } from '../api/firebase';
 import { updateTransactionIcon } from '../api/icons';
 import { Bill, IconType } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { getNextOccurrenceDate } from '../utils/transactionUtils';
 
 // Combined transaction interface
 export interface CombinedTransaction {
@@ -16,6 +17,7 @@ export interface CombinedTransaction {
   amount: number;
   frequency: string;
   dueDate: string;
+  startDate?: string;
   account: string;
   source: 'manual' | 'monarch';
   // Manual transaction fields
@@ -119,15 +121,21 @@ export function useTransactions() {
 
     // Add all bills (both manual and Monarch sources)
     bills.forEach(bill => {
+        const source = bill.source || 'manual';
+        const rawFrequency = bill.frequency;
+        const repeatsEvery = bill.repeats_every || 1;
         combined.push({
           id: bill.id,
           name: bill.name,
           category: bill.category,
           amount: bill.amount,
-          frequency: formatFrequency(bill.frequency, bill.repeats_every || 1),
-          dueDate: bill.start_date,
-          account: bill.source === 'monarch' ? (bill.accountName || 'Unknown') : '—',
-          source: bill.source || 'manual',
+          frequency: formatFrequency(rawFrequency, repeatsEvery),
+          dueDate: source === 'manual'
+            ? getNextOccurrenceDate(bill.start_date, rawFrequency, repeatsEvery)
+            : bill.start_date,
+          startDate: bill.start_date,
+          account: source === 'monarch' ? (bill.accountName || 'Unknown') : '—',
+          source,
           notes: bill.notes,
           iconUrl: bill.iconUrl,
           iconType: bill.iconType,
@@ -140,8 +148,8 @@ export function useTransactions() {
           accountSubtype: bill.accountSubtype,
           institutionName: bill.institutionName,
           isEditable: bill.source !== 'monarch',
-          rawFrequency: bill.frequency,
-          repeats_every: bill.repeats_every || 1
+          rawFrequency,
+          repeats_every: repeatsEvery
         });
     });
 

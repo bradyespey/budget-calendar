@@ -263,6 +263,7 @@ export function CalendarPage() {
   };
 
   const formatSignedCurrency = (amount: number) => {
+    if (Math.round(amount) === 0) return formatCurrency(0);
     const sign = amount >= 0 ? '+' : '-';
     return `${sign}${formatCurrency(Math.abs(amount))}`;
   };
@@ -492,7 +493,7 @@ export function CalendarPage() {
                 onClick={() => handleSelectDate(date)}
                 className={`${view === 'day' ? 'min-h-[360px] rounded-[18px] border' : view === 'week' ? 'min-h-[360px] border-b border-r' : 'min-h-[134px] border-b border-r'} cursor-pointer border-[color:var(--line)] p-2 transition ${
                   day ? 'bg-[color:var(--surface)]' : 'bg-[color:var(--surface-muted)]/55'
-                } ${isSelected ? 'ring-2 ring-inset ring-[color:var(--accent)]' : 'hover:bg-[color:var(--surface-muted)]/70'}`}
+                } ${isSelected && view !== 'day' ? 'bg-[color:var(--accent-soft)]/35 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_45%,transparent)]' : 'hover:bg-[color:var(--surface-muted)]/70'}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -526,22 +527,34 @@ export function CalendarPage() {
                 </div>
 
                 {day && visibleTransactions.length > 0 ? (
-                  <div className="mt-2 space-y-1">
+                  <div className={view === 'day' ? 'mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3' : 'mt-2 space-y-1'}>
                     {visibleTransactions.map(transaction => (
                       <div
                         key={`${date}-${transaction.id}`}
                         title={`${transaction.name} • ${transaction.category}${!affectsBalance(transaction) ? ' • Excluded from balance' : ''}`}
-                        className="flex min-w-0 items-center justify-between gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] px-1.5 py-1 text-[11px]"
+                        className={view === 'day'
+                          ? 'flex min-h-[58px] min-w-0 items-center justify-between gap-3 rounded-[14px] border border-[color:var(--line)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm'
+                          : 'flex min-w-0 items-center justify-between gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] px-1.5 py-1 text-[11px]'
+                        }
                       >
-                        <span className="min-w-0 flex-1 truncate font-semibold text-[color:var(--text)]">
-                          {transaction.name}
-                        </span>
-                        {!affectsBalance(transaction) && (
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" aria-label="Excluded from balance" />
-                        )}
-                        <span className="shrink-0 font-bold tabular-nums text-[color:var(--muted)]">
-                          {formatSignedCurrency(transaction.amount)}
-                        </span>
+                        <div className="min-w-0">
+                          <span className="block truncate font-semibold text-[color:var(--text)]">
+                            {transaction.name}
+                          </span>
+                          {view === 'day' && (
+                            <span className="mt-0.5 block truncate text-xs text-[color:var(--muted)]">
+                              {transaction.category}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {!affectsBalance(transaction) && (
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" aria-label="Excluded from balance" />
+                          )}
+                          <span className="font-bold tabular-nums text-[color:var(--muted)]">
+                            {formatSignedCurrency(transaction.amount)}
+                          </span>
+                        </div>
                       </div>
                     ))}
                     {hiddenTransactions.length > 0 && (
@@ -556,7 +569,10 @@ export function CalendarPage() {
                           setAnchor(getLocalDate(date));
                           setView('day');
                         }}
-                        className="w-full rounded-md px-2 py-1 text-center text-[11px] font-semibold text-[color:var(--muted)] transition hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)]"
+                        className={view === 'day'
+                          ? 'rounded-[14px] border border-dashed border-[color:var(--line-strong)] px-3 py-2 text-center text-sm font-semibold text-[color:var(--muted)] transition hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)]'
+                          : 'w-full rounded-md px-2 py-1 text-center text-[11px] font-semibold text-[color:var(--muted)] transition hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)]'
+                        }
                       >
                         +{hiddenTransactions.length} more
                       </button>

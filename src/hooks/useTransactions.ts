@@ -20,6 +20,9 @@ export interface CombinedTransaction {
   startDate?: string;
   account: string;
   source: 'manual' | 'monarch';
+  originalDueDate?: string | null;
+  checkingImpactDate?: string | null;
+  draftRule?: string | null;
   // Manual transaction fields
   notes?: string | null;
   iconUrl?: string | null;
@@ -136,6 +139,9 @@ export function useTransactions() {
           startDate: bill.start_date,
           account: source === 'monarch' ? (bill.accountName || 'Unknown') : '—',
           source,
+          originalDueDate: bill.originalDueDate,
+          checkingImpactDate: bill.checkingImpactDate,
+          draftRule: bill.draftRule,
           notes: bill.notes,
           iconUrl: bill.iconUrl,
           iconType: bill.iconType,

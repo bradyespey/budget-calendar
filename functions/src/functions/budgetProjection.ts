@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
+import { getCreditCardDraftDetails } from "../utils/creditCardDraftRules";
 
 const db = getFirestore();
 const region = 'us-central1';
@@ -12,6 +13,38 @@ const LOW_BALANCE_ALERT_DOC = 'admin/lowBalanceAlert';
 type LowBalancePoint = {
   balance: number;
   date: string;
+};
+
+type AccountRecord = {
+  id?: string;
+  accountType?: string;
+  name?: string;
+  accountName?: string;
+  lastBalance?: number | string;
+};
+
+type BillRecord = {
+  id?: string;
+  name?: string;
+  category?: string;
+  amount?: number | string;
+  frequency?: string;
+  repeats_every?: number | string;
+  repeatsEvery?: number | string;
+  start_date?: string;
+  startDate?: string;
+  end_date?: string;
+  endDate?: string;
+  checkingImpactDate?: string;
+  accountType?: string;
+  isActive?: boolean;
+};
+
+type ProjectionSettings = {
+  projectionDays?: number;
+  balanceThreshold?: number | string;
+  manualBalanceOverride?: unknown;
+  lastProjectedAt?: Date | null;
 };
 
 function formatInChicago(date: Date): string {
@@ -173,7 +206,7 @@ function isWeekendUTC(date: Date): boolean {
   return day === 0 || day === 6;
 }
 
-function getStartingBalance(accounts: any[], manualBalanceOverride: unknown): number {
+function getStartingBalance(accounts: AccountRecord[], manualBalanceOverride: unknown): number {
   const manualBalance = typeof manualBalanceOverride === 'number'
     ? manualBalanceOverride
     : Number(manualBalanceOverride);
@@ -216,18 +249,22 @@ async function fetchUSHolidays(start: Date, end: Date): Promise<Set<string>> {
 }
 
 function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<string>): Date {
-  let d = new Date(date);
+  const d = new Date(date);
   const dateStr = (dateValue: Date) => formatInChicago(dateValue);
-  
-  while (true) {
+  let adjusted = true;
+
+  while (adjusted) {
+    adjusted = false;
     if (isPaycheck) {
       // Paychecks move to previous weekday (not weekend or holiday)
       if (isWeekendUTC(d)) {
         d.setUTCDate(d.getUTCDate() - 1);
+        adjusted = true;
         continue;
       }
       if (holidays.has(dateStr(d))) {
         d.setUTCDate(d.getUTCDate() - 1);
+        adjusted = true;
         continue;
       }
     } else {
@@ -235,21 +272,29 @@ function adjustTransactionDate(date: Date, isPaycheck: boolean, holidays: Set<st
       if (isWeekendUTC(d)) {
         // Move to next Monday (or Tuesday if Monday is a holiday)
         d.setUTCDate(d.getUTCDate() + ((8 - d.getUTCDay()) % 7));
+        adjusted = true;
         continue;
       }
       if (holidays.has(dateStr(d))) {
         d.setUTCDate(d.getUTCDate() + 1);
+        adjusted = true;
         continue;
       }
     }
-    break;
   }
   return d;
 }
 
-function shouldBillOccurOnDate(bill: any, date: Date): boolean {
-  const billDate = parseProjectionDate(bill.start_date || bill.startDate);
+function shouldBillOccurOnDate(bill: BillRecord, date: Date): boolean {
+  const draftDetails = getCreditCardDraftDetails(bill);
+  const billDate = parseProjectionDate(
+    bill.checkingImpactDate ||
+    draftDetails?.checkingImpactDate ||
+    bill.start_date ||
+    bill.startDate
+  );
   const repeatsEvery = Number(bill.repeats_every ?? bill.repeatsEvery ?? 1) || 1;
+  const frequency = bill.frequency || 'monthly';
   
   // Check if the date is before the start date
   if (date < billDate) {
@@ -267,20 +312,20 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   }
   
   // One-time bills only occur on their exact start date
-  if (bill.frequency === 'one-time') {
+  if (frequency === 'one-time') {
     return formatInChicago(billDate) === formatInChicago(date);
   }
   
-  if (bill.frequency === 'daily') return true;
+  if (frequency === 'daily') return true;
   
-  if (bill.frequency === 'weekly') {
+  if (frequency === 'weekly') {
     const daysDiff = Math.floor((date.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
     return daysDiff >= 0 && daysDiff % (7 * repeatsEvery) === 0;
   }
   
   // Handle "Every X weeks" frequencies (e.g., every 2 weeks, every 3 weeks, etc.)
-  if (bill.frequency.startsWith('every_') && bill.frequency.includes('_weeks')) {
-    const weeksMatch = bill.frequency.match(/every_(\d+)_weeks/);
+  if (frequency.startsWith('every_') && frequency.includes('_weeks')) {
+    const weeksMatch = frequency.match(/every_(\d+)_weeks/);
     if (weeksMatch) {
       const weekInterval = parseInt(weeksMatch[1]);
       const daysDiff = Math.floor((date.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -288,13 +333,13 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
     }
   }
   
-  if (bill.frequency === 'biweekly') {
+  if (frequency === 'biweekly') {
     // Bi-weekly occurs every 14 days (every 2 weeks)
     const daysDiff = Math.floor((date.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
     return daysDiff >= 0 && daysDiff % (14 * repeatsEvery) === 0;
   }
   
-  if (bill.frequency === 'monthly') {
+  if (frequency === 'monthly') {
     const billDay = billDate.getUTCDate();
     const checkDay = date.getUTCDate();
     
@@ -309,8 +354,8 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
   }
   
   // Handle "Every X months" frequencies (e.g., every 2 months, every 3 months, etc.)
-  if (bill.frequency.startsWith('every_') && bill.frequency.includes('_months')) {
-    const monthsMatch = bill.frequency.match(/every_(\d+)_months/);
+  if (frequency.startsWith('every_') && frequency.includes('_months')) {
+    const monthsMatch = frequency.match(/every_(\d+)_months/);
     if (monthsMatch) {
       const monthInterval = parseInt(monthsMatch[1]);
       const billDay = billDate.getUTCDate();
@@ -369,17 +414,17 @@ function shouldBillOccurOnDate(bill: any, date: Date): boolean {
 }
 
 
-async function computeProjections(settings: any) {
+async function computeProjections(settings: ProjectionSettings) {
   try {
     logger.info("Starting computeProjections");
     
     const billsSnapshot = await db.collection('bills').get();
-    const bills = billsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    const bills = billsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as BillRecord[];
     
     logger.info(`Found ${bills.length} bills`);
   
   const accountsSnapshot = await db.collection('accounts').get();
-  const accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+  const accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AccountRecord[];
   
   if (accounts.length === 0) {
     logger.warn("No accounts found, cannot compute projections");
@@ -423,7 +468,7 @@ async function computeProjections(settings: any) {
   let thresholdBreach: { balance: number, date: string } | null = null;
   
   // Pre-compute all bill occurrences with adjustments for the entire projection period
-  const billOccurrences = new Map<string, any[]>(); // dateStr -> bills[]
+  const billOccurrences = new Map<string, BillRecord[]>(); // dateStr -> bills[]
   
   // Initialize all projection dates
   for (let i = 0; i < projectionDays; i++) {
@@ -432,9 +477,18 @@ async function computeProjections(settings: any) {
   }
   
   // Helper function to determine if a bill should affect balance calculations
-  const shouldAffectBalance = (bill: any) => {
-    // Skip inactive bills (past credit card payments, etc.)
-    if (bill.isActive === false) return false;
+  const shouldAffectBalance = (bill: BillRecord) => {
+    const isCreditCardPayment = bill.category && bill.category.toLowerCase().includes('credit card payment');
+    const draftDetails = getCreditCardDraftDetails(bill);
+    const checkingImpactDate = bill.checkingImpactDate || draftDetails?.checkingImpactDate;
+
+    // Skip inactive bills unless an older Monarch due date marked a card payment inactive
+    // before its actual checking draft date.
+    if (bill.isActive === false) {
+      if (!isCreditCardPayment || !checkingImpactDate || checkingImpactDate < todayChicago) {
+        return false;
+      }
+    }
     
     // Skip bills from credit card accounts (they're already in the CC payment)
     // This applies to both manual and Monarch transactions
@@ -446,7 +500,7 @@ async function computeProjections(settings: any) {
     
     // Credit card payment transactions affect balance (they hit checking)
     // Note: These are now 'one-time' bills, so they naturally only appear once
-    if (bill.category && bill.category.toLowerCase().includes('credit card payment')) return true;
+    if (isCreditCardPayment) return true;
     
     // Everything else affects balance (manual budgets, checking account bills, income, etc.)
     return true;
@@ -467,7 +521,7 @@ async function computeProjections(settings: any) {
           }
         } else {
           // Adjust the date for weekends/holidays
-          const isPaycheck = bill.category && bill.category.toLowerCase() === 'paycheck';
+          const isPaycheck = bill.category?.toLowerCase() === 'paycheck';
           const adjustedDate = adjustTransactionDate(checkDate, isPaycheck, holidays);
           const adjustedDateStr = formatInChicago(adjustedDate);
           
@@ -499,7 +553,7 @@ async function computeProjections(settings: any) {
       // - Positive amounts = income (add to balance)
       const billsAffectingBalance = billsToProcess.filter(bill => shouldAffectBalance(bill));
       
-      const totalBillsToday = billsAffectingBalance.reduce((sum, bill) => sum + bill.amount, 0);
+      const totalBillsToday = billsAffectingBalance.reduce((sum, bill) => sum + (Number(bill.amount) || 0), 0);
       runningBalance += totalBillsToday; // Add amounts directly (negative = expense, positive = income)
       balanceToStore = runningBalance;
       logger.info(`Day ${i} (${dateStr}): ${billsToProcess.length} bills (${billsAffectingBalance.length} affect balance) totaling $${totalBillsToday}, new balance: $${balanceToStore}`);
@@ -514,7 +568,7 @@ async function computeProjections(settings: any) {
     }
     
     // Track first threshold breach
-    if (!thresholdBreach && balanceToStore < settings.balanceThreshold) {
+    if (!thresholdBreach && balanceToStore < (Number(settings.balanceThreshold) || 0)) {
       thresholdBreach = { balance: balanceToStore, date: dateStr };
     }
     
@@ -567,7 +621,7 @@ async function computeProjections(settings: any) {
 }
 
 // Monthly Cash Flow calculation function
-function calculateMonthlyCashFlow(bills: any[]) {
+function calculateMonthlyCashFlow(bills: BillRecord[]) {
   const categories: Record<string, { monthly: number; yearly: number }> = {};
   const summary = {
     oneTime: { bills: 0, income: 0 },
@@ -710,7 +764,7 @@ export const budgetProjection = functions.region(region).https.onRequest(
     try {
       const settingsDocRef = db.collection('settings').doc('config');
       const settingsDoc = await settingsDocRef.get();
-      let settings;
+      let settings: ProjectionSettings;
       
       if (!settingsDoc.exists) {
         const defaultSettings = {
@@ -723,7 +777,7 @@ export const budgetProjection = functions.region(region).https.onRequest(
         await settingsDocRef.set(defaultSettings);
         settings = defaultSettings;
       } else {
-        settings = settingsDoc.data();
+        settings = settingsDoc.data() as ProjectionSettings;
       }
       
       // Override projectionDays from request body if provided

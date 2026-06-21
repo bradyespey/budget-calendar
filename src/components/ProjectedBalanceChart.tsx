@@ -1,20 +1,28 @@
 //src/components/ProjectedBalanceChart.tsx
 
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { Projection } from '../types'
 
 interface ProjectedBalanceChartProps {
   data: Projection[]
+  lowBalanceThreshold: number
 }
 
-export function ProjectedBalanceChart({ data }: ProjectedBalanceChartProps) {
+function clamp(value: number, min = 0, max = 100) {
+  return Math.min(max, Math.max(min, value))
+}
+
+export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBalanceChartProps) {
+  const gradientId = useId().replace(/:/g, '')
   const chartTheme =
     typeof window === 'undefined'
       ? {
           grid: '#cbd5e1',
-          line: '#2563eb',
+          success: '#2c8b6d',
+          warning: '#c37a3a',
+          danger: '#c45045',
           text: '#64748b',
           tooltipBg: '#0f172a',
           tooltipBorder: '#334155',
@@ -23,7 +31,9 @@ export function ProjectedBalanceChart({ data }: ProjectedBalanceChartProps) {
           const styles = getComputedStyle(document.documentElement)
           return {
             grid: styles.getPropertyValue('--line-strong').trim() || '#cbd5e1',
-            line: styles.getPropertyValue('--accent').trim() || '#2563eb',
+            success: styles.getPropertyValue('--success').trim() || '#2c8b6d',
+            warning: styles.getPropertyValue('--warning').trim() || '#c37a3a',
+            danger: styles.getPropertyValue('--danger').trim() || '#c45045',
             text: styles.getPropertyValue('--muted').trim() || '#64748b',
             tooltipBg: styles.getPropertyValue('--surface-elevated').trim() || '#0f172a',
             tooltipBorder: styles.getPropertyValue('--line-strong').trim() || '#334155',
@@ -53,6 +63,23 @@ export function ProjectedBalanceChart({ data }: ProjectedBalanceChartProps) {
       }))
   }, [data])
 
+  const yScale = useMemo(() => {
+    const balances = chartData.map(item => item.balance)
+    const rawMin = Math.min(...balances, 0, lowBalanceThreshold)
+    const rawMax = Math.max(...balances, lowBalanceThreshold)
+    const range = Math.max(rawMax - rawMin, 1)
+    const padding = Math.max(range * 0.08, 500)
+    const min = Math.floor(rawMin - padding)
+    const max = Math.ceil(rawMax + padding)
+    const offsetForValue = (value: number) => clamp(((max - value) / (max - min)) * 100)
+
+    return {
+      domain: [min, max] as [number, number],
+      thresholdOffset: offsetForValue(lowBalanceThreshold),
+      zeroOffset: offsetForValue(0),
+    }
+  }, [chartData, lowBalanceThreshold])
+
   const labelFormatter = useMemo(
     () => (label: string) => {
       const item = chartData.find(point => point.date === label)
@@ -72,6 +99,16 @@ export function ProjectedBalanceChart({ data }: ProjectedBalanceChartProps) {
   return (
     <ResponsiveContainer width="100%" height={250}>
       <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={chartTheme.success} />
+            <stop offset={`${yScale.thresholdOffset}%`} stopColor={chartTheme.success} />
+            <stop offset={`${yScale.thresholdOffset}%`} stopColor={chartTheme.warning} />
+            <stop offset={`${yScale.zeroOffset}%`} stopColor={chartTheme.warning} />
+            <stop offset={`${yScale.zeroOffset}%`} stopColor={chartTheme.danger} />
+            <stop offset="100%" stopColor={chartTheme.danger} />
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.7} />
         <XAxis
           dataKey="date"
@@ -80,6 +117,7 @@ export function ProjectedBalanceChart({ data }: ProjectedBalanceChartProps) {
           style={{ fontSize: '12px' }}
         />
         <YAxis
+          domain={yScale.domain}
           stroke={chartTheme.text}
           style={{ fontSize: '12px' }}
           tickFormatter={formatCurrency}
@@ -98,7 +136,7 @@ export function ProjectedBalanceChart({ data }: ProjectedBalanceChartProps) {
         <Line
           type="monotone"
           dataKey="balance"
-          stroke={chartTheme.line}
+          stroke={`url(#${gradientId})`}
           strokeWidth={3}
           dot={false}
           activeDot={{ r: 6 }}

@@ -12,6 +12,26 @@ import { Projection } from '../types';
 import { format } from 'date-fns';
 import { generateMockProjections } from './mockData';
 
+const deployedFunctionsBaseUrl = 'https://us-central1-budgetcalendar-e6538.cloudfunctions.net';
+const localFunctionsBaseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined;
+
+const getFunctionUrl = (functionName: string): string => {
+  const baseUrl = import.meta.env.DEV && localFunctionsBaseUrl
+    ? localFunctionsBaseUrl
+    : deployedFunctionsBaseUrl;
+
+  return `${baseUrl.replace(/\/$/, '')}/${functionName}`;
+};
+
+type FirestoreProjection = {
+  projDate: string;
+  projectedBalance: number;
+  lowest: boolean;
+  highest: boolean;
+  thresholdBreach?: boolean;
+  bills?: Projection['bills'];
+};
+
 export async function getProjections() {
   try {
     if (!auth.currentUser) {
@@ -41,9 +61,9 @@ export async function getProjections() {
       const snapshot = await getDocs(projectionsRef);
       return snapshot.docs
         .map(d => d.data())
-        .filter((d: any) => d.projDate >= todayString)
-        .sort((a: any, b: any) => (a.projDate > b.projDate ? 1 : -1))
-        .map((d: any) => ({
+        .filter((d): d is FirestoreProjection => typeof d.projDate === 'string' && d.projDate >= todayString)
+        .sort((a, b) => (a.projDate > b.projDate ? 1 : -1))
+        .map((d) => ({
           proj_date: d.projDate,
           projected_balance: d.projectedBalance,
           lowest: d.lowest,
@@ -78,9 +98,9 @@ export async function getHighLowProjections() {
     const todayString = format(today, 'yyyy-MM-dd');
     const projectionsRef = collection(db, 'projections');
 
-    let highest: any | undefined;
-    let lowest: any | undefined;
-    let thresholdBreach: any | undefined;
+    let highest: FirestoreProjection | undefined;
+    let lowest: FirestoreProjection | undefined;
+    let thresholdBreach: FirestoreProjection | undefined;
 
     // Try fast path using flags. If it fails (index), continue to fallback.
     try {
@@ -105,9 +125,9 @@ export async function getHighLowProjections() {
       );
       const thresholdBreachSnapshot = await getDocs(thresholdBreachQuery);
 
-      highest = highestSnapshot.docs[0]?.data();
-      lowest = lowestSnapshot.docs[0]?.data();
-      thresholdBreach = thresholdBreachSnapshot.docs[0]?.data();
+      highest = highestSnapshot.docs[0]?.data() as FirestoreProjection | undefined;
+      lowest = lowestSnapshot.docs[0]?.data() as FirestoreProjection | undefined;
+      thresholdBreach = thresholdBreachSnapshot.docs[0]?.data() as FirestoreProjection | undefined;
     } catch {
       // Ignore and compute below
     }
@@ -115,7 +135,7 @@ export async function getHighLowProjections() {
     // Fallback: compute from future projections if flags missing or query failed
     if (!highest || !lowest || !thresholdBreach) {
       // Try indexed query; if it fails, read all and filter
-      let all: any[] = [];
+      let all: FirestoreProjection[] = [];
       try {
         const allFutureQuery = query(
           projectionsRef,
@@ -123,23 +143,25 @@ export async function getHighLowProjections() {
           orderBy('projDate')
         );
         const allSnapshot = await getDocs(allFutureQuery);
-        all = allSnapshot.docs.map(d => d.data());
+        all = allSnapshot.docs.map(d => d.data() as FirestoreProjection);
       } catch {
         const allSnapshot = await getDocs(projectionsRef);
-        all = allSnapshot.docs.map(d => d.data()).filter((d: any) => d.projDate >= todayString);
-        all.sort((a: any, b: any) => (a.projDate > b.projDate ? 1 : -1));
+        all = allSnapshot.docs
+          .map(d => d.data())
+          .filter((d): d is FirestoreProjection => typeof d.projDate === 'string' && d.projDate >= todayString);
+        all.sort((a, b) => (a.projDate > b.projDate ? 1 : -1));
       }
 
       if (all.length > 0) {
-        const max = all.reduce((acc: any, cur: any) =>
+        const max = all.reduce<FirestoreProjection | null>((acc, cur) =>
           acc && acc.projectedBalance >= cur.projectedBalance ? acc : cur,
-        null as any);
-        const min = all.reduce((acc: any, cur: any) =>
+        null);
+        const min = all.reduce<FirestoreProjection | null>((acc, cur) =>
           acc && acc.projectedBalance <= cur.projectedBalance ? acc : cur,
-        null as any);
-        const breach = all.find((d: any) => d.thresholdBreach === true);
-        highest = highest || max;
-        lowest = lowest || min;
+        null);
+        const breach = all.find((d) => d.thresholdBreach === true);
+        highest = highest || max || undefined;
+        lowest = lowest || min || undefined;
         thresholdBreach = thresholdBreach || breach;
       }
     }
@@ -174,7 +196,7 @@ export async function getHighLowProjections() {
 
 export async function triggerManualRecalculation() {
   try {
-    const response = await fetch('https://us-central1-budgetcalendar-e6538.cloudfunctions.net/budgetProjection', {
+    const response = await fetch(getFunctionUrl('budgetProjection'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})

@@ -219,6 +219,16 @@ export function TransactionsPage() {
     return undefined;
   };
 
+  const headerStats = [
+    { label: 'Total', value: combinedTransactions.length.toString(), tone: 'accent' as const },
+    ...(filteredTransactions.length !== combinedTransactions.length
+      ? [{ label: 'Filtered', value: filteredTransactions.length.toString(), tone: 'success' as const }]
+      : []),
+    { label: 'Manual', value: combinedTransactions.filter(t => t.source === 'manual').length.toString(), tone: 'warning' as const },
+    { label: 'Monarch', value: combinedTransactions.filter(t => t.source === 'monarch').length.toString(), tone: 'danger' as const },
+    { label: 'Categories', value: categories.length.toString(), tone: 'violet' as const },
+  ];
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -246,13 +256,7 @@ export function TransactionsPage() {
               ],
             },
           ]}
-          stats={[
-            { label: 'Total', value: combinedTransactions.length.toString(), tone: 'accent' },
-            { label: 'Visible', value: filteredTransactions.length.toString(), tone: 'success' },
-            { label: 'Manual', value: combinedTransactions.filter(t => t.source === 'manual').length.toString(), tone: 'warning' },
-            { label: 'Monarch', value: combinedTransactions.filter(t => t.source === 'monarch').length.toString(), tone: 'danger' },
-            { label: 'Categories', value: categories.length.toString(), tone: 'violet' },
-          ]}
+          stats={headerStats}
           actions={
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={handleRefresh} size="sm" variant="outline" isLoading={refreshing}>
@@ -276,7 +280,7 @@ export function TransactionsPage() {
           <CardContent className="space-y-5 p-5 sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CardTitle>Recurring Bills & Income</CardTitle>
+                <CardTitle>Recurring Bills and Income</CardTitle>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button

@@ -537,7 +537,7 @@ export function DashboardPage() {
               </div>
             }
           >
-            <ProjectedBalanceChart data={balanceProjections} />
+            <ProjectedBalanceChart data={balanceProjections} lowBalanceThreshold={settings?.balanceThreshold ?? 1000} />
           </Suspense>
         </CardContent>
       </Card>

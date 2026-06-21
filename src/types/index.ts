@@ -20,6 +20,9 @@ export interface Bill {
   iconType?: IconType
   source?: 'manual' | 'monarch'
   streamId?: string
+  originalDueDate?: string | null
+  checkingImpactDate?: string | null
+  draftRule?: string | null
   accountName?: string
   logoUrl?: string | null
   isActive?: boolean

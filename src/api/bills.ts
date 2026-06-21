@@ -3,6 +3,7 @@
 import { 
   collection, 
   doc, 
+  DocumentData,
   getDocs, 
   getDoc, 
   addDoc, 
@@ -14,6 +15,8 @@ import { db, auth } from '../lib/firebaseConfig';
 import { Bill } from '../types';
 import { MOCK_BILLS } from './mockData';
 
+type BillPayload = Record<string, unknown>;
+
 export async function getBills() {
   try {
     if (!auth.currentUser) {
@@ -23,7 +26,7 @@ export async function getBills() {
     const snapshot = await getDocs(billsRef);
     
     return snapshot.docs.map(doc => {
-      const d: any = doc.data();
+      const d: DocumentData = doc.data();
       return {
         id: doc.id,
         name: d.name,
@@ -38,6 +41,9 @@ export async function getBills() {
         iconType: d.iconType,
         source: d.source,
         streamId: d.streamId,
+        originalDueDate: d.originalDueDate,
+        checkingImpactDate: d.checkingImpactDate,
+        draftRule: d.draftRule,
         accountName: d.accountName,
         logoUrl: d.logoUrl,
         // Enhanced fields from Monarch
@@ -72,7 +78,7 @@ export async function getBill(id: string) {
       throw new Error(`Bill with id ${id} not found`);
     }
     
-    const d: any = billDoc.data();
+    const d: DocumentData = billDoc.data();
     return {
       id: billDoc.id,
       name: d.name,
@@ -86,6 +92,9 @@ export async function getBill(id: string) {
       note: d.note,
       iconUrl: d.iconUrl,
       iconType: d.iconType,
+      originalDueDate: d.originalDueDate,
+      checkingImpactDate: d.checkingImpactDate,
+      draftRule: d.draftRule,
       accountType: d.accountType,
     } as Bill;
   } catch (error) {
@@ -97,7 +106,7 @@ export async function getBill(id: string) {
 export async function createBill(bill: Omit<Bill, 'id'>) {
   try {
     const billsRef = collection(db, 'bills');
-    const payload: any = {
+    const payload: BillPayload = {
       name: bill.name,
       category: bill.category,
       normalizedCategory: bill.category.toLowerCase(), // Store normalized for matching
@@ -129,7 +138,7 @@ export async function updateBill(id: string, updates: Partial<Omit<Bill, 'id'>>)
   try {
     const billRef = doc(db, 'bills', id);
     
-    const firestoreUpdates: any = {};
+    const firestoreUpdates: BillPayload = {};
     if (updates.name !== undefined) firestoreUpdates.name = updates.name;
     if (updates.category !== undefined) {
       firestoreUpdates.category = updates.category;
@@ -185,7 +194,7 @@ export async function importBills(bills: Array<{
     
     bills.forEach(bill => {
       const newBillRef = doc(billsRef);
-      const payload: any = {
+      const payload: BillPayload = {
         name: bill.name,
         category: bill.category,
         amount: bill.amount,

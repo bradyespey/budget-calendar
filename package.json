@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:functions": "npm --prefix functions run serve",
+    "dev:local-functions": "VITE_FIREBASE_FUNCTIONS_BASE_URL=http://localhost:5001/budgetcalendar-e6538/us-central1 vite --host 0.0.0.0 --port 5174",
     "build": "vite build",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",

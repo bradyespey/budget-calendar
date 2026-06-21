@@ -78,7 +78,7 @@ export function QuickActionButtons({
       <div className="space-y-1">
         <Button className={actionButtonClass} variant="outline" onClick={onSyncCalendar} disabled={busy}>
           {busy && activeAction === 'calendar' ? <Loader className="animate-spin" size={18} /> : <Calendar size={18} />}
-          Sync Calendar
+          Sync to Google Calendar
         </Button>
         <div className="px-2 space-y-1">
           <div className="flex items-center gap-2 text-xs">

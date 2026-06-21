@@ -1,11 +1,13 @@
 //src/components/TransactionsTable.tsx
 
-import { Edit2, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { useState } from 'react';
+import { Edit2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Info } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { TransactionIcon } from './TransactionIcon';
 import { CombinedTransaction } from '../hooks/useTransactions';
 import { SortField, SortDirection } from '../hooks/useTransactionFilters';
 import { formatCurrency, capitalize, shortenAccountName, formatFrequencyLabel } from '../utils/transactionUtils';
+import { formatDraftRuleLabel, getCreditCardDraftDetails } from '../utils/creditCardDraftRules';
 
 interface TransactionsTableProps {
   transactions: CombinedTransaction[];
@@ -60,6 +62,15 @@ function SortHeader({
   );
 }
 
+function formatShortDate(date: string | null | undefined) {
+  if (!date) return null;
+  try {
+    return format(parseISO(date), 'MMM d');
+  } catch {
+    return date;
+  }
+}
+
 export function TransactionsTable({
   transactions,
   sortField,
@@ -70,6 +81,8 @@ export function TransactionsTable({
   onFilterClick,
   editMode = false,
 }: TransactionsTableProps) {
+  const [openDraftInfoId, setOpenDraftInfoId] = useState<string | null>(null);
+
   return (
     <div className="table-shell overflow-hidden">
       <div className="max-h-[72vh] overflow-x-auto overflow-y-auto rounded-[15px]">
@@ -125,7 +138,26 @@ export function TransactionsTable({
               </tr>
             </thead>
             <tbody>
-              {transactions.map((transaction) => (
+              {transactions.map((transaction) => {
+                const draftDetails = getCreditCardDraftDetails({
+                  name: transaction.name,
+                  merchantName: transaction.merchantName,
+                  category: transaction.category,
+                  dueDate: transaction.dueDate,
+                  originalDueDate: transaction.originalDueDate,
+                  checkingImpactDate: transaction.checkingImpactDate,
+                  draftRule: transaction.draftRule,
+                });
+                const hasDraftRule = Boolean(draftDetails);
+                const draftInfo = draftDetails
+                  ? [
+                      formatDraftRuleLabel(draftDetails.draftRule),
+                      draftDetails.originalDueDate && `Card due date: ${formatShortDate(draftDetails.originalDueDate)}`,
+                      draftDetails.checkingImpactDate && `Checking impact: ${formatShortDate(draftDetails.checkingImpactDate)}`,
+                    ].filter(Boolean).join('\n')
+                  : '';
+
+                return (
                 <tr
                   key={transaction.id}
                   className="border-b transition hover:bg-[color:var(--surface-hover)] surface-divider"
@@ -141,6 +173,30 @@ export function TransactionsTable({
                         className="w-8 h-8"
                       />
                         <span className="truncate font-medium text-[color:var(--text)]">{transaction.name}</span>
+                        {hasDraftRule && (
+                          <span className="relative shrink-0">
+                            <button
+                              type="button"
+                              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[color:var(--line)] bg-[color:var(--surface-muted)] text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                              title={draftInfo}
+                              aria-label={draftInfo}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenDraftInfoId(openDraftInfoId === transaction.id ? null : transaction.id);
+                              }}
+                              onBlur={() => window.setTimeout(() => setOpenDraftInfoId(null), 120)}
+                            >
+                              <Info className="h-3 w-3" />
+                            </button>
+                            {openDraftInfoId === transaction.id && (
+                              <span className="absolute left-0 top-7 z-30 w-64 rounded-[12px] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 text-xs leading-5 text-[color:var(--muted)] shadow-xl">
+                                {draftInfo.split('\n').map((line) => (
+                                  <span key={line} className="block">{line}</span>
+                                ))}
+                              </span>
+                            )}
+                          </span>
+                        )}
                       </div>
                       {editMode && transaction.isEditable ? (
                         <div className="flex shrink-0 items-center gap-2">
@@ -235,7 +291,7 @@ export function TransactionsTable({
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
       </div>

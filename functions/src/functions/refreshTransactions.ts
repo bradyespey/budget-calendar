@@ -1,7 +1,9 @@
-import * as admin from "firebase-admin";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
+import { getCreditCardDraftDetails } from "../utils/creditCardDraftRules";
 
+const db = getFirestore();
 const region = 'us-central1';
 
 // Helper function to determine account type from account icon and category
@@ -102,7 +104,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
       };
 
       // Get existing Monarch bills for comparison
-      const existingSnapshot = await admin.firestore().collection('bills').where('source', '==', 'monarch').get();
+      const existingSnapshot = await db.collection('bills').where('source', '==', 'monarch').get();
       const existingBills = new Map();
       existingSnapshot.docs.forEach(doc => {
         const data = doc.data();
@@ -196,7 +198,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
       }
 
       const streams = result.data?.recurringTransactionStreams || [];
-      const storeBatch = admin.firestore().batch();
+      const storeBatch = db.batch();
       let storedCount = 0;
 
       for (const item of streams) {
@@ -219,15 +221,25 @@ export const refreshTransactions = functions.region(region).https.onRequest(
         
         // For past credit card payments, mark as inactive but keep them for historical view
         const billDate = nextTransaction.date || new Date().toISOString().split('T')[0];
+        const draftDetails = getCreditCardDraftDetails({
+          name: stream.name,
+          merchantName: stream.merchant?.name,
+          category,
+          startDate: billDate,
+        });
+        const checkingImpactDate = draftDetails?.checkingImpactDate ?? billDate;
         const today = new Date().toISOString().split('T')[0];
-        const isPastPayment = isCreditCardPayment && billDate < today;
+        const isPastPayment = isCreditCardPayment && checkingImpactDate < today;
         
         const billData = {
           name: stream.name || 'Unknown',
           amount: nextTransaction.amount || 0, // Preserve original sign from Monarch
           category,
           frequency,
-          startDate: nextTransaction.date || new Date().toISOString().split('T')[0], // Use nextForecastedTransaction date
+          startDate: checkingImpactDate,
+          originalDueDate: draftDetails?.originalDueDate ?? null,
+          checkingImpactDate: draftDetails?.checkingImpactDate ?? null,
+          draftRule: draftDetails?.draftRule ?? null,
           endDate: null,
           repeatsEvery: 1,
           notes: null, // Don't save notes for Monarch transactions
@@ -257,7 +269,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
           // Metadata
           isActive: isPastPayment ? false : (stream.isActive !== false),
           isApproximate: stream.isApproximate || false,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          updatedAt: FieldValue.serverTimestamp()
         };
 
         // Debug logging for account type determination
@@ -274,6 +286,9 @@ export const refreshTransactions = functions.region(region).https.onRequest(
             existingBill.category !== billData.category ||
             existingBill.frequency !== billData.frequency ||
             existingBill.startDate !== billData.startDate ||
+            existingBill.originalDueDate !== billData.originalDueDate ||
+            existingBill.checkingImpactDate !== billData.checkingImpactDate ||
+            existingBill.draftRule !== billData.draftRule ||
             existingBill.accountName !== billData.accountName ||
             existingBill.accountType !== billData.accountType ||
             existingBill.isActive !== billData.isActive
@@ -281,7 +296,7 @@ export const refreshTransactions = functions.region(region).https.onRequest(
 
           if (needsUpdate) {
             // Update existing bill
-            const docRef = admin.firestore().collection('bills').doc(existingBill.id);
+            const docRef = db.collection('bills').doc(existingBill.id);
             storeBatch.update(docRef, billData);
             logger.info(`Updating bill for ${stream.name} (${stream.id})`);
           }
@@ -292,9 +307,9 @@ export const refreshTransactions = functions.region(region).https.onRequest(
           // Create new bill
           const newBillData = {
             ...billData,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
+            createdAt: FieldValue.serverTimestamp()
           };
-          const docRef = admin.firestore().collection('bills').doc();
+          const docRef = db.collection('bills').doc();
           storeBatch.set(docRef, newBillData);
           logger.info(`Creating new bill for ${stream.name} (${stream.id})`);
         }
@@ -305,12 +320,12 @@ export const refreshTransactions = functions.region(region).https.onRequest(
       await storeBatch.commit();
 
       // Delete bills that no longer exist in Monarch
-      const deleteBatch = admin.firestore().batch();
+      const deleteBatch = db.batch();
       let deletedCount = 0;
       
       for (const [streamId, bill] of existingBills) {
         logger.info(`Deleting bill for ${bill.name} (${streamId}) - no longer in Monarch`);
-        const docRef = admin.firestore().collection('bills').doc(bill.id);
+        const docRef = db.collection('bills').doc(bill.id);
         deleteBatch.delete(docRef);
         deletedCount++;
       }
@@ -321,8 +336,8 @@ export const refreshTransactions = functions.region(region).https.onRequest(
 
       // Update function timestamp
       try {
-        const timestamp = admin.firestore.Timestamp.now();
-        await admin.firestore().doc('admin/functionTimestamps').set({
+        const timestamp = Timestamp.now();
+        await db.doc('admin/functionTimestamps').set({
           refreshTransactions: timestamp,
           refreshRecurringTransactions: timestamp
         }, { merge: true });
@@ -339,11 +354,12 @@ export const refreshTransactions = functions.region(region).https.onRequest(
         updatedAt: new Date().toISOString()
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Refresh recurring transactions error:', error);
       res.status(500).json({ 
         error: 'Internal server error',
-        details: error.message 
+        details: message
       });
     }
   }

@@ -270,7 +270,7 @@ export function SettingsPage() {
   }
 
   async function handleSyncCalendar() {
-    if (isDemo) { showNotification('Calendar sync completed.', 'success'); return; }
+    if (isDemo) { showNotification('Google Calendar sync completed.', 'success'); return; }
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
     setBusy(true);
     setActiveAction('calendar');
@@ -283,12 +283,12 @@ export function SettingsPage() {
       await saveFunctionTimestampLocal('syncCalendar');
       
       if (result.success) {
-        showNotification(`Calendar sync completed for ${calendarMode} calendar. Created ${result.eventsCreated || 0}, updated ${result.eventsUpdated || 0}, deleted ${result.eventsDeleted || 0} events.`, 'success');
+        showNotification(`Google Calendar sync completed for ${calendarMode} calendar. Created ${result.eventsCreated || 0}, updated ${result.eventsUpdated || 0}, deleted ${result.eventsDeleted || 0} events.`, 'success');
       } else {
-        showNotification(`Calendar sync failed: ${result.message}`, 'error');
+        showNotification(`Google Calendar sync failed: ${result.message}`, 'error');
       }
     } catch (e: unknown) {
-      showNotification(`Error syncing calendar: ${getErrorMessage(e, 'Calendar sync failed')}`, 'error');
+      showNotification(`Error syncing Google Calendar: ${getErrorMessage(e, 'Google Calendar sync failed')}`, 'error');
     } finally {
       setBusy(false);
       setActiveAction(null);
@@ -451,7 +451,7 @@ export function SettingsPage() {
     if (activeAction === 'refresh') return 'Refreshing Accounts...';
     if (activeAction === 'balance') return 'Updating Balance...';
     if (activeAction === 'projection') return 'Running Budget Projection...';
-    if (activeAction === 'calendar') return 'Syncing Calendar...';
+    if (activeAction === 'calendar') return 'Syncing Google Calendar...';
     if (activeAction === 'validate') return 'Validating Projections...';
     if (activeAction === 'clear') return 'Clearing Calendars...';
     if (activeAction === 'import') return 'Importing Bills from CSV...';
@@ -468,7 +468,7 @@ export function SettingsPage() {
     <div className="mx-auto max-w-6xl space-y-5">
       {/* Header */}
       <PageHeader
-        className="sticky top-3 z-30 bg-[color:var(--bg)]/95 pb-3 backdrop-blur-xl"
+        className="sticky-page-header sticky top-3 z-40 pb-3"
         eyebrow="Settings"
         title="Settings"
         actions={(
@@ -488,7 +488,7 @@ export function SettingsPage() {
               'Refresh Accounts - Update Monarch Money data',
               'Update Balance - Pull latest account balances',
               'Run Projection - Recalculate future balances',
-              'Sync Calendar - Push events to Google Calendar',
+              'Sync to Google Calendar - Push forecast events to Google Calendar',
               'Run All - Execute full automation workflow',
             ],
           },

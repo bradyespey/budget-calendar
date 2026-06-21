@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { getFunctions } from 'firebase/functions';
+import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -26,6 +26,17 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app, 'us-central1');
 
+const localFunctionsBaseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined;
+
+if (import.meta.env.DEV && localFunctionsBaseUrl) {
+  try {
+    const emulatorUrl = new URL(localFunctionsBaseUrl);
+    connectFunctionsEmulator(functions, emulatorUrl.hostname, Number(emulatorUrl.port || 5001));
+  } catch (error) {
+    console.error('Failed to configure local Firebase Functions emulator:', error);
+  }
+}
+
 // Configure Google Auth Provider
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -33,4 +44,3 @@ googleProvider.setCustomParameters({
 });
 
 export default app;
-

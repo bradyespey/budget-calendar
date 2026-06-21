@@ -13,7 +13,7 @@ export function SavingsChart({ data }: SavingsChartProps) {
     typeof window === 'undefined'
       ? {
           grid: '#cbd5e1',
-          line: '#2c8b6d',
+          line: '#3467c7',
           text: '#64748b',
           tooltipBg: '#0f172a',
           tooltipBorder: '#334155',
@@ -22,7 +22,7 @@ export function SavingsChart({ data }: SavingsChartProps) {
           const styles = getComputedStyle(document.documentElement)
           return {
             grid: styles.getPropertyValue('--line-strong').trim() || '#cbd5e1',
-            line: styles.getPropertyValue('--success').trim() || '#2c8b6d',
+            line: styles.getPropertyValue('--accent').trim() || '#3467c7',
             text: styles.getPropertyValue('--muted').trim() || '#64748b',
             tooltipBg: styles.getPropertyValue('--surface-elevated').trim() || '#0f172a',
             tooltipBorder: styles.getPropertyValue('--line-strong').trim() || '#334155',
@@ -40,15 +40,6 @@ export function SavingsChart({ data }: SavingsChartProps) {
     }));
   }, [data]);
 
-  if (chartData.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
-        <p>No savings history yet. Start tracking by updating balances.</p>
-      </div>
-    )
-  }
-
-  // Memoize formatters to prevent re-creating on every render
   const formatCurrency = useMemo(() => 
     (value: number) => new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -66,6 +57,14 @@ export function SavingsChart({ data }: SavingsChartProps) {
     },
     [chartData]
   );
+
+  if (chartData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
+        <p>No savings history yet. Start tracking by updating balances.</p>
+      </div>
+    )
+  }
 
   return (
     <ResponsiveContainer width="100%" height={250}>

@@ -1,14 +1,14 @@
 //src/pages/CalendarPage.tsx
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { addDays, parseISO } from 'date-fns';
-import { getProjections } from '../api/projections';
+import { getProjections, triggerManualRecalculation } from '../api/projections';
 import { Projection } from '../types';
-import { ArrowDownRight, ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Search, X } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, RefreshCw, TrendingUp, TrendingDown, Search, X } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
-import { getSettings, getFunctionTimestamps } from '../api/firebase';
+import { getFunctionTimestamps, refreshRecurringTransactions, saveFunctionTimestamp } from '../api/firebase';
 import { useLocation } from 'react-router-dom';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useAuth } from '../context/AuthContext';
@@ -48,6 +48,10 @@ const affectsBalance = (transaction: DayData['transactions'][0]): boolean => {
   // Everything else affects balance (manual budgets, checking account bills, income, etc.)
   return true;
 };
+
+function sortTransactionsByLargest(transactions: DayData['transactions']) {
+  return [...transactions].sort((a, b) => Math.abs(Number(b.amount) || 0) - Math.abs(Number(a.amount) || 0));
+}
 
 function getLocalDate(dateStr: string) {
   return new Date(`${dateStr}T12:00:00`);
@@ -112,13 +116,14 @@ function formatCalendarTitle(view: ForecastView, anchor: Date) {
 export function CalendarPage() {
   const [calendarDaysData, setCalendarDaysData] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastProjected, setLastProjected] = useState<Date | null>(null);
   const [budgetProjectionTimestamp, setBudgetProjectionTimestamp] = useState<Date | null>(null);
   const [syncCalendarTimestamp, setSyncCalendarTimestamp] = useState<Date | null>(null);
+  const [refreshingProjection, setRefreshingProjection] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<ForecastView>('month');
   const [anchor, setAnchor] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => getIsoDate(new Date()));
+  const currentWeekRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const { session } = useAuth();
   const todayIso = getIsoDate(new Date());
@@ -164,23 +169,12 @@ export function CalendarPage() {
   useEffect(() => {
     fetchCalendarData();
     loadTimestamps();
-    async function fetchLastProjected() {
-      try {
-        const settings = await getSettings();
-        if (settings?.lastProjectedAt) {
-          setLastProjected(settings.lastProjectedAt);
-        }
-      } catch (error) {
-        console.error('Error fetching last projected time:', error);
-      }
-    }
-    fetchLastProjected();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, session.isAuthenticated]);
 
-  const fetchCalendarData = async () => {
+  const fetchCalendarData = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
 
       // We only need projections now since they contain the bills
       const projections = await getProjections();
@@ -197,7 +191,7 @@ export function CalendarPage() {
     } catch (error) {
       console.error('Error fetching calendar data:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -207,15 +201,17 @@ export function CalendarPage() {
       return {
         date: proj.proj_date,
         balance: proj.projected_balance,
-        transactions: (proj.bills || []).map(bill => ({
-          id: bill.id,
-          name: bill.name,
-          amount: bill.amount,
-          category: bill.category,
-          accountType: bill.accountType,
-          source: bill.source,
-          isActive: bill.isActive
-        })),
+        transactions: sortTransactionsByLargest(
+          (proj.bills || []).map(bill => ({
+            id: bill.id,
+            name: bill.name,
+            amount: bill.amount,
+            category: bill.category,
+            accountType: bill.accountType,
+            source: bill.source,
+            isActive: bill.isActive
+          }))
+        ),
         isHighest: proj.highest,
         isLowest: proj.lowest
       };
@@ -290,6 +286,18 @@ export function CalendarPage() {
     });
   }, [anchor, filteredDays, view]);
 
+  const currentWeekStartIso = getIsoDate(getMondayStart(getLocalDate(selectedDate)));
+
+  useEffect(() => {
+    if (loading || view !== 'month' || !currentWeekRef.current) return;
+
+    const frame = requestAnimationFrame(() => {
+      currentWeekRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [calendarDays.length, currentWeekStartIso, loading, view]);
+
   const handleSelectDate = (date: string) => {
     setSelectedDate(date);
     if (view !== 'month') {
@@ -323,6 +331,23 @@ export function CalendarPage() {
     }
   };
 
+  const handleRefreshProjection = async () => {
+    setRefreshingProjection(true);
+    try {
+      if (session.isAuthenticated) {
+        await refreshRecurringTransactions();
+        await triggerManualRecalculation();
+        await saveFunctionTimestamp('budgetProjection');
+      }
+      await fetchCalendarData(false);
+      await loadTimestamps();
+    } catch (error) {
+      console.error('Error refreshing projection:', error);
+    } finally {
+      setRefreshingProjection(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -339,18 +364,15 @@ export function CalendarPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <div className="sticky top-3 z-30 space-y-3 bg-[color:var(--bg)]/95 pb-3 backdrop-blur-xl">
+      <div className="sticky-page-stack sticky top-3 z-40 space-y-3 pb-3">
         <PageHeader
           className="mb-0"
           eyebrow="Calendar"
           title={`${searchTerm ? `${filteredDays.length} of ${calendarDaysData.length}` : calendarDaysData.length}-Day Calendar`}
-          subtitle={
-            [
-              budgetProjectionTimestamp && `Projections: ${formatTimestamp(budgetProjectionTimestamp)}`,
-              syncCalendarTimestamp && `Calendar Sync: ${formatTimestamp(syncCalendarTimestamp)}`,
-              lastProjected && `Last projected: ${formatTimestamp(lastProjected)}`,
-            ].filter(Boolean).join(' • ')
-          }
+          stats={[
+            { label: 'Projected', value: formatTimestamp(budgetProjectionTimestamp), tone: 'neutral' },
+            { label: 'Calendar sync', value: formatTimestamp(syncCalendarTimestamp), tone: 'neutral' },
+          ]}
           helpSections={[
             {
               title: 'Display',
@@ -384,26 +406,40 @@ export function CalendarPage() {
             },
           ]}
           actions={
-            <div className="flex items-center gap-2">
-              {(['month', 'week', 'day'] as const).map(mode => (
-                <Button
-                  key={mode}
-                  size="sm"
-                  variant={view === mode ? 'primary' : 'outline'}
-                  onClick={() => handleSelectView(mode)}
-                  className="capitalize"
-                >
-                  {mode}
-                </Button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefreshProjection}
+                isLoading={refreshingProjection}
+                leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+              >
+                Refresh
+              </Button>
+              <div className="flex items-center gap-2">
+                {(['month', 'week', 'day'] as const).map(mode => (
+                  <Button
+                    key={mode}
+                    size="sm"
+                    variant={view === mode ? 'primary' : 'outline'}
+                    onClick={() => handleSelectView(mode)}
+                    className="capitalize"
+                  >
+                    {mode}
+                  </Button>
+                ))}
+              </div>
             </div>
           }
         />
 
         <Card className="overflow-hidden">
-          <CardContent className="p-2.5 sm:p-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:max-w-xl">
+          <div className="flex flex-wrap items-center gap-3 border-b surface-divider px-4 py-3">
+            <div className="flex min-w-[180px] items-center gap-2">
+              <CalendarDays className="h-4 w-4 shrink-0 text-[color:var(--accent)]" />
+              <h2 className="truncate text-base font-bold text-[color:var(--text)]">{formatCalendarTitle(view, anchor)}</h2>
+            </div>
+            <div className="relative min-w-[260px] flex-1 lg:max-w-[520px]">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--muted)]" />
               <Input
                 type="text"
@@ -414,34 +450,21 @@ export function CalendarPage() {
               />
               {searchTerm && (
                 <button
+                  type="button"
                   onClick={() => setSearchTerm('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] transition hover:text-[color:var(--text)]"
+                  aria-label="Clear search"
                 >
                   <X className="h-4 w-4" />
                 </button>
               )}
             </div>
-            {searchTerm && (
-              <div className="whitespace-nowrap text-xs font-semibold text-[color:var(--muted)]">
-                {totalOccurrences} occurrence{totalOccurrences !== 1 ? 's' : ''} found
-              </div>
-            )}
-          </div>
-          {searchTerm && (
-            <div className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-[color:var(--muted)]">
-              Showing {filteredDays.length} day{filteredDays.length !== 1 ? 's' : ''} with matching transactions
-            </div>
-          )}
-          </CardContent>
-        </Card>
-
-        <Card className="hidden overflow-hidden lg:block">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b surface-divider px-4 py-3">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-[color:var(--accent)]" />
-              <h2 className="text-base font-bold text-[color:var(--text)]">{formatCalendarTitle(view, anchor)}</h2>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="ml-auto flex flex-wrap items-center gap-3">
+              {searchTerm && (
+                <span className="whitespace-nowrap text-xs font-semibold text-[color:var(--muted)]">
+                  {totalOccurrences} found
+                </span>
+              )}
               <div className="flex flex-wrap items-center gap-3 rounded-full border border-[color:var(--line)] bg-[color:var(--surface-muted)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--muted)]">
                 <span>+ Credit</span>
                 <span>- Debit</span>
@@ -466,7 +489,7 @@ export function CalendarPage() {
             </div>
           </div>
           {view !== 'day' && (
-            <div className="grid grid-cols-7 border-b surface-divider bg-[color:var(--surface-muted)]">
+            <div className="hidden grid-cols-7 border-b surface-divider bg-[color:var(--surface-muted)] lg:grid">
               {WEEKDAYS.map(day => (
                 <div key={day} className="px-2 py-2 text-center text-[0.68rem] font-bold uppercase tracking-[0.2em] text-[color:var(--muted)]">
                   {day}
@@ -490,10 +513,12 @@ export function CalendarPage() {
             return (
               <div
                 key={date}
+                ref={date === currentWeekStartIso ? currentWeekRef : null}
                 onClick={() => handleSelectDate(date)}
                 className={`${view === 'day' ? 'min-h-[360px] rounded-[18px] border' : view === 'week' ? 'min-h-[360px] border-b border-r' : 'min-h-[134px] border-b border-r'} cursor-pointer border-[color:var(--line)] p-2 transition ${
                   day ? 'bg-[color:var(--surface)]' : 'bg-[color:var(--surface-muted)]/55'
                 } ${isSelected && view !== 'day' ? 'bg-[color:var(--accent-soft)]/35 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_45%,transparent)]' : 'hover:bg-[color:var(--surface-muted)]/70'}`}
+                style={date === currentWeekStartIso ? { scrollMarginTop: '260px' } : undefined}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-1.5">

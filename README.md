@@ -52,7 +52,7 @@ Important notes:
 - `refreshAccounts`, `updateBalance`, and `refreshTransactions` use server-side Firebase Functions env vars, not browser env vars
 - `refreshAccounts` calls Monarch directly, requests checking/savings refresh, and waits until those configured accounts are done syncing before returning success
 - Localhost calls deployed Firebase Functions by default so dev and production use the same backend
-- `VITE_FIREBASE_FUNCTIONS_BASE_URL` is optional and only needed for explicit emulator testing
+- `VITE_FIREBASE_FUNCTIONS_BASE_URL` is optional and only needed for explicit emulator testing from the browser UI
 
 Firebase Functions env vars required for live Functions:
 
@@ -82,20 +82,24 @@ GitHub Actions secrets required for weekly encrypted backups:
 
 ## Run Modes
 - Dev app: `npm run dev`
+- Dev app against local Functions emulator: run `npm run dev:functions`, then `npm run dev:local-functions`
 - Local functions emulator: `cd functions && npm run serve`
 - Type check: `npm run type-check`
 - Production build: `npm run build`
 
 Development environment loading:
 - `npm run dev` runs plain `vite` — Vite loads `.env` automatically from the project root
+- `npm run dev:local-functions` starts Vite with `VITE_FIREBASE_FUNCTIONS_BASE_URL=http://localhost:5001/budgetcalendar-e6538/us-central1` so function-triggering buttons call the local Functions emulator instead of deployed Functions
 
 Local function testing:
 - Fill in the local `functions/.env` values before starting the emulator
 - Keep `functions/.env` local only; it contains secrets and is gitignored
 - Set `VITE_FIREBASE_FUNCTIONS_BASE_URL=http://127.0.0.1:5001/budgetcalendar-e6538/us-central1` only when intentionally testing the local emulator
+- The Functions emulator is functions-only by default; Firestore/Auth calls still use the configured Firebase project, so local function tests can update live app data
 
 ## Scripts and Ops
 - Dev: `npm run dev`
+- Dev with local Functions: `npm run dev:functions` plus `npm run dev:local-functions`
 - Build: `npm run build`
 - Type check: `npm run type-check`
 - Automation check: `npm run check:automation`
@@ -105,8 +109,8 @@ Local function testing:
 Key Functions:
 - `refreshAccounts`: calls Monarch directly to refresh configured checking/savings accounts and waits for those syncs to complete
 - `updateBalance`: pulls checking, savings, and credit-card totals from Monarch and stores account snapshots
-- `refreshTransactions`: refreshes recurring Monarch streams into Firestore; maps Monarch account types to Checking/Credit Card; Unknown account type + negative amount is reclassified as Credit Card (CC charges without a real account don't affect balance projection)
-- `budgetProjection`: calculates projected checking balances with business-day adjustments; excludes Credit Card and unknown-account-type expenses from balance (those are covered by CC payment bills); writes monthly cash flow summary (category averages and bills/income by frequency) to `monthlyCashFlow/current`; sends one Resend email when the forecast changes below the configured threshold, including the first threshold-crossing date and the lowest point in the current forecast
+- `refreshTransactions`: refreshes recurring Monarch streams into Firestore; maps Monarch account types to Checking/Credit Card; Unknown account type + negative amount is reclassified as Credit Card (CC charges without a real account don't affect balance projection); known credit card payments store a checking-impact date when the card due date differs from the bank draft date
+- `budgetProjection`: calculates projected checking balances with business-day adjustments; excludes Credit Card and unknown-account-type expenses from balance (those are covered by CC payment bills); uses credit card draft rules for known cards (Chase Southwest/Amazon Prime on the 23rd with next-business-day movement, Apple Card on the 1st of the following month with Sunday/holiday movement, AmEx on the 14th with next-business-day movement); writes monthly cash flow summary (category averages and bills/income by frequency) to `monthlyCashFlow/current`; sends one Resend email when the forecast changes below the configured threshold, including the first threshold-crossing date and the lowest point in the current forecast
 - Projection day `0` stores the current live checking balance and displays today's transactions without subtracting them again, since they may already be reflected in the account balance. Future days apply scheduled transactions normally. If a bill posts on a different date than its configured schedule, update the transaction date for a more accurate forecast.
 - `syncCalendar`: syncs bills and projected balances to Google Calendar as all-day events with event reminders disabled
 - `clearCalendars`: clears future events from configured calendars
@@ -136,7 +140,7 @@ Important:
 ## App Pages / Routes
 - `/dashboard`: balances, alerts, forecast summary, balance projection chart, savings trend; category averages (client-side, all bills, clickable → filtered transactions); bills/income summary by frequency (daily/weekly/biweekly/semimonthly/monthly/yearly/one-time)
 - `/transactions`: Recurring Bills & Income — Monarch entries are read-only (categories and details sync from Monarch); manual transactions can be created and edited freely
-- `/calendar`: projection calendar, transaction search, balance-impact vs excluded display; CC charges shown as excluded (covered by CC payment bill)
+- `/calendar`: projection calendar, compact search, month/week/day views, refresh action, balance-impact vs excluded display; CC charges shown as excluded (covered by CC payment bill)
 - `/settings`: projection settings, quick actions, maintenance actions, calendar controls
 - `/login`: restricted sign-in and demo access
 
@@ -178,3 +182,4 @@ Read this README first, then scan `src/`, `functions/src/functions/`, and `scrip
 ## Links
 - [Projection workflow notes](docs/Apple%20Notes%20Export/Budget%20Projection%20Workflow.md)
 - [Monarch integration notes](docs/Apple%20Notes%20Export/Monarch%20Money%20API%20Integration%20Guide.md)
+- [Calendar projection notes](docs/calendar-projection-notes.md)

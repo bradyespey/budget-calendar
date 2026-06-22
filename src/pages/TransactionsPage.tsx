@@ -6,7 +6,8 @@ import { Layout } from '../components/Layout/Layout';
 import { Plus, Pencil } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
-import { Card, CardContent, CardTitle } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/Card';
+import { SectionInfoHeading } from '../components/ui/SectionInfoHeading';
 import { TransactionsFilters } from '../components/TransactionsFilters';
 import { TransactionsTable } from '../components/TransactionsTable';
 import { TransactionForm, FormMode, TransactionSubmitData } from '../components/TransactionForm';
@@ -242,20 +243,10 @@ export function TransactionsPage() {
       <div className="space-y-5">
         {/* Header */}
         <PageHeader
+          className="sticky-page-header sticky top-3 z-40 pb-3"
           eyebrow="Transactions"
           title="Transactions"
           subtitle={refreshTransactionsTimestamp ? formatTimestamp(refreshTransactionsTimestamp) : undefined}
-          helpSections={[
-            {
-              title: 'Quick Tips',
-              items: [
-                'Monarch transactions are read-only — categories and details sync automatically from Monarch and cannot be edited here.',
-                'To change a Monarch transaction\'s category, update it in Monarch and click Refresh.',
-                'Manual transactions (nanny, one-off bills, etc.) can be created and edited freely.',
-                'Filter by frequency, account, category, or source to narrow the list.',
-              ],
-            },
-          ]}
           stats={headerStats}
           actions={
             <div className="flex flex-wrap items-center gap-3">
@@ -280,7 +271,15 @@ export function TransactionsPage() {
           <CardContent className="space-y-5 p-5 sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CardTitle>Recurring Bills and Income</CardTitle>
+                <SectionInfoHeading
+                  title="Recurring Bills and Income"
+                  items={[
+                    'Monarch transactions are read-only; categories and details sync automatically from Monarch and cannot be edited here.',
+                    'To change a Monarch transaction category, update it in Monarch and click Refresh.',
+                    'Manual transactions such as nanny payments or one-off bills can be created and edited freely.',
+                    'Use the filters to narrow by frequency, account, category, or source.',
+                  ]}
+                />
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button

@@ -7,7 +7,6 @@ import { Button } from '../components/ui/Button'
 import {
   Card,
   CardHeader,
-  CardTitle,
   CardContent,
 } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
@@ -26,6 +25,8 @@ import { getIconBackupInfo } from '../api/icons'
 import { QuickActionButtons } from '../components/QuickActions'
 import { MaintenanceActions } from '../components/MaintenanceActions'
 import { useMaintenanceActions } from '../hooks/useMaintenanceActions'
+import { ThemeToggleMenu } from '../components/ThemeToggleMenu'
+import { SectionInfoHeading } from '../components/ui/SectionInfoHeading'
 
 type CurrencyInputProps = React.ComponentProps<typeof Input> & {
   value: string;
@@ -481,35 +482,6 @@ export function SettingsPage() {
             Save
           </Button>
         )}
-        helpSections={[
-          {
-            title: 'Quick Actions',
-            items: [
-              'Refresh Accounts - Update Monarch Money data',
-              'Update Balance - Pull latest account balances',
-              'Run Projection - Recalculate future balances',
-              'Sync to Google Calendar - Push forecast events to Google Calendar',
-              'Run All - Execute full automation workflow',
-            ],
-          },
-          {
-            title: 'Settings',
-            items: [
-              'Days to Project - How many days ahead to calculate',
-              'Low Balance Alert - Threshold for balance warnings',
-              'Manual Balance Override - Temporarily override live balance',
-            ],
-          },
-          {
-            title: 'Maintenance',
-            items: [
-              'Validate Projections - Check for missing bills',
-              'Clear Calendars - Remove all calendar events',
-              'Generate Icons - Create transaction icons',
-              'Import/Export - Manage transaction data',
-            ],
-          },
-        ]}
         stats={[
           { label: 'Projection days', value: `${localProjectionDays ?? 7}`, tone: 'accent' },
           { label: 'Low balance alert', value: `$${localBalanceThreshold.toLocaleString()}`, tone: 'danger' },
@@ -541,7 +513,16 @@ export function SettingsPage() {
       <Card className="w-full">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Quick Actions</CardTitle>
+            <SectionInfoHeading
+              title="Quick Actions"
+              items={[
+                'Refresh Accounts updates Monarch Money data.',
+                'Update Balance pulls the latest account balances.',
+                'Run Projection recalculates future balances.',
+                'Sync to Google Calendar pushes forecast events to Google Calendar.',
+                'Run All executes the full automation workflow.',
+              ]}
+            />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500 dark:text-gray-400">Show timestamps</span>
@@ -583,7 +564,14 @@ export function SettingsPage() {
       <Card className="w-full">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Budget Projection Settings</CardTitle>
+            <SectionInfoHeading
+              title="Budget Projection Settings"
+              items={[
+                'Days to Project controls how many days ahead balances are calculated.',
+                'Low Balance Alert sets the threshold for warnings and chart color changes.',
+                'Manual Balance Override temporarily replaces the live checking balance for projections.',
+              ]}
+            />
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -666,7 +654,15 @@ export function SettingsPage() {
       <Card className="w-full">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Maintenance Actions</CardTitle>
+            <SectionInfoHeading
+              title="Maintenance Actions"
+              items={[
+                'Validate Projections checks for missing bills.',
+                'Clear Calendars removes calendar events from the configured calendars.',
+                'Generate Icons creates transaction icons.',
+                'Import and export actions manage transaction data.',
+              ]}
+            />
           </div>
         </CardHeader>
         <CardContent>
@@ -694,8 +690,16 @@ export function SettingsPage() {
         showNotification={showNotification}
         sidePanel={(
           <div className="grid gap-4">
-            <section className="rounded-[18px] border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4">
-              <p className="eyebrow mb-3">Calendar Links</p>
+            <section className="rounded-[18px] border border-[color:var(--line)] bg-[color:var(--surface)] p-4 shadow-[var(--shadow-soft)]">
+              <SectionInfoHeading
+                title="Calendar Links"
+                items={[
+                  'Quick links to open the configured Google Calendar views.',
+                  'Use these to check test or main calendar sync output.',
+                ]}
+                className="mb-3"
+                headingClassName="text-[1.1rem]"
+              />
               <div className="grid gap-2">
                 <a
                   href="https://calendar.google.com/calendar/u/0/r/agenda"
@@ -716,6 +720,18 @@ export function SettingsPage() {
                   Main Calendar
                 </a>
               </div>
+            </section>
+            <section className="rounded-[18px] border border-[color:var(--line)] bg-[color:var(--surface)] p-4 shadow-[var(--shadow-soft)]">
+              <SectionInfoHeading
+                title="Appearance"
+                items={[
+                  'Switch between light, dark, or system appearance.',
+                  'The selected theme is saved locally for this browser.',
+                ]}
+                className="mb-3"
+                headingClassName="text-[1.1rem]"
+              />
+              <ThemeToggleMenu fullWidth showLabel align="start" className="h-10 justify-center gap-2 px-4 text-sm font-semibold" />
             </section>
           </div>
         )}

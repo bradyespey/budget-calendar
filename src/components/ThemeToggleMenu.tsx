@@ -23,12 +23,14 @@ interface ThemeToggleMenuProps {
   className?: string
   fullWidth?: boolean
   align?: 'start' | 'end'
+  showLabel?: boolean
 }
 
 export function ThemeToggleMenu({
   className = '',
   fullWidth = false,
   align = 'end',
+  showLabel = false,
 }: ThemeToggleMenuProps) {
   const { theme, setTheme } = useTheme()
 
@@ -48,6 +50,7 @@ export function ThemeToggleMenu({
           aria-label="Change theme"
         >
           <ActiveIcon size={20} />
+          {showLabel ? <span>{activeTheme.label}</span> : null}
         </button>
       </DropdownMenuTrigger>
 

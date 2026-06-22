@@ -16,7 +16,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useBalance } from '../../context/BalanceContext';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 import { useState, useEffect } from 'react';
-import { getHighLowProjections } from '../../api/projections';
+import { getProjections } from '../../api/projections';
+import { getSettings } from '../../api/firebase';
 
 interface NavbarProps {
   onTransactionsClick?: () => void;
@@ -28,16 +29,24 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [thresholdBreach, setThresholdBreach] = useState<{ date: string; balance: number } | null>(null);
+  const [balanceThreshold, setBalanceThreshold] = useState(1000);
 
   // Fetch threshold breach data
   useEffect(() => {
     async function fetchThresholdBreach() {
       try {
-        const highLowData = await getHighLowProjections();
-        if (highLowData.thresholdBreach) {
+        const [settings, projections] = await Promise.all([
+          getSettings(),
+          getProjections(),
+        ]);
+        const threshold = settings.balanceThreshold ?? 1000;
+        const thresholdBreach = projections.find((projection) => projection.projected_balance < threshold);
+        setBalanceThreshold(threshold);
+
+        if (thresholdBreach) {
           setThresholdBreach({ 
-            date: highLowData.thresholdBreach.projDate, 
-            balance: highLowData.thresholdBreach.projectedBalance 
+            date: thresholdBreach.proj_date,
+            balance: thresholdBreach.projected_balance,
           });
         } else {
           setThresholdBreach(null);
@@ -66,6 +75,10 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
     { path: '/settings', label: 'Settings', icon: Settings2 },
   ];
 
+  const isBalanceSyncStale = lastSync
+    ? Date.now() - lastSync.getTime() > 24 * 60 * 60 * 1000
+    : false;
+
   const handleSignIn = async () => {
     try {
       await signIn();
@@ -82,7 +95,7 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
         <p className="display-copy text-[1.75rem] text-[color:var(--text)]">
           {formatCurrency(balance ?? 0)}
         </p>
-        <p className="mt-1 text-xs text-[color:var(--muted)]">
+        <p className={`mt-1 text-xs ${isBalanceSyncStale ? 'font-semibold text-[color:var(--danger)]' : 'text-[color:var(--muted)]'}`}>
           {lastSync
             ? `Updated ${formatDistanceToNow(lastSync, { addSuffix: true }).replace('about ', '')}`
             : 'Preview data ready'}
@@ -98,7 +111,9 @@ export function Navbar({ onTransactionsClick }: NavbarProps) {
           {thresholdBreach ? format(parseISO(thresholdBreach.date), 'MMM d') : 'No alert'}
         </p>
         <p className="mt-1 text-xs text-[color:var(--muted)]">
-          {thresholdBreach ? formatCurrency(thresholdBreach.balance) : 'Projected balances stay above threshold.'}
+          {thresholdBreach
+            ? `${formatCurrency(thresholdBreach.balance)} below ${formatCurrency(balanceThreshold)}`
+            : `Projected balances stay above ${formatCurrency(balanceThreshold)}.`}
         </p>
       </div>
     </div>

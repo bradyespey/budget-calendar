@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardContent } from '../components/ui/Card'
+import { SectionInfoHeading } from '../components/ui/SectionInfoHeading'
 import { getHighLowProjections, getProjections } from '../api/projections'
 import { getBills } from '../api/bills'
 import { getSavingsBalance, getSavingsHistory, getCreditCardDebt } from '../api/accounts'
@@ -56,6 +57,7 @@ interface BillsSummary {
   biweekly: BillsIncome
   semimonthly: BillsIncome
   monthly: BillsIncome
+  quarterly: BillsIncome
   yearly: BillsIncome
 }
 
@@ -74,26 +76,38 @@ interface SummaryCard {
   supporting?: string
 }
 
+function findThresholdBreach(projections: Projection[], threshold: number) {
+  const breach = projections.find((projection) => projection.projected_balance < threshold)
+
+  return breach
+    ? { date: breach.proj_date, balance: breach.projected_balance }
+    : null
+}
+
 function getMonthlyAmount(bill: Bill) {
   const amount = Number(bill.amount) || 0
-  const frequency = (bill.frequency || 'monthly') as string
+  const frequency = (bill.frequency || 'monthly').toLowerCase()
   const repeatsEvery = Number(bill.repeats_every ?? 1) || 1
 
   switch (frequency) {
-    case 'daily': return (amount * 30.44) / repeatsEvery
-    case 'weekly': return (amount * 52.18) / (12 * repeatsEvery)
+    case 'daily': return (amount * 365) / (12 * repeatsEvery)
+    case 'days': return (amount * 365) / (12 * repeatsEvery)
+    case 'weekly': return (amount * 52) / (12 * repeatsEvery)
+    case 'weeks': return (amount * 52) / (12 * repeatsEvery)
     case 'biweekly': return (amount * 26) / (12 * repeatsEvery)
     case 'semimonthly':
-    case 'Semimonthly_mid_end':
     case 'semimonthly_mid_end': return (amount * 2) / repeatsEvery
     case 'monthly': return amount / repeatsEvery
+    case 'months': return amount / repeatsEvery
+    case 'quarterly': return amount / (3 * repeatsEvery)
     case 'yearly': return amount / (12 * repeatsEvery)
+    case 'years': return amount / (12 * repeatsEvery)
     case 'one-time': return 0
     default: {
       const everyMonths = frequency.match(/every_(\d+)_months/)
       const everyWeeks = frequency.match(/every_(\d+)_weeks/)
       if (everyMonths) return amount / (Number(everyMonths[1]) * repeatsEvery)
-      if (everyWeeks) return (amount * 52.18) / (Number(everyWeeks[1]) * 12 * repeatsEvery)
+      if (everyWeeks) return (amount * 52) / (Number(everyWeeks[1]) * 12 * repeatsEvery)
       return amount / repeatsEvery
     }
   }
@@ -107,6 +121,7 @@ function computeMonthlyFlow(bills: Bill[]) {
     biweekly: { bills: 0, income: 0 },
     semimonthly: { bills: 0, income: 0 },
     monthly: { bills: 0, income: 0 },
+    quarterly: { bills: 0, income: 0 },
     yearly: { bills: 0, income: 0 },
   }
   let income = 0
@@ -117,13 +132,14 @@ function computeMonthlyFlow(bills: Bill[]) {
 
     const amount = Number(bill.amount) || 0
     const monthlyAmount = getMonthlyAmount(bill)
-    const frequency = (bill.frequency || 'monthly') as string
+    const frequency = (bill.frequency || 'monthly').toLowerCase()
     const bucket =
-      frequency === 'daily' ? 'daily'
-      : frequency === 'weekly' || frequency.match(/every_(\d+)_weeks/) ? 'weekly'
+      frequency === 'daily' || frequency === 'days' ? 'daily'
+      : frequency === 'weekly' || frequency === 'weeks' || frequency.match(/every_(\d+)_weeks/) ? 'weekly'
       : frequency === 'biweekly' ? 'biweekly'
-      : frequency === 'semimonthly' || frequency === 'Semimonthly_mid_end' || frequency === 'semimonthly_mid_end' ? 'semimonthly'
-      : frequency === 'yearly' ? 'yearly'
+      : frequency === 'semimonthly' || frequency === 'semimonthly_mid_end' ? 'semimonthly'
+      : frequency === 'quarterly' ? 'quarterly'
+      : frequency === 'yearly' || frequency === 'years' ? 'yearly'
       : frequency === 'one-time' ? 'oneTime'
       : 'monthly'
 
@@ -218,6 +234,7 @@ export function DashboardPage() {
     biweekly: { bills: 0, income: 0 },
     semimonthly: { bills: 0, income: 0 },
     monthly: { bills: 0, income: 0 },
+    quarterly: { bills: 0, income: 0 },
     yearly: { bills: 0, income: 0 },
   })
   const [monthlyTotals, setMonthlyTotals] = useState({ income: 0, bills: 0, leftover: 0 })
@@ -296,12 +313,7 @@ export function DashboardPage() {
         setProjectionDays(settings.projectionDays ?? 7)
         setSettings(settings)
         
-        // Get threshold breach from projections (set by budgetProjection function)
-        if (highLowData.thresholdBreach) {
-          setThresholdBreach({ date: highLowData.thresholdBreach.projDate, balance: highLowData.thresholdBreach.projectedBalance })
-        } else {
-          setThresholdBreach(null)
-        }
+        setThresholdBreach(findThresholdBreach(projections, settings.balanceThreshold ?? 1000))
         
         // Compute category averages client-side from all bills so every category is included
         setCategoryAverages(computeCategoryAverages(billsData))
@@ -319,6 +331,7 @@ export function DashboardPage() {
           biweekly: { bills: 0, income: 0 },
           semimonthly: { bills: 0, income: 0 },
           monthly: { bills: 0, income: 0 },
+          quarterly: { bills: 0, income: 0 },
           yearly: { bills: 0, income: 0 },
         })
         setMonthlyTotals({ income: 0, bills: 0, leftover: 0 })
@@ -412,7 +425,7 @@ export function DashboardPage() {
       icon: ArrowUpCircle,
       iconTone: 'text-emerald-600 dark:text-emerald-400',
       iconBg: 'bg-emerald-100 dark:bg-emerald-900/50',
-      detail: 'Recurring income',
+      detail: 'Positive monthly amounts',
     },
     {
       label: 'Total Monthly Bills',
@@ -420,7 +433,7 @@ export function DashboardPage() {
       icon: ArrowDownCircle,
       iconTone: 'text-rose-600 dark:text-rose-400',
       iconBg: 'bg-rose-100 dark:bg-rose-900/50',
-      detail: 'Recurring bills and cards',
+      detail: 'Negative monthly amounts',
     },
     {
       label: 'Monthly Leftover',
@@ -442,9 +455,33 @@ export function DashboardPage() {
   }
 
   const summarySections = [
-    { title: 'Accounts', cards: accountSummaryCards },
-    { title: 'Forecast', cards: projectionSummaryCards },
-    { title: 'Monthly Flow', cards: monthlySummaryCards },
+    {
+      title: 'Accounts',
+      cards: accountSummaryCards,
+      help: [
+        'Latest checking, savings, and credit-card balances from account refreshes.',
+        'Checking is the balance used as the starting point for projections.',
+      ],
+    },
+    {
+      title: 'Forecast',
+      cards: projectionSummaryCards,
+      help: [
+        'High, low, and first low-balance alert from the current projection window.',
+        'Low-balance status is compared against your saved alert threshold.',
+      ],
+    },
+    {
+      title: 'Monthly Flow',
+      cards: monthlySummaryCards,
+      help: [
+        'Monthly income is the total of positive recurring amounts from Monarch and manual transactions.',
+        'Monthly bills are the total of negative recurring amounts from Monarch and manual transactions.',
+        'Non-monthly items are normalized: daily x 365 / 12, weekly x 52 / 12, yearly / 12.',
+        'One-time transactions are excluded from monthly flow.',
+        'Variable card spending is only included when it exists as a recurring transaction; credit card payments are excluded.',
+      ],
+    },
   ]
 
   if (loading) {
@@ -466,21 +503,10 @@ export function DashboardPage() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
+        className="sticky-page-header sticky top-3 z-40 pb-3"
         eyebrow="Dashboard"
         title="Overview"
         subtitle={refreshAccountsTimestamp ? formatTimestamp(refreshAccountsTimestamp) : 'Live account summary'}
-        helpSections={[
-          {
-            title: 'Quick Overview',
-            items: [
-              'Current account balances (checking, savings, credit)',
-              'Projected high/low balances for next 7+ days',
-              'Low balance alerts and threshold tracking',
-              'Monthly cash flow and spending patterns',
-              'Category averages and bills/income breakdown',
-            ],
-          },
-        ]}
         stats={[
           { label: 'Checking', value: formatCurrency(checkingBalance ?? 0), tone: 'success' },
           { label: 'Next low point', value: thresholdBreach ? format(parseISO(thresholdBreach.date), 'MMM d') : 'Clear', tone: 'danger' },
@@ -494,7 +520,12 @@ export function DashboardPage() {
           <div className="grid gap-5 xl:grid-cols-3">
             {summarySections.map((section) => (
               <section key={section.title} className="min-w-0">
-                <h2 className="section-display mb-3 text-[1.35rem] text-[color:var(--text)]">{section.title}</h2>
+                <SectionInfoHeading
+                  title={section.title}
+                  items={section.help}
+                  as="h2"
+                  className="mb-3 [&>h2]:text-[1.35rem]"
+                />
                 <div className="grid gap-2">
                   {section.cards.map((card) => {
                     const Icon = card.icon
@@ -527,7 +558,14 @@ export function DashboardPage() {
       <Card>
         <CardContent className="p-4 sm:p-5">
           <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <h3 className="section-display text-[1.45rem] text-[color:var(--text)]">Balance Projection</h3>
+            <SectionInfoHeading
+              title="Balance Projection"
+              items={[
+                'Projected checking balance from today through the forecast window.',
+                'Green is above your low-balance threshold; red is below it.',
+                'The dashed $0 marker shows where projected checking crosses zero.',
+              ]}
+            />
             <p className="text-xs text-[color:var(--muted)]">Projected checking balance from today through the forecast window.</p>
           </div>
           <Suspense
@@ -547,7 +585,13 @@ export function DashboardPage() {
         <Card>
           <CardContent className="p-4 sm:p-5">
             <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <h3 className="section-display text-[1.45rem] text-[color:var(--text)]">Savings Trend</h3>
+              <SectionInfoHeading
+                title="Savings Trend"
+                items={[
+                  'Savings balance history from balance refreshes and nightly automation.',
+                  'Use it to spot whether savings is rising, falling, or flat over time.',
+                ]}
+              />
               <p className="text-xs text-[color:var(--muted)]">Updates from balance refreshes and nightly automation.</p>
             </div>
             <Suspense
@@ -567,7 +611,14 @@ export function DashboardPage() {
         {/* Category Averages */}
         <Card>
           <CardContent className="p-4 sm:p-5">
-            <h3 className="section-display text-[1.45rem] text-[color:var(--text)]">Category Averages</h3>
+            <SectionInfoHeading
+              title="Category Averages"
+              items={[
+                'Estimated monthly and yearly totals grouped by category.',
+                'Recurring frequencies are normalized into monthly and yearly amounts.',
+                'Click a category to open matching transactions.',
+              ]}
+            />
             <div className="table-shell mt-3 overflow-x-auto">
               <table className="table-surface min-w-[400px]">
                 <thead>
@@ -640,7 +691,16 @@ export function DashboardPage() {
         {/* Bills/Income Summary */}
         <Card>
           <CardContent className="p-4 sm:p-5">
-            <h3 className="section-display text-[1.45rem] text-[color:var(--text)]">Bills/Income Summary</h3>
+            <SectionInfoHeading
+              title="Bills/Income Summary"
+              items={[
+                'Monthly equivalents grouped by transaction frequency.',
+                'Negative amounts count as bills; positive amounts count as income.',
+                'Manual and Monarch recurring transactions are included.',
+                'One-time items are listed separately and excluded from monthly leftover.',
+                'Variable credit-card spending is not estimated here unless it exists as a recurring transaction.',
+              ]}
+            />
             <div className="table-shell mt-3 overflow-x-auto">
               <table className="table-surface min-w-[400px]">
                 <thead>
@@ -694,6 +754,15 @@ export function DashboardPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
                       {formatCurrency(billsSummary.monthly.income)}
+                    </td>
+                  </tr>
+                  <tr className="border-b surface-divider">
+                    <td className="px-4 py-3 text-[color:var(--text)]">Quarterly</td>
+                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">
+                      -{formatCurrency(billsSummary.quarterly.bills)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
+                      {formatCurrency(billsSummary.quarterly.income)}
                     </td>
                   </tr>
                   <tr className="border-b surface-divider">

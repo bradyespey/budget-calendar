@@ -25,6 +25,8 @@ Some credit-card recurring streams have a statement due date that differs from t
 - `checkingImpactDate`: the date used by balance projection.
 - `draftRule`: the rule key shown in the Transactions info tooltip.
 
+The Transactions page may still show the card due date in the main date column. Use the info tooltip beside known credit-card payment names to confirm the checking draft date that the Calendar and balance projection use.
+
 Current known rules:
 
 - Chase Southwest Credit Card and Amazon Prime Credit draft on the 23rd, moved forward for weekends and federal holidays.

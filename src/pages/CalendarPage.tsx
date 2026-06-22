@@ -13,6 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
+import { SectionInfoHeading } from '../components/ui/SectionInfoHeading';
 
 interface DayData {
   date: string;
@@ -143,9 +144,8 @@ export function CalendarPage() {
     }
   };
 
-  // Format timestamp for display
-  const formatTimestamp = (date: Date | null): string => {
-    if (!date) return 'Never updated';
+  const formatShortTimestamp = (date: Date | null): string => {
+    if (!date) return 'Never';
 
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -153,17 +153,15 @@ export function CalendarPage() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMinutes < 1) return 'Just updated';
-    if (diffMinutes < 60) return `Updated ${diffMinutes}m ago`;
-    if (diffHours < 24) return `Updated ${diffHours}h ago`;
-    if (diffDays < 7) return `Updated ${diffDays}d ago`;
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
 
-    return `Updated ${date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })}`;
+    });
   };
 
   useEffect(() => {
@@ -369,41 +367,10 @@ export function CalendarPage() {
           className="mb-0"
           eyebrow="Calendar"
           title={`${searchTerm ? `${filteredDays.length} of ${calendarDaysData.length}` : calendarDaysData.length}-Day Calendar`}
+          statVariant="stacked"
           stats={[
-            { label: 'Projected', value: formatTimestamp(budgetProjectionTimestamp), tone: 'neutral' },
-            { label: 'Calendar sync', value: formatTimestamp(syncCalendarTimestamp), tone: 'neutral' },
-          ]}
-          helpSections={[
-            {
-              title: 'Display',
-              items: [
-                'All transactions appear here (for awareness/cancellation)',
-                'Credit card charges, payments, utilities, income, etc.',
-              ],
-            },
-            {
-              title: 'Balance Calculation',
-              items: [
-                'Recurring bills that hit checking directly (utilities, rent)',
-                'Credit card payments (one-time bills, auto-update with Monarch)',
-                'Manual budgets (food, custom estimates)',
-                'Income (paychecks, deposits)',
-              ],
-            },
-            {
-              title: 'Excluded from Balance',
-              items: [
-                'Individual credit card charges — groceries, dining, etc. charged to a card are excluded here because they\'re already captured by your monthly credit card payment bill.',
-                'The CC payment syncs automatically from Monarch and reflects your full statement balance, so all CC spending (including food, gas, etc.) is accounted for through that one payment.',
-              ],
-            },
-            {
-              title: 'Date Adjustments',
-              items: [
-                'Bills move to next business day on weekends/holidays',
-                'Paychecks move to previous business day',
-              ],
-            },
+            { label: 'Projection', value: formatShortTimestamp(budgetProjectionTimestamp), tone: 'neutral' },
+            { label: 'Calendar Sync', value: formatShortTimestamp(syncCalendarTimestamp), tone: 'neutral' },
           ]}
           actions={
             <div className="flex flex-wrap items-center gap-2">
@@ -437,7 +404,19 @@ export function CalendarPage() {
           <div className="flex flex-wrap items-center gap-3 border-b surface-divider px-4 py-3">
             <div className="flex min-w-[180px] items-center gap-2">
               <CalendarDays className="h-4 w-4 shrink-0 text-[color:var(--accent)]" />
-              <h2 className="truncate text-base font-bold text-[color:var(--text)]">{formatCalendarTitle(view, anchor)}</h2>
+              <SectionInfoHeading
+                title={formatCalendarTitle(view, anchor)}
+                items={[
+                  'All transactions appear here for awareness, including credit card charges, payments, utilities, and income.',
+                  'Balance calculations include recurring bills that hit checking directly, credit card payments, manual budgets, and income.',
+                  'Individual credit card charges are excluded from balance because they are already captured by the monthly credit card payment bill.',
+                  'The credit card payment syncs from Monarch and reflects statement balance, so card spending is accounted for through that one payment.',
+                  'Known credit-card payments may show a checking-impact date that differs from the original statement due date.',
+                  'Bills move to the next business day on weekends or holidays; paychecks move to the previous business day.',
+                ]}
+                as="h2"
+                headingClassName="truncate text-base font-bold"
+              />
             </div>
             <div className="relative min-w-[260px] flex-1 lg:max-w-[520px]">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--muted)]" />

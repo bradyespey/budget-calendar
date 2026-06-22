@@ -1,7 +1,7 @@
 //src/components/ProjectedBalanceChart.tsx
 
 import { useId, useMemo } from 'react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { Projection } from '../types'
 
@@ -21,7 +21,6 @@ export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBa
       ? {
           grid: '#cbd5e1',
           success: '#2c8b6d',
-          warning: '#c37a3a',
           danger: '#c45045',
           text: '#64748b',
           tooltipBg: '#0f172a',
@@ -32,7 +31,6 @@ export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBa
           return {
             grid: styles.getPropertyValue('--line-strong').trim() || '#cbd5e1',
             success: styles.getPropertyValue('--success').trim() || '#2c8b6d',
-            warning: styles.getPropertyValue('--warning').trim() || '#c37a3a',
             danger: styles.getPropertyValue('--danger').trim() || '#c45045',
             text: styles.getPropertyValue('--muted').trim() || '#64748b',
             tooltipBg: styles.getPropertyValue('--surface-elevated').trim() || '#0f172a',
@@ -76,7 +74,6 @@ export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBa
     return {
       domain: [min, max] as [number, number],
       thresholdOffset: offsetForValue(lowBalanceThreshold),
-      zeroOffset: offsetForValue(0),
     }
   }, [chartData, lowBalanceThreshold])
 
@@ -98,18 +95,23 @@ export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBa
 
   return (
     <ResponsiveContainer width="100%" height={250}>
-      <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+      <LineChart data={chartData} margin={{ top: 5, right: 44, left: 0, bottom: 5 }}>
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={chartTheme.success} />
             <stop offset={`${yScale.thresholdOffset}%`} stopColor={chartTheme.success} />
-            <stop offset={`${yScale.thresholdOffset}%`} stopColor={chartTheme.warning} />
-            <stop offset={`${yScale.zeroOffset}%`} stopColor={chartTheme.warning} />
-            <stop offset={`${yScale.zeroOffset}%`} stopColor={chartTheme.danger} />
+            <stop offset={`${yScale.thresholdOffset}%`} stopColor={chartTheme.danger} />
             <stop offset="100%" stopColor={chartTheme.danger} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.7} />
+        <ReferenceLine
+          y={0}
+          stroke={chartTheme.text}
+          strokeDasharray="4 4"
+          strokeOpacity={0.65}
+          label={{ value: '$0', position: 'right', fill: chartTheme.text, fontSize: 12 }}
+        />
         <XAxis
           dataKey="date"
           minTickGap={28}

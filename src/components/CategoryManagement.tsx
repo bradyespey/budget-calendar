@@ -6,6 +6,7 @@ import { Edit2, Trash2, Check, X, Plus } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
+import { SectionInfoHeading } from './ui/SectionInfoHeading';
 import { 
   getCategories, 
   createCategory, 
@@ -171,12 +172,19 @@ export function CategoryManagement({ showNotification, sidePanel }: CategoryMana
   }
 
   return (
-    <div className="col-span-2">
+    <div className={sidePanel ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]' : 'col-span-2'}>
       <Card>
         <CardHeader className="py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle>Manual Transaction Categories</CardTitle>
+              <SectionInfoHeading
+                title="Manual Transaction Categories"
+                items={[
+                  'Manual-only categories are used for transactions created in Budget Calendar.',
+                  'Recurring categories still sync from Monarch.',
+                  'Categories can only be deleted when no transactions are using them.',
+                ]}
+              />
               <p className="mt-1 text-sm text-[color:var(--muted)]">
                 Manual-only categories. Recurring categories still come from Monarch.
               </p>
@@ -237,7 +245,7 @@ export function CategoryManagement({ showNotification, sidePanel }: CategoryMana
           )}
 
           {/* Categories table */}
-          <div className={sidePanel ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]' : ''}>
+          <div>
             {categories.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-500 dark:text-gray-400">
@@ -369,10 +377,10 @@ export function CategoryManagement({ showNotification, sidePanel }: CategoryMana
               </div>
             </div>
             )}
-            {sidePanel ? <div className="min-w-0">{sidePanel}</div> : null}
           </div>
         </CardContent>
       </Card>
+      {sidePanel ? <div className="min-w-0">{sidePanel}</div> : null}
     </div>
   );
 }

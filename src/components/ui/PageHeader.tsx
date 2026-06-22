@@ -22,6 +22,7 @@ interface PageHeaderProps {
     value: string;
     tone?: 'accent' | 'success' | 'warning' | 'danger' | 'neutral' | 'violet';
   }>;
+  statVariant?: 'pill' | 'stacked';
 }
 
 const toneStyles = {
@@ -42,6 +43,7 @@ export function PageHeader({
   helpSections,
   actions,
   stats,
+  statVariant = 'pill',
 }: PageHeaderProps) {
   const hasStats = Boolean(stats?.length)
   const hasSideMeta = Boolean(subtitle || helpSections || actions)
@@ -74,12 +76,17 @@ export function PageHeader({
                 <div
                   key={`${stat.label}-${stat.value}`}
                   className={clsx(
-                    'inline-flex min-h-0 items-center gap-2.5 rounded-full border px-3.5 py-1.5',
+                    statVariant === 'stacked'
+                      ? 'inline-flex min-w-[118px] flex-col items-center justify-center rounded-[16px] border px-3 py-2 text-center'
+                      : 'inline-flex min-h-0 items-center gap-2.5 rounded-full border px-3.5 py-1.5',
                     toneStyles[stat.tone || 'neutral']
                   )}
                 >
                   <p className="eyebrow text-[0.58rem] text-current opacity-90">{stat.label}</p>
-                  <p className="whitespace-nowrap text-sm font-bold leading-tight text-[color:var(--text)]">{stat.value}</p>
+                  <p className={clsx(
+                    'whitespace-nowrap text-sm font-bold leading-tight text-[color:var(--text)]',
+                    statVariant === 'stacked' ? 'mt-1' : ''
+                  )}>{stat.value}</p>
                 </div>
               ))}
             </div>

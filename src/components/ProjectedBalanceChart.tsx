@@ -1,6 +1,6 @@
 //src/components/ProjectedBalanceChart.tsx
 
-import { useId, useMemo } from 'react'
+import { useMemo } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { Projection } from '../types'
@@ -10,12 +10,7 @@ interface ProjectedBalanceChartProps {
   lowBalanceThreshold: number
 }
 
-function clamp(value: number, min = 0, max = 100) {
-  return Math.min(max, Math.max(min, value))
-}
-
 export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBalanceChartProps) {
-  const gradientId = useId().replace(/:/g, '')
   const chartTheme =
     typeof window === 'undefined'
       ? {
@@ -52,14 +47,20 @@ export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBa
   const chartData = useMemo(() => {
     return data
       .slice(0, 180)
-      .map(item => ({
-        date: format(parseISO(item.proj_date), 'MMM d'),
-        fullDate: format(parseISO(item.proj_date), 'EEEE, MMM d, yyyy'),
-        balance: Math.round(item.projected_balance),
-        isLowest: item.lowest,
-        isHighest: item.highest,
-      }))
-  }, [data])
+      .map(item => {
+        const roundedBalance = Math.round(item.projected_balance)
+
+        return {
+          date: format(parseISO(item.proj_date), 'MMM d'),
+          fullDate: format(parseISO(item.proj_date), 'EEEE, MMM d, yyyy'),
+          balance: roundedBalance,
+          aboveThresholdBalance: roundedBalance >= lowBalanceThreshold ? roundedBalance : null,
+          belowThresholdBalance: roundedBalance < lowBalanceThreshold ? roundedBalance : null,
+          isLowest: item.lowest,
+          isHighest: item.highest,
+        }
+      })
+  }, [data, lowBalanceThreshold])
 
   const yScale = useMemo(() => {
     const balances = chartData.map(item => item.balance)
@@ -69,11 +70,9 @@ export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBa
     const padding = Math.max(range * 0.08, 500)
     const min = Math.floor(rawMin - padding)
     const max = Math.ceil(rawMax + padding)
-    const offsetForValue = (value: number) => clamp(((max - value) / (max - min)) * 100)
 
     return {
       domain: [min, max] as [number, number],
-      thresholdOffset: offsetForValue(lowBalanceThreshold),
     }
   }, [chartData, lowBalanceThreshold])
 
@@ -96,14 +95,6 @@ export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBa
   return (
     <ResponsiveContainer width="100%" height={250}>
       <LineChart data={chartData} margin={{ top: 5, right: 44, left: 0, bottom: 5 }}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={chartTheme.success} />
-            <stop offset={`${yScale.thresholdOffset}%`} stopColor={chartTheme.success} />
-            <stop offset={`${yScale.thresholdOffset}%`} stopColor={chartTheme.danger} />
-            <stop offset="100%" stopColor={chartTheme.danger} />
-          </linearGradient>
-        </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.7} />
         <ReferenceLine
           y={0}
@@ -137,8 +128,19 @@ export function ProjectedBalanceChart({ data, lowBalanceThreshold }: ProjectedBa
         />
         <Line
           type="monotone"
-          dataKey="balance"
-          stroke={`url(#${gradientId})`}
+          dataKey="aboveThresholdBalance"
+          name="Projected balance"
+          stroke={chartTheme.success}
+          strokeWidth={3}
+          dot={false}
+          activeDot={{ r: 6 }}
+          isAnimationActive={false}
+        />
+        <Line
+          type="monotone"
+          dataKey="belowThresholdBalance"
+          name="Projected balance"
+          stroke={chartTheme.danger}
           strokeWidth={3}
           dot={false}
           activeDot={{ r: 6 }}

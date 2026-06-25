@@ -1,5 +1,5 @@
 import { validateProjections } from '../utils/validateProjections'
-import { generateTransactionIcons, resetAllTransactionIcons, backupTransactionIcons, restoreTransactionIcons } from '../api/icons'
+import { resetAllTransactionIcons, backupTransactionIcons, restoreTransactionIcons } from '../api/icons'
 import { clearCalendars } from '../api/firebase'
 import { importBillsFromCSV } from '../utils/importBills'
 import { exportBillsToCSV, downloadSampleCSV } from '../utils/csvExport'
@@ -75,30 +75,6 @@ export function useMaintenanceActions({
       showNotification(result.message || 'Calendars cleared.', 'success')
     } catch (e: unknown) {
       showNotification(`Error clearing calendars: ${getErrorMessage(e, 'Calendar clear failed')}`, 'error')
-    } finally {
-      setBusy(false)
-      setActiveAction(null)
-    }
-  }
-
-  const handleGenerateIcons = async () => {
-    if (isDemo) { showNotification('Icon generation completed.', 'success'); return; }
-    scrollToTop()
-    setBusy(true)
-    setActiveAction('icons')
-    try {
-      await saveSettings()
-      const result = await generateTransactionIcons()
-      await saveFunctionTimestamp('generateIcons')
-      
-      let message = `Icon generation completed: ${result.updatedCount} updated, ${result.skippedCount} skipped`
-      if (result.errorCount > 0) {
-        message += `, ${result.errorCount} errors`
-      }
-      
-      showNotification(message, 'success')
-    } catch (e: unknown) {
-      showNotification(`Error generating icons: ${getErrorMessage(e, 'Icon generation failed')}`, 'error')
     } finally {
       setBusy(false)
       setActiveAction(null)
@@ -232,7 +208,6 @@ export function useMaintenanceActions({
   return {
     handleValidateProjections,
     handleClearCalendars,
-    handleGenerateIcons,
     handleResetAllIcons,
     handleBackupIcons,
     handleRestoreIcons,

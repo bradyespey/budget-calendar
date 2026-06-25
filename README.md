@@ -115,6 +115,7 @@ Key Functions:
 - Some credit-card payments draft from checking later than the due date shown on the Transactions page. For those rows, use the info tooltip beside the transaction name to confirm the checking-impact date used by the projection.
 - `syncCalendar`: syncs bills and projected balances to Google Calendar as all-day events with event reminders disabled
 - `clearCalendars`: clears future events from configured calendars
+- Icon maintenance keeps manual/custom icon URLs and backup/restore support; AI-based icon generation has been removed
 - `runAll`: orchestrates the nightly automation flow; it requests a Monarch account refresh first, but if Monarch is still syncing after the wait window, it records a warning and continues with the balance, transaction, projection, and calendar steps using available account data
 
 Automation:

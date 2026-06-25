@@ -63,7 +63,7 @@ export function TransactionIcon({
       </div>
     );
   } else if (icon.iconType === 'generated' || icon.iconType === 'custom') {
-    // AI-generated and custom icons - larger with better styling
+    // Legacy generated and custom icons use stored image URLs.
     return (
       <div className={`${className} flex items-center justify-center rounded-full overflow-hidden shadow-md bg-white dark:bg-gray-100`}>
         <img 

@@ -1,5 +1,5 @@
 import { Button } from './ui/Button'
-import { Loader, CheckCircle2, Trash2, Sparkles, RotateCcw, Save, Download, Upload, FileText, FileSpreadsheet } from 'lucide-react'
+import { Loader, CheckCircle2, Trash2, RotateCcw, Save, Download, Upload, FileText, FileSpreadsheet } from 'lucide-react'
 
 interface MaintenanceActionsProps {
   busy: boolean
@@ -10,7 +10,6 @@ interface MaintenanceActionsProps {
   backupInfo: { hasBackup: boolean; backupCount?: number; timestamp?: string; message: string } | null
   onValidateProjections: () => void
   onClearCalendars: () => void
-  onGenerateIcons: () => void
   onResetAllIcons: () => void
   onBackupIcons: () => void
   onRestoreIcons: () => void
@@ -28,7 +27,6 @@ export function MaintenanceActions({
   backupInfo,
   onValidateProjections,
   onClearCalendars,
-  onGenerateIcons,
   onResetAllIcons,
   onBackupIcons,
   onRestoreIcons,
@@ -51,15 +49,6 @@ export function MaintenanceActions({
           <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Removes all budget calendar events from today onwards in both main and test calendars</p>
           {showTimestamps && (
             <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.clearCalendars)}</p>
-          )}
-        </div>
-        <div className="space-y-2">
-          <Button onClick={onGenerateIcons} variant="outline" className="w-full inline-flex items-center justify-center gap-2" disabled={busy}>
-            {busy && activeAction === 'icons' ? <Loader className="animate-spin" size={18} /> : <Sparkles size={18} />} Generate Icons
-          </Button>
-          <p className="text-xs text-gray-500 dark:text-gray-400 px-2">Generates icons for transactions using AI and brand mapping</p>
-          {showTimestamps && (
-            <p className="text-xs font-medium text-blue-600 dark:text-blue-400 px-2">Last run: {formatTimestamp(functionTimestamps.generateIcons)}</p>
           )}
         </div>
         <div className="space-y-2">

@@ -89,7 +89,6 @@ export function SettingsPage() {
     budgetProjection?: Date;
     syncCalendar?: Date;
     clearCalendars?: Date;
-    generateIcons?: Date;
     resetAllTransactionIcons?: Date;
     backupTransactionIcons?: Date;
     restoreTransactionIcons?: Date;
@@ -659,7 +658,7 @@ export function SettingsPage() {
               items={[
                 'Validate Projections checks for missing bills.',
                 'Clear Calendars removes calendar events from the configured calendars.',
-                'Generate Icons creates transaction icons.',
+                'Icon backup and restore actions manage custom transaction icons.',
                 'Import and export actions manage transaction data.',
               ]}
             />
@@ -675,7 +674,6 @@ export function SettingsPage() {
             backupInfo={backupInfo}
             onValidateProjections={maintenanceActions.handleValidateProjections}
             onClearCalendars={maintenanceActions.handleClearCalendars}
-            onGenerateIcons={maintenanceActions.handleGenerateIcons}
             onResetAllIcons={maintenanceActions.handleResetAllIcons}
             onBackupIcons={maintenanceActions.handleBackupIcons}
             onRestoreIcons={maintenanceActions.handleRestoreIcons}

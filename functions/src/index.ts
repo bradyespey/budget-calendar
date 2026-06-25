@@ -14,7 +14,6 @@ export { runAll } from './functions/runAll';
 // Maintenance
 export { validateProjections } from './functions/validateProjections';
 export { clearCalendars } from './functions/clearCalendars';
-export { generateIcons } from './functions/generateIcons';
 export { resetAllIcons } from './functions/resetAllIcons';
 export { backupIcons } from './functions/backupIcons';
 export { restoreIcons } from './functions/restoreIcons';

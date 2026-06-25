@@ -15,7 +15,7 @@ Budget Calendar is a personal financial forecasting app for checking-balance pla
   - Weekly backup status logging: `.github/workflows/backup.yml`
 
 ## Tech Stack
-- Frontend: React 18, Vite, TypeScript, Tailwind CSS
+- Frontend: React 19, Vite 8, TypeScript 6, Tailwind CSS 4
 - Backend: Firebase Functions v1, Firestore, Firebase Auth
 - Forecasting data: Monarch Money unofficial API
 - Calendar sync: Google Calendar API via Firebase Functions

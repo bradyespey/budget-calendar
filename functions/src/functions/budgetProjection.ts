@@ -1,5 +1,4 @@
-import * as admin from "firebase-admin";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
 import { getCreditCardDraftDetails } from "../utils/creditCardDraftRules";
@@ -794,8 +793,8 @@ export const budgetProjection = functions.region(region).https.onRequest(
       
       // Update function timestamp
       try {
-        await admin.firestore().doc('admin/functionTimestamps').set({
-          budgetProjection: admin.firestore.Timestamp.now()
+        await db.doc('admin/functionTimestamps').set({
+          budgetProjection: Timestamp.now()
         }, { merge: true });
         logger.info('Updated budgetProjection timestamp');
       } catch (timestampError) {
